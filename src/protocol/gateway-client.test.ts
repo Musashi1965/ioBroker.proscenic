@@ -1,6 +1,6 @@
 import { createCipheriv } from "node:crypto";
 import { expect } from "chai";
-import { parseGatewayFrame } from "./gateway-client";
+import { parseGatewayFrame, parseGatewayFrameResult } from "./gateway-client";
 
 describe("parseGatewayFrame", () => {
 	it("decrypts encrypted gateway status frames", () => {
@@ -22,5 +22,17 @@ describe("parseGatewayFrame", () => {
 				mode: "charge",
 			},
 		});
+	});
+});
+
+describe("parseGatewayFrameResult", () => {
+	it("returns parse errors without throwing", () => {
+		const result = parseGatewayFrameResult(
+			JSON.stringify({ encrypt: true, data: "not-valid-ciphertext" }),
+			"0123456789abcdef",
+		);
+
+		expect(result.event).to.equal(undefined);
+		expect(result.error).to.be.instanceOf(Error);
 	});
 });

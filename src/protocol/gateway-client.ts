@@ -57,7 +57,13 @@ export class ProscenicGatewayClient {
 				continue;
 			}
 
-			const event = parseGatewayFrame(frame, this.options.token);
+			const result = parseGatewayFrameResult(frame, this.options.token);
+			if (result.error) {
+				this.closeWithError(result.error);
+				return;
+			}
+
+			const event = result.event;
 			if (event) {
 				this.options.onEvent(event);
 			}
@@ -81,6 +87,23 @@ export class ProscenicGatewayClient {
 		this.socket.destroy();
 		this.buffer = "";
 		this.options.onClose();
+	}
+}
+
+export interface GatewayFrameParseResult {
+	event?: GatewayEvent;
+	error?: Error;
+}
+
+export function parseGatewayFrameResult(frame: string, token?: string): GatewayFrameParseResult {
+	try {
+		return {
+			event: parseGatewayFrame(frame, token),
+		};
+	} catch (error) {
+		return {
+			error: error instanceof Error ? error : new Error(String(error)),
+		};
 	}
 }
 
