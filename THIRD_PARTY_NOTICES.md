@@ -6,6 +6,29 @@ terms.
 
 No third-party runtime dependency or vendored source has been adopted yet.
 
+## Development dependencies
+
+### TypeScript
+
+- Package: `typescript`
+- Source: https://www.npmjs.com/package/typescript
+- License: Apache-2.0
+- Use: compile the local read-only protocol PoC
+
+### Node.js type definitions
+
+- Package: `@types/node`
+- Source: https://www.npmjs.com/package/@types/node
+- License: MIT
+- Use: TypeScript declarations for Node.js APIs used by the local PoC
+
+### Undici type definitions
+
+- Package: `undici-types`
+- Source: https://www.npmjs.com/package/undici-types
+- License: MIT
+- Use: transitive type dependency of `@types/node`
+
 ## Protocol and behavior references
 
 ### andker87/Proscenic-M7-PRO

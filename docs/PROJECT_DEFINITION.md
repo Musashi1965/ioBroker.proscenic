@@ -87,4 +87,4 @@ Public releases must satisfy ioBroker naming and repository rules, English
 documentation, license/provenance review, valid state roles, package and
 integration tests, GitHub Actions, npm Trusted Publishing, Adapter Checker,
 `latest` user testing, and later `stable` requirements. See
-`docs/PUBLICATION_CHECKLIST.md` and ADR 0005.
+`docs/PUBLICATION_CHECKLIST.md`, `docs/PROTOCOL_POC.md`, and ADR 0005.

@@ -35,8 +35,9 @@ Proscenic Home account, so it does not establish a Tuya backend for this device.
 
 The private legacy API probe used independently written code and printed no
 password, token, or serial number. It verified authentication, token issuance,
-and one M7 Pro device record. This result is sufficient to proceed to a
-read-only gateway PoC, not to claim an operational adapter.
+and one M7 Pro device record. This result was sufficient to create the
+read-only gateway PoC described in `docs/PROTOCOL_POC.md`, not to claim an
+operational adapter.
 
 ## ioBroker baseline
 
