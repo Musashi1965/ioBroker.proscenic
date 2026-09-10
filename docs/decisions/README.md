@@ -17,6 +17,8 @@ Current decisions:
   object structure
 - [ADR 0009](0009-read-only-legacy-backend-integration.md): read-only legacy
   backend integration
+- [ADR 0010](0010-reviewed-test-host-deployment.md): reviewed test-host
+  deployment path
 
 Required future decisions include accepting the first public object contract,
 stable device identity, gateway reconnect, token renewal, command confirmation
