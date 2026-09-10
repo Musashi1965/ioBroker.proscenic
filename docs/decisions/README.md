@@ -20,10 +20,12 @@ Current decisions:
 - [ADR 0010](0010-reviewed-test-host-deployment.md): reviewed test-host
   deployment path
 - [ADR 0011](0011-gateway-reconnect-policy.md): gateway reconnect policy
+- [ADR 0012](0012-command-proof-of-concept.md): command proof of concept before
+  public controls
 
 Required future decisions include accepting the first public object contract,
-stable device identity, token renewal, command confirmation behavior, and map
-privacy/storage.
+stable device identity, token renewal, command confirmation behavior, public
+command states, and map privacy/storage.
 
 ## Template
 

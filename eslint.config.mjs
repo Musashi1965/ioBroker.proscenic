@@ -9,6 +9,7 @@ export default [
 		ignores: [
 			'.dev-server/',
 			'.vscode/',
+			'tools/command-poc/',
 			'tools/protocol-poc/',
 			'*.test.js',
 			'test/**/*.js',

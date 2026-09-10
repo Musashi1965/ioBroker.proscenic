@@ -33,6 +33,9 @@ The PoC must not:
 - run as public CI because it requires a private account and a live vendor
   service.
 
+Command validation is intentionally separated into `tools/command-poc`. The
+protocol PoC remains read-only.
+
 ## Verified Evidence
 
 Private runs against one M7 Pro on 2026-09-10 verified:
