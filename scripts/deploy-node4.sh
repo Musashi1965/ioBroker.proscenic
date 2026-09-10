@@ -89,12 +89,12 @@ fi
 
 runuser -u "${iobroker_user}" -- bash -lc "cd '${IOBROKER_ROOT}' && npm install '${REMOTE_DIR}/${ARTIFACT_FILE}' --omit=dev"
 
-"${IOBROKER_ROOT}/iobroker" upload "${ADAPTER_NAME}"
+runuser -u "${iobroker_user}" -- bash -lc "cd '${IOBROKER_ROOT}' && ./iobroker upload '${ADAPTER_NAME}'"
 
-if "${IOBROKER_ROOT}/iobroker" object get "system.adapter.${ADAPTER_NAME}.0" >/dev/null 2>&1; then
-	"${IOBROKER_ROOT}/iobroker" restart "${ADAPTER_NAME}.0"
+if runuser -u "${iobroker_user}" -- bash -lc "cd '${IOBROKER_ROOT}' && ./iobroker object get 'system.adapter.${ADAPTER_NAME}.0' >/dev/null 2>&1"; then
+	runuser -u "${iobroker_user}" -- bash -lc "cd '${IOBROKER_ROOT}' && ./iobroker restart '${ADAPTER_NAME}.0'"
 else
-	"${IOBROKER_ROOT}/iobroker" add "${ADAPTER_NAME}"
+	runuser -u "${iobroker_user}" -- bash -lc "cd '${IOBROKER_ROOT}' && ./iobroker add '${ADAPTER_NAME}'"
 fi
 
 {
