@@ -137,6 +137,30 @@ export interface StatusCandidateSummary {
   unknownFields: string[];
 }
 
+export interface SafeStatus20001Values {
+  allArea?: number;
+  allTime?: number;
+  autoBoost?: boolean;
+  cleanArea?: number;
+  cleanComponents?: boolean;
+  cleanMode?: number;
+  cleanTime?: number;
+  elec?: number;
+  elecReal?: number;
+  errorCount?: number;
+  isInForbidMode?: number;
+  led?: number;
+  mode?: string;
+  mop?: number;
+  mute?: number;
+  reliable?: number;
+  subMode?: string;
+  vol?: number;
+  water?: number;
+  workNoisy?: string;
+  workstationType?: number;
+}
+
 export function summarizeStatus20001(data: unknown): StatusCandidateSummary | undefined {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     return undefined;
@@ -162,4 +186,57 @@ function hasExpectedType(value: unknown, expected: StatusCandidate["valueType"])
   }
 
   return typeof value === expected;
+}
+
+export function extractSafeStatus20001Values(data: unknown): SafeStatus20001Values | undefined {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return undefined;
+  }
+
+  const record = data as Record<string, unknown>;
+  const values: SafeStatus20001Values = {};
+  copyNumber(record, values, "allArea");
+  copyNumber(record, values, "allTime");
+  copyBoolean(record, values, "autoBoost");
+  copyNumber(record, values, "cleanArea");
+  copyBoolean(record, values, "cleanComponents");
+  copyNumber(record, values, "cleanMode");
+  copyNumber(record, values, "cleanTime");
+  copyNumber(record, values, "elec");
+  copyNumber(record, values, "elecReal");
+  copyNumber(record, values, "isInForbidMode");
+  copyNumber(record, values, "led");
+  copyString(record, values, "mode");
+  copyNumber(record, values, "mop");
+  copyNumber(record, values, "mute");
+  copyNumber(record, values, "reliable");
+  copyString(record, values, "subMode");
+  copyNumber(record, values, "vol");
+  copyNumber(record, values, "water");
+  copyString(record, values, "workNoisy");
+  copyNumber(record, values, "workstationType");
+
+  if (Array.isArray(record.errorState)) {
+    values.errorCount = record.errorState.length;
+  }
+
+  return values;
+}
+
+function copyNumber<T extends object>(source: Record<string, unknown>, target: T, key: keyof T & string): void {
+  if (typeof source[key] === "number") {
+    Object.assign(target, { [key]: source[key] });
+  }
+}
+
+function copyBoolean<T extends object>(source: Record<string, unknown>, target: T, key: keyof T & string): void {
+  if (typeof source[key] === "boolean") {
+    Object.assign(target, { [key]: source[key] });
+  }
+}
+
+function copyString<T extends object>(source: Record<string, unknown>, target: T, key: keyof T & string): void {
+  if (typeof source[key] === "string") {
+    Object.assign(target, { [key]: source[key] });
+  }
 }

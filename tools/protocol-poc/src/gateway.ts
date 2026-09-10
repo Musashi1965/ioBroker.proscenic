@@ -40,6 +40,7 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
     const events: GatewayEvent[] = [];
     let buffer = "";
     let settled = false;
+    let connected = false;
     const startedAt = Date.now();
 
     const finish = (completionReason: GatewayProbeCompletionReason, error?: Error): void => {
@@ -75,6 +76,7 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
 
     socket.setTimeout(options.timeoutMs);
     socket.on("connect", () => {
+      connected = true;
       clearTimeout(connectTimer);
       socket.setTimeout(0);
       socket.write(gatewayHandshake(options.token, options.serial), "utf8");
@@ -108,7 +110,13 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
     });
 
     socket.on("timeout", () => finish("socket-timeout"));
-    socket.on("error", (error) => finish("socket-closed", error));
+    socket.on("error", (error) => {
+      if (connected) {
+        finish("socket-closed");
+      } else {
+        finish("socket-closed", error);
+      }
+    });
     socket.on("close", () => finish("socket-closed"));
     socket.connect(options.endpoint.port, options.endpoint.host);
   });

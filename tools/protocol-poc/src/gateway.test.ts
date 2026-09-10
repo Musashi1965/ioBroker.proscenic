@@ -72,4 +72,38 @@ describe("gateway reader", () => {
       });
     }
   });
+
+  it("reports socket-closed when the gateway closes immediately", async () => {
+    const server = createServer((socket) => {
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    try {
+      const address = server.address();
+      assert.equal(typeof address, "object");
+      assert.ok(address);
+      const { port } = address as AddressInfo;
+      const result = await readGatewayEvents({
+        endpoint: {
+          host: "127.0.0.1",
+          port,
+        },
+        token: "0123456789abcdef",
+        serial: "serial",
+        listenSeconds: 10,
+        maxEvents: 1,
+        timeoutMs: 100,
+        maxBufferBytes: 1024,
+      });
+
+      assert.equal(result.completionReason, "socket-closed");
+      assert.equal(result.events.length, 0);
+      assert.ok(result.elapsedMs < 1_000);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
 });

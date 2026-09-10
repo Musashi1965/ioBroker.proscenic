@@ -2,8 +2,9 @@
 import { ProscenicClient, type Region } from "./client.js";
 import { readGatewayEvents, type GatewayEndpoint } from "./gateway.js";
 import { promptHidden, promptLine } from "./input.js";
+import { createPrivateCaptureWriter } from "./private-capture.js";
 import { summarizeObjectShape } from "./redaction.js";
-import { summarizeStatus20001 } from "./status-candidates.js";
+import { extractSafeStatus20001Values, summarizeStatus20001 } from "./status-candidates.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LISTEN_SECONDS = 30;
@@ -18,6 +19,11 @@ async function main(): Promise<void> {
   const listenSeconds = parsePositiveInt(process.env.PROSCENIC_LISTEN_SECONDS, DEFAULT_LISTEN_SECONDS);
   const maxEvents = parsePositiveInt(process.env.PROSCENIC_MAX_EVENTS, DEFAULT_MAX_EVENTS);
   const deviceIndex = parseNonNegativeInt(process.env.PROSCENIC_DEVICE_INDEX, 0);
+  const printSafeStatusValues = parseBooleanFlag(process.env.PROSCENIC_PRINT_SAFE_STATUS_VALUES);
+  const privateCapture = await createPrivateCaptureWriter(parseBooleanFlag(process.env.PROSCENIC_PRIVATE_CAPTURE));
+  if (privateCapture) {
+    console.log("Private capture: enabled, ignored local file created");
+  }
 
   const client = new ProscenicClient({ email, password, region, timeoutMs });
 
@@ -47,11 +53,11 @@ async function main(): Promise<void> {
   }));
 
   const gateway = await client.getGateway(token, device.sn);
-  const endpoint = selectGatewayEndpoint(gateway.addr_list);
-  console.log("Gateway: endpoint received and validated: true");
+  const endpoints = selectGatewayEndpoints(gateway.addr_list);
+  console.log("Gateway: endpoints received and validated:", endpoints.length);
 
-  const gatewayResult = await readGatewayEvents({
-    endpoint,
+  const gatewayResult = await readGatewayEndpoints({
+    endpoints,
     token,
     serial: device.sn,
     listenSeconds,
@@ -66,6 +72,24 @@ async function main(): Promise<void> {
     elapsedMs: gatewayResult.elapsedMs,
     listenSeconds,
   }));
+  if (privateCapture) {
+    await privateCapture.write({
+      kind: "run",
+      createdAt: new Date().toISOString(),
+      device: {
+        index: deviceIndex,
+        code: device.code ?? null,
+        model: device.model ?? null,
+        status: device.status ?? null,
+      },
+      gatewayCompletion: {
+        reason: gatewayResult.completionReason,
+        elapsedMs: gatewayResult.elapsedMs,
+        listenSeconds,
+      },
+      eventCount: gatewayResult.events.length,
+    });
+  }
   for (const [index, event] of gatewayResult.events.entries()) {
     console.log(`Event ${index + 1}:`, JSON.stringify({
       encrypted: event.encrypted,
@@ -88,7 +112,25 @@ async function main(): Promise<void> {
           unknownFields: statusSummary.unknownFields,
         }));
       }
+
+      if (printSafeStatusValues) {
+        console.log("Status 20001 safe values:", JSON.stringify(extractSafeStatus20001Values(event.decrypted?.data)));
+      }
     }
+
+    if (privateCapture) {
+      await privateCapture.write({
+        kind: "event",
+        index: index + 1,
+        encrypted: event.encrypted,
+        infoType: event.infoType ?? null,
+        decrypted: event.decrypted ?? null,
+      });
+    }
+  }
+
+  if (privateCapture) {
+    await privateCapture.close();
   }
 }
 
@@ -126,28 +168,79 @@ function parseNonNegativeInt(value: string | undefined, fallback: number): numbe
   return parsed;
 }
 
-function selectGatewayEndpoint(addresses: unknown): GatewayEndpoint {
+function parseBooleanFlag(value: string | undefined): boolean {
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function selectGatewayEndpoints(addresses: unknown): GatewayEndpoint[] {
   if (!Array.isArray(addresses) || addresses.length === 0) {
     throw new Error("No gateway endpoint returned");
   }
 
-  const candidate = addresses[0] as { ip?: unknown; port?: unknown };
-  if (typeof candidate.ip !== "string" || candidate.ip.length === 0) {
-    throw new Error("Gateway endpoint has no host");
+  return addresses.map((entry, index) => {
+    const candidate = entry as { ip?: unknown; port?: unknown };
+    if (typeof candidate.ip !== "string" || candidate.ip.length === 0) {
+      throw new Error(`Gateway endpoint ${index + 1} has no host`);
+    }
+
+    const port = typeof candidate.port === "number"
+      ? candidate.port
+      : Number.parseInt(String(candidate.port), 10);
+
+    if (!Number.isSafeInteger(port) || port <= 0 || port > 65535) {
+      throw new Error(`Gateway endpoint ${index + 1} has invalid port`);
+    }
+
+    return {
+      host: candidate.ip,
+      port,
+    };
+  });
+}
+
+async function readGatewayEndpoints(options: {
+  endpoints: GatewayEndpoint[];
+  token: string;
+  serial: string;
+  listenSeconds: number;
+  maxEvents: number;
+  timeoutMs: number;
+  maxBufferBytes: number;
+}): ReturnType<typeof readGatewayEvents> {
+  let lastResult: Awaited<ReturnType<typeof readGatewayEvents>> | undefined;
+
+  for (const [index, endpoint] of options.endpoints.entries()) {
+    console.log("Gateway attempt:", JSON.stringify({
+      index: index + 1,
+      total: options.endpoints.length,
+    }));
+    const result = await readGatewayEvents({
+      endpoint,
+      token: options.token,
+      serial: options.serial,
+      listenSeconds: options.listenSeconds,
+      maxEvents: options.maxEvents,
+      timeoutMs: options.timeoutMs,
+      maxBufferBytes: options.maxBufferBytes,
+    });
+    console.log("Gateway attempt completion:", JSON.stringify({
+      index: index + 1,
+      reason: result.completionReason,
+      elapsedMs: result.elapsedMs,
+      events: result.events.length,
+    }));
+
+    lastResult = result;
+    if (result.events.length > 0 || result.completionReason !== "socket-closed") {
+      return result;
+    }
   }
 
-  const port = typeof candidate.port === "number"
-    ? candidate.port
-    : Number.parseInt(String(candidate.port), 10);
-
-  if (!Number.isSafeInteger(port) || port <= 0 || port > 65535) {
-    throw new Error("Gateway endpoint has invalid port");
+  if (!lastResult) {
+    throw new Error("No gateway endpoints tried");
   }
 
-  return {
-    host: candidate.ip,
-    port,
-  };
+  return lastResult;
 }
 
 main().catch((error: unknown) => {

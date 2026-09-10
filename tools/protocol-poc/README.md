@@ -40,6 +40,10 @@ Optional settings:
 - `PROSCENIC_MAX_EVENTS`: maximum encrypted gateway events to summarize,
   default `3`.
 - `PROSCENIC_TIMEOUT_MS`: REST/socket timeout, default `10000`.
+- `PROSCENIC_PRINT_SAFE_STATUS_VALUES`: print selected `infoType` 20001 live
+  values when set to `1`.
+- `PROSCENIC_PRIVATE_CAPTURE`: write full decrypted private research captures
+  under `.poc-private/protocol-poc/` when set to `1`.
 
 When a decrypted `infoType` 20001 event is received, the tool prints candidate
 ioBroker status fields with upstream field name, candidate state ID, value
@@ -48,6 +52,14 @@ type, role, optional unit, and confidence. It does not print the live value.
 The gateway result also prints a completion reason and elapsed time. This makes
 it visible whether the listen window elapsed normally, the maximum event count
 was reached, the socket timed out, or the gateway closed the connection.
+If the cloud returns multiple gateway endpoints, the PoC tries them in order
+and reports only the attempt number and completion reason, never the endpoint
+address.
+
+Private capture mode is for owner-local protocol research only. It may contain
+serial numbers, map data, positions, and raw decrypted payloads. The directory
+is ignored by Git and must not be copied into issues, documentation, commits,
+packages, releases, or adapter logs.
 
 ## Safety Boundaries
 
