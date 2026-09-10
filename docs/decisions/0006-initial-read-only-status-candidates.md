@@ -5,10 +5,11 @@
 
 ## Context
 
-The read-only protocol PoC received and decrypted an `infoType` 20001 gateway
-event from one real Proscenic M7 Pro. The event exposes status-like fields, but
-the project has not yet verified every field's exact user-visible meaning,
-range, unit, enum values, or change behavior.
+The read-only protocol PoC received and decrypted repeated `infoType` 20001
+gateway events from one real Proscenic M7 Pro, including during active
+cleaning. The event exposes status-like fields, but the project has not yet
+verified every field's exact user-visible meaning, range, unit, enum values, or
+change behavior.
 
 The ioBroker object tree is a public API. State IDs, value types, roles, write
 semantics, units, and ranges must be stable once released. Therefore the first
@@ -42,6 +43,11 @@ Do not expose position arrays, timestamps, vendor counters, forbidden-mode
 internals, workstation details, or undocumented raw JSON in the first public
 contract.
 
+Observed `infoType` 20001 fields that remain intentionally excluded from the
+candidate public contract include `cleanMode`, `dustCenterFreq`,
+`isInForbidMode`, `ldAvoidCollide`, `mute`, `phi`, `pos`, `reliable`,
+`timeStamp`, `vol`, and `workstationType`.
+
 All accepted states will be read-only and published with `ack=true`. Commands
 remain out of scope for this ADR.
 
@@ -72,9 +78,12 @@ during at least these states:
 
 - docked/charging;
 - idle;
-- active cleaning;
 - returning to dock;
 - a low-risk error or unavailable condition, if it occurs naturally.
+
+Active cleaning has produced repeated redacted `infoType` 20001 events and is
+available for value-level comparison, but the field meanings have not yet been
+accepted.
 
 Record only redacted field names, types, enum labels, and semantic conclusions.
 Do not record raw maps, serial numbers, gateway endpoints, or complete payloads.

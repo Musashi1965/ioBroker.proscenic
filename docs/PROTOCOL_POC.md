@@ -35,7 +35,7 @@ The PoC must not:
 
 ## Verified Evidence
 
-A private run against one M7 Pro on 2026-09-10 verified:
+Private runs against one M7 Pro on 2026-09-10 verified:
 
 - successful login and token acquisition without printing the token;
 - enumeration of one `M7_PRO` / `811_LDS` device;
@@ -44,6 +44,12 @@ A private run against one M7 Pro on 2026-09-10 verified:
 - receipt and decryption of three encrypted gateway events;
 - event summaries for `infoType` 20001, `20002`, and `30000` without raw
   payloads, serial numbers, gateway data, or map contents.
+
+A later active-cleaning run reached the configured maximum of five gateway
+events in about two seconds. It observed repeated `infoType` 20001 status
+events, plus `infoType` 20002 and `30000`. This indicates that the gateway
+pushes events actively while the robot is moving; idle behavior still needs
+separate repeated observation.
 
 This evidence is sufficient to start designing a minimal read-only status
 contract. It is not sufficient for command support, map publication,
