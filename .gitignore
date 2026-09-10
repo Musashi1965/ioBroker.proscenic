@@ -1,0 +1,49 @@
+# Dependencies and generated output
+node_modules/
+build/
+dist/
+coverage/
+.nyc_output/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local.json
+*.local.yaml
+*.local.yml
+*.credentials.json
+*.tokens.json
+secrets/
+private/
+.poc-private/
+
+# Device and protocol diagnostics
+*.pcap
+*.pcapng
+*.har
+*.log
+logs/
+tmp/
+*.map
+*.bin
+
+# Package-manager and tool caches
+.npm/
+.cache/
+.eslintcache
+.dev-server/
+
+# ioBroker build and package artifacts
+iobroker.*.tgz
+.commitinfo
+admin/i18n/flat.txt
+admin/i18n/*/flat.txt
+admin/custom/mf-stats.json
+
+# Editor and operating-system noise
+.DS_Store
+.idea/
+.vscode/
+*.code-workspace
+*.swp
