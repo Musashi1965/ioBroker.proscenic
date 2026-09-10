@@ -1,6 +1,6 @@
 # Legacy Protocol Proof Of Concept
 
-Status: initial read-only tool, real gateway verification pending
+Status: read-only real gateway reception verified on one M7 Pro
 
 The repository contains a small TypeScript proof of concept in
 `tools/protocol-poc`. It exists to verify the undocumented legacy Proscenic
@@ -32,18 +32,33 @@ The PoC must not:
 - run as public CI because it requires a private account and a live vendor
   service.
 
-## Acceptance Gate
+## Verified Evidence
 
-Before the PoC can inform production adapter behavior, record private,
-redacted evidence for:
+A private run against one M7 Pro on 2026-09-10 verified:
 
-1. successful login and token acquisition;
-2. device enumeration of the M7 Pro;
-3. gateway endpoint discovery;
-4. successful gateway connection and handshake;
-5. at least one decrypted status event, preferably `infoType` 20001;
-6. timeout and clean shutdown without leaked timers or sockets;
-7. authentication and gateway failure behavior with redacted errors.
+- successful login and token acquisition without printing the token;
+- enumeration of one `M7_PRO` / `811_LDS` device;
+- gateway endpoint discovery without printing the endpoint;
+- successful `infoType` 70001 gateway handshake;
+- receipt and decryption of three encrypted gateway events;
+- event summaries for `infoType` 20001, `20002`, and `30000` without raw
+  payloads, serial numbers, gateway data, or map contents.
 
-Only after that evidence exists should the project freeze a first public
-ioBroker status contract in a new ADR.
+This evidence is sufficient to start designing a minimal read-only status
+contract. It is not sufficient for command support, map publication,
+multi-device support, or release claims.
+
+## Remaining Acceptance Gate
+
+Before the PoC can inform production command or release behavior, record
+private, redacted evidence for:
+
+1. repeated startup and shutdown without leaked timers or sockets;
+2. reconnect after socket close or timeout;
+3. token refresh behavior after authentication/session failure;
+4. stable interpretation of candidate `infoType` 20001 status fields;
+5. authentication and gateway failure behavior with redacted errors;
+6. every command separately, including confirmation and failure semantics.
+
+Only after the candidate status fields are interpreted should the project
+freeze the first public ioBroker status contract in a new ADR.

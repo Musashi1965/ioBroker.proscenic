@@ -1,7 +1,7 @@
 # Technical Architecture
 
-Status: initial boundary definition; public objects and concrete APIs remain
-subject to PoC evidence.
+Status: read-only gateway reception verified; public objects and concrete APIs
+remain subject to status-contract evidence.
 
 ## Core rule
 
@@ -103,7 +103,7 @@ through a bounded authentication path. See ADR 0004.
 
 - stable public device identifier and first object contract;
 - exact runtime and js-controller baseline after skeleton generation;
-- gateway heartbeat and reconnect policy after the read-only PoC;
+- gateway heartbeat and reconnect policy after repeated read-only PoC runs;
 - command confirmation semantics;
 - map storage, serving, size limits, and privacy policy;
 - multi-device/account/region behavior;

@@ -1,6 +1,6 @@
 # General Project Definition
 
-Status: initial governance and research baseline, 2026-09-10
+Status: read-only gateway PoC verified, 2026-09-10
 
 ## Identity
 
@@ -19,17 +19,22 @@ Status: initial governance and research baseline, 2026-09-10
 
 ## Evidence baseline
 
-A private real-device probe on 2026-09-10 verified against the European legacy
-endpoint:
+Private real-device probes on 2026-09-10 verified against the European legacy
+endpoint and gateway:
 
 - successful account authentication;
 - successful token acquisition without printing the token;
 - enumeration of exactly one M7 Pro;
-- product code `M7_PRO`, model `811_LDS`, and reported availability.
+- product code `M7_PRO`, model `811_LDS`, and reported availability;
+- gateway endpoint discovery without printing the endpoint;
+- read-only gateway handshake with `infoType` 70001;
+- receipt and decryption of three gateway events, including `infoType` 20001,
+  `20002`, and `30000`, with only redacted shape summaries printed.
 
-This proves only authentication and device enumeration. Gateway address
-discovery, socket authentication, decryption, status fields, command endpoints,
-map data, reconnect, and cleanup remain unverified.
+This proves authentication, device enumeration, gateway discovery, socket
+handshake, framing, and AES decryption on one real M7 Pro. Exact status field
+semantics, command endpoints, map handling, reconnect, and cleanup behavior
+remain pending.
 
 ## Initial goals
 
