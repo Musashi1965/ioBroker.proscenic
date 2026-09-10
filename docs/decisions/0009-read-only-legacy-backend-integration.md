@@ -23,7 +23,8 @@ Wire the first read-only backend into the adapter runtime:
 - connect to the gateway socket, send the verified handshake, split frames,
   decrypt encrypted events, and normalize `infoType` 20001 status values;
 - project only the ADR 0008 read-only object structure with `ack=true`;
-- mark `info.connection` true only when the gateway connection is established;
+- mark `info.connection` from the cloud/backend connection, while exposing the
+  gateway socket status separately as `connection.gateway`;
 - clear the gateway socket on unload;
 - redact account, host, IP, and endpoint material before writing error states
   or logs.
@@ -39,8 +40,9 @@ behavior, token renewal, detailed status semantics, command confirmation,
 multi-device behavior, and map policy remain pending.
 
 The gateway implementation is intentionally small and bounded. If the gateway
-closes, the adapter marks the gateway connection offline instead of silently
-claiming an online state.
+closes, the adapter marks `connection.gateway` offline instead of silently
+claiming an online socket state. `info.connection` remains the adapter-level
+backend health indicator and does not mirror transient gateway socket closure.
 
 ## Validation
 

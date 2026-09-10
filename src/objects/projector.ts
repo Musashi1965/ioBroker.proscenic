@@ -37,7 +37,7 @@ export async function setConnectionState(
 	connected: boolean,
 ): Promise<void> {
 	await adapter.setStateAsync(`connection.${id}`, { val: connected, ack: true });
-	if (id === "gateway") {
+	if (id === "cloud") {
 		await adapter.setStateAsync("info.connection", { val: connected, ack: true });
 	}
 }
