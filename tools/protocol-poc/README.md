@@ -45,6 +45,10 @@ When a decrypted `infoType` 20001 event is received, the tool prints candidate
 ioBroker status fields with upstream field name, candidate state ID, value
 type, role, optional unit, and confidence. It does not print the live value.
 
+The gateway result also prints a completion reason and elapsed time. This makes
+it visible whether the listen window elapsed normally, the maximum event count
+was reached, the socket timed out, or the gateway closed the connection.
+
 ## Safety Boundaries
 
 This PoC is intentionally read-only. Command endpoints, maps, persistent

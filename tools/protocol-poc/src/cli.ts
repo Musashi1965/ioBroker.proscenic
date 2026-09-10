@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   const endpoint = selectGatewayEndpoint(gateway.addr_list);
   console.log("Gateway: endpoint received and validated: true");
 
-  const events = await readGatewayEvents({
+  const gatewayResult = await readGatewayEvents({
     endpoint,
     token,
     serial: device.sn,
@@ -60,8 +60,13 @@ async function main(): Promise<void> {
     maxBufferBytes: MAX_BUFFER_BYTES,
   });
 
-  console.log(`Gateway events: ${events.length}`);
-  for (const [index, event] of events.entries()) {
+  console.log(`Gateway events: ${gatewayResult.events.length}`);
+  console.log("Gateway completion:", JSON.stringify({
+    reason: gatewayResult.completionReason,
+    elapsedMs: gatewayResult.elapsedMs,
+    listenSeconds,
+  }));
+  for (const [index, event] of gatewayResult.events.entries()) {
     console.log(`Event ${index + 1}:`, JSON.stringify({
       encrypted: event.encrypted,
       infoType: event.infoType ?? null,

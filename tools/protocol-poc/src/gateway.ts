@@ -12,6 +12,18 @@ export interface GatewayEvent {
   decrypted?: Record<string, unknown>;
 }
 
+export type GatewayProbeCompletionReason =
+  | "listen-window-elapsed"
+  | "max-events-reached"
+  | "socket-timeout"
+  | "socket-closed";
+
+export interface GatewayProbeResult {
+  events: GatewayEvent[];
+  completionReason: GatewayProbeCompletionReason;
+  elapsedMs: number;
+}
+
 export interface GatewayProbeOptions {
   endpoint: GatewayEndpoint;
   token: string;
@@ -22,14 +34,15 @@ export interface GatewayProbeOptions {
   maxBufferBytes: number;
 }
 
-export async function readGatewayEvents(options: GatewayProbeOptions): Promise<GatewayEvent[]> {
+export async function readGatewayEvents(options: GatewayProbeOptions): Promise<GatewayProbeResult> {
   return new Promise((resolve, reject) => {
     const socket = new Socket();
     const events: GatewayEvent[] = [];
     let buffer = "";
     let settled = false;
+    const startedAt = Date.now();
 
-    const finish = (error?: Error): void => {
+    const finish = (completionReason: GatewayProbeCompletionReason, error?: Error): void => {
       if (settled) {
         return;
       }
@@ -41,28 +54,36 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
       if (error) {
         reject(error);
       } else {
-        resolve(events);
+        resolve({
+          events,
+          completionReason,
+          elapsedMs: Date.now() - startedAt,
+        });
       }
     };
 
     const connectTimer = setTimeout(() => {
-      finish(new Error(`Gateway connection timed out after ${options.timeoutMs} ms`));
+      finish(
+        "socket-timeout",
+        new Error(`Gateway connection timed out after ${options.timeoutMs} ms`),
+      );
     }, options.timeoutMs);
 
     const listenTimer = setTimeout(() => {
-      finish();
+      finish("listen-window-elapsed");
     }, options.listenSeconds * 1000);
 
     socket.setTimeout(options.timeoutMs);
     socket.on("connect", () => {
       clearTimeout(connectTimer);
+      socket.setTimeout(0);
       socket.write(gatewayHandshake(options.token, options.serial), "utf8");
     });
 
     socket.on("data", (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
       if (Buffer.byteLength(buffer, "utf8") > options.maxBufferBytes) {
-        finish(new Error("Gateway buffer limit exceeded"));
+        finish("socket-closed", new Error("Gateway buffer limit exceeded"));
         return;
       }
 
@@ -80,15 +101,15 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
         }
 
         if (events.length >= options.maxEvents) {
-          finish();
+          finish("max-events-reached");
           return;
         }
       }
     });
 
-    socket.on("timeout", () => finish());
-    socket.on("error", finish);
-    socket.on("close", () => finish());
+    socket.on("timeout", () => finish("socket-timeout"));
+    socket.on("error", (error) => finish("socket-closed", error));
+    socket.on("close", () => finish("socket-closed"));
     socket.connect(options.endpoint.port, options.endpoint.host);
   });
 }
