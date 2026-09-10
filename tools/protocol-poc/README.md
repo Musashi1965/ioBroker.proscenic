@@ -12,7 +12,8 @@ The tool verifies:
 - socket handshake with `infoType` 70001;
 - framed gateway message reception;
 - AES-ECB decryption of encrypted gateway payloads;
-- redacted, bounded status summaries.
+- redacted, bounded status summaries;
+- candidate status-field summaries for `infoType` 20001 without live values.
 
 The tool never prints the password, token, serial number, gateway address, map
 payload, or raw upstream payload.
@@ -39,6 +40,10 @@ Optional settings:
 - `PROSCENIC_MAX_EVENTS`: maximum encrypted gateway events to summarize,
   default `3`.
 - `PROSCENIC_TIMEOUT_MS`: REST/socket timeout, default `10000`.
+
+When a decrypted `infoType` 20001 event is received, the tool prints candidate
+ioBroker status fields with upstream field name, candidate state ID, value
+type, role, optional unit, and confidence. It does not print the live value.
 
 ## Safety Boundaries
 

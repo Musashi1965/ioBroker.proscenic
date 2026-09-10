@@ -19,7 +19,8 @@ The PoC may:
 - send only the read-only `infoType` 70001 gateway handshake;
 - receive delimited gateway frames;
 - decrypt encrypted payloads with the memory-only token;
-- print redacted event summaries.
+- print redacted event summaries;
+- print candidate `infoType` 20001 status fields without live values.
 
 The PoC must not:
 
@@ -47,6 +48,10 @@ A private run against one M7 Pro on 2026-09-10 verified:
 This evidence is sufficient to start designing a minimal read-only status
 contract. It is not sufficient for command support, map publication,
 multi-device support, or release claims.
+
+Candidate read-only status fields are tracked in ADR 0006. They remain proposed
+until their value semantics, units, ranges, and enum labels are verified against
+real device behavior.
 
 ## Remaining Acceptance Gate
 

@@ -3,6 +3,7 @@ import { ProscenicClient, type Region } from "./client.js";
 import { readGatewayEvents, type GatewayEndpoint } from "./gateway.js";
 import { promptHidden, promptLine } from "./input.js";
 import { summarizeObjectShape } from "./redaction.js";
+import { summarizeStatus20001 } from "./status-candidates.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LISTEN_SECONDS = 30;
@@ -66,6 +67,23 @@ async function main(): Promise<void> {
       infoType: event.infoType ?? null,
       dataShape: summarizeObjectShape(event.decrypted?.data),
     }));
+
+    if (event.infoType === 20001) {
+      const statusSummary = summarizeStatus20001(event.decrypted?.data);
+      if (statusSummary) {
+        console.log("Status 20001 candidates:", JSON.stringify({
+          observedFields: statusSummary.observedCandidateFields.map((candidate) => ({
+            upstreamField: candidate.upstreamField,
+            candidateStateId: candidate.candidateStateId,
+            valueType: candidate.valueType,
+            role: candidate.candidateRole,
+            unit: candidate.unit ?? null,
+            confidence: candidate.confidence,
+          })),
+          unknownFields: statusSummary.unknownFields,
+        }));
+      }
+    }
   }
 }
 

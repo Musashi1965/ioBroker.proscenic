@@ -10,10 +10,12 @@ Current decisions:
 - [ADR 0003](0003-project-license.md): license and source provenance
 - [ADR 0004](0004-credential-and-session-handling.md): credentials and sessions
 - [ADR 0005](0005-semantic-versioning.md): release classification
+- [ADR 0006](0006-initial-read-only-status-candidates.md): proposed initial
+  read-only status candidates
 
-Required future decisions include the runtime baseline after generator review,
-the first public object contract, stable device identity, gateway reconnect and
-command confirmation behavior, and map privacy/storage.
+Required future decisions include accepting the first public object contract,
+the runtime baseline after generator review, stable device identity, gateway
+reconnect and command confirmation behavior, and map privacy/storage.
 
 ## Template
 
