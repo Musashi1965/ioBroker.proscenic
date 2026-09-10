@@ -13,10 +13,14 @@ Current decisions:
 - [ADR 0006](0006-initial-read-only-status-candidates.md): proposed initial
   read-only status candidates
 - [ADR 0007](0007-initial-adapter-skeleton.md): initial adapter skeleton
+- [ADR 0008](0008-initial-read-only-object-structure.md): initial read-only
+  object structure
+- [ADR 0009](0009-read-only-legacy-backend-integration.md): read-only legacy
+  backend integration
 
 Required future decisions include accepting the first public object contract,
-stable device identity, gateway reconnect and command confirmation behavior,
-and map privacy/storage.
+stable device identity, gateway reconnect, token renewal, command confirmation
+behavior, and map privacy/storage.
 
 ## Template
 

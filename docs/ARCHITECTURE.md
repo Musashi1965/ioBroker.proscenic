@@ -1,7 +1,7 @@
 # Technical Architecture
 
-Status: read-only gateway reception verified; public objects and concrete APIs
-remain subject to status-contract evidence.
+Status: initial read-only adapter implementation; public objects remain subject
+to status-contract evidence before release.
 
 ## Core rule
 

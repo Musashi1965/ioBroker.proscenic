@@ -4,7 +4,7 @@
 declare global {
 	namespace ioBroker {
 		interface AdapterConfig {
-			region: "eu" | "us" | "cn";
+			region: "eu";
 			vendor: "proscenic";
 			username: string;
 			password: string;

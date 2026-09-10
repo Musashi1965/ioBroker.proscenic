@@ -64,8 +64,8 @@
 		"adminUI": {
 			"config": "json"
 		},
-		"protectedNative": ["password"],
-		"encryptedNative": ["password"],
+		"protectedNative": ["username", "password"],
+		"encryptedNative": ["username", "password"],
 		"dependencies": [
 			{
 				"js-controller": ">=6.0.11"

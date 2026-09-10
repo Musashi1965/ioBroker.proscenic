@@ -5,11 +5,27 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
+import { normalizeStatus20001 } from "./domain/status";
+import { extendAdapterObjects } from "./objects/object-definitions";
+import {
+	projectDevice,
+	projectStatus,
+	redactedErrorMessage,
+	setConnectionState,
+	setInitialCapabilityStates,
+	setLastError,
+} from "./objects/projector";
+import { ProscenicGatewayClient } from "./protocol/gateway-client";
+import { ProscenicRestClient } from "./protocol/rest-client";
+import type { DeviceRecord, GatewayData, GatewayEndpoint } from "./protocol/types";
 
-// Load your modules here, e.g.:
-// import * as fs from "fs";
+const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 
 class Proscenic extends utils.Adapter {
+	private gatewayClient: ProscenicGatewayClient | undefined;
+	private shuttingDown = false;
+
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
 			...options,
@@ -26,14 +42,25 @@ class Proscenic extends utils.Adapter {
 	 * Is called when databases are connected and adapter received configuration.
 	 */
 	private async onReady(): Promise<void> {
+		await extendAdapterObjects(this);
 		await this.setState("info.connection", false, true);
+		await setConnectionState(this, "cloud", false);
+		await setConnectionState(this, "gateway", false);
+		await setInitialCapabilityStates(this);
 
 		if (!this.config.username || !this.config.password) {
 			this.log.warn("Proscenic cloud credentials are not configured yet.");
 			return;
 		}
 
-		this.log.info("Proscenic adapter skeleton started. Protocol modules are not connected yet.");
+		try {
+			await this.startReadOnlyGateway();
+		} catch (error) {
+			await setLastError(this, error);
+			await setConnectionState(this, "cloud", false);
+			await setConnectionState(this, "gateway", false);
+			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
+		}
 	}
 
 	/**
@@ -43,16 +70,77 @@ class Proscenic extends utils.Adapter {
 	 */
 	private onUnload(callback: () => void): void {
 		try {
-			// Here you must clear all timeouts or intervals that may still be active
-			// clearTimeout(timeout1);
-			// clearTimeout(timeout2);
-			// ...
-			// clearInterval(interval1);
-
+			this.shuttingDown = true;
+			this.gatewayClient?.destroy();
+			this.gatewayClient = undefined;
 			callback();
 		} catch (error) {
 			this.log.error(`Error during unloading: ${(error as Error).message}`);
 			callback();
+		}
+	}
+
+	private async startReadOnlyGateway(): Promise<void> {
+		const client = new ProscenicRestClient({
+			username: this.config.username,
+			password: this.config.password,
+			region: this.config.region,
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		});
+
+		this.log.info("Connecting to the Proscenic legacy cloud.");
+		const token = await client.login();
+		await setConnectionState(this, "cloud", true);
+
+		const devices = await client.listDevices();
+		const device = selectDevice(devices, this.config.deviceCode);
+		await projectDevice(this, device);
+
+		if (!device.sn) {
+			throw new Error("Selected device cannot be used because its protocol serial is missing");
+		}
+
+		const gateway = await client.getGateway(token, device.sn);
+		const endpoint = selectGatewayEndpoint(gateway);
+
+		this.gatewayClient?.destroy();
+		this.gatewayClient = new ProscenicGatewayClient({
+			endpoint,
+			token,
+			serial: device.sn,
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+			maxBufferBytes: MAX_GATEWAY_BUFFER_BYTES,
+			onConnect: () => {
+				void setConnectionState(this, "gateway", true);
+				this.log.info("Connected to the Proscenic gateway.");
+			},
+			onEvent: event => {
+				void this.handleGatewayEvent(event.infoType, event.data);
+			},
+			onClose: () => {
+				void setConnectionState(this, "gateway", false);
+				if (!this.shuttingDown) {
+					this.log.warn("Proscenic gateway connection closed.");
+				}
+			},
+			onError: error => {
+				void setLastError(this, error);
+				if (!this.shuttingDown) {
+					this.log.warn(`Proscenic gateway error: ${redactedErrorMessage(error)}`);
+				}
+			},
+		});
+		this.gatewayClient.connect();
+	}
+
+	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {
+		if (infoType !== 20001) {
+			return;
+		}
+
+		const status = normalizeStatus20001(data);
+		if (status) {
+			await projectStatus(this, status);
 		}
 	}
 
@@ -101,6 +189,55 @@ class Proscenic extends utils.Adapter {
 	// 	}
 	// }
 }
+
+function selectDevice(devices: DeviceRecord[], deviceCode: string): DeviceRecord {
+	if (devices.length === 0) {
+		throw new Error("No Proscenic devices returned by legacy cloud");
+	}
+
+	const selected = deviceCode ? devices.find(device => device.code === deviceCode) : devices[0];
+	if (!selected) {
+		throw new Error("Configured Proscenic device code was not found");
+	}
+	if (!selected.sn) {
+		throw new Error("Selected Proscenic device has no protocol serial");
+	}
+
+	return selected;
+}
+
+function selectGatewayEndpoint(gateway: GatewayData): GatewayEndpoint {
+	const endpoints = selectGatewayEndpoints(gateway.addr_list);
+	if (endpoints.length === 0) {
+		throw new Error("No Proscenic gateway endpoint returned");
+	}
+
+	return endpoints[0];
+}
+
+function selectGatewayEndpoints(addresses: unknown): GatewayEndpoint[] {
+	if (!Array.isArray(addresses)) {
+		return [];
+	}
+
+	return addresses.map((entry, index) => {
+		const candidate = entry as { ip?: unknown; port?: unknown };
+		if (typeof candidate.ip !== "string" || candidate.ip.length === 0) {
+			throw new Error(`Gateway endpoint ${index + 1} has no host`);
+		}
+
+		const port = typeof candidate.port === "number" ? candidate.port : Number.parseInt(String(candidate.port), 10);
+		if (!Number.isSafeInteger(port) || port <= 0 || port > 65_535) {
+			throw new Error(`Gateway endpoint ${index + 1} has invalid port`);
+		}
+
+		return {
+			host: candidate.ip,
+			port,
+		};
+	});
+}
+
 if (require.main !== module) {
 	// Export the constructor in compact mode
 	module.exports = (options: Partial<utils.AdapterOptions> | undefined) => new Proscenic(options);
