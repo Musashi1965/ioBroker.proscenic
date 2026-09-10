@@ -19,10 +19,11 @@ Current decisions:
   backend integration
 - [ADR 0010](0010-reviewed-test-host-deployment.md): reviewed test-host
   deployment path
+- [ADR 0011](0011-gateway-reconnect-policy.md): gateway reconnect policy
 
 Required future decisions include accepting the first public object contract,
-stable device identity, gateway reconnect, token renewal, command confirmation
-behavior, and map privacy/storage.
+stable device identity, token renewal, command confirmation behavior, and map
+privacy/storage.
 
 ## Template
 

@@ -5,6 +5,7 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
+import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
@@ -24,6 +25,9 @@ const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
+	private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+	private reconnectAttempt = 0;
+	private reconnectInProgress = false;
 	private shuttingDown = false;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -53,14 +57,7 @@ class Proscenic extends utils.Adapter {
 			return;
 		}
 
-		try {
-			await this.startReadOnlyGateway();
-		} catch (error) {
-			await setLastError(this, error);
-			await setConnectionState(this, "cloud", false);
-			await setConnectionState(this, "gateway", false);
-			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
-		}
+		await this.connectReadOnlyGateway();
 	}
 
 	/**
@@ -71,12 +68,33 @@ class Proscenic extends utils.Adapter {
 	private onUnload(callback: () => void): void {
 		try {
 			this.shuttingDown = true;
+			this.clearReconnectTimer();
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
 			callback();
 		} catch (error) {
 			this.log.error(`Error during unloading: ${(error as Error).message}`);
 			callback();
+		}
+	}
+
+	private async connectReadOnlyGateway(): Promise<void> {
+		if (this.shuttingDown || this.reconnectInProgress) {
+			return;
+		}
+
+		this.clearReconnectTimer();
+		this.reconnectInProgress = true;
+		try {
+			await this.startReadOnlyGateway();
+		} catch (error) {
+			await setLastError(this, error);
+			await setConnectionState(this, "cloud", false);
+			await setConnectionState(this, "gateway", false);
+			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
+			this.scheduleReconnect("connection failure");
+		} finally {
+			this.reconnectInProgress = false;
 		}
 	}
 
@@ -111,6 +129,7 @@ class Proscenic extends utils.Adapter {
 			timeoutMs: DEFAULT_TIMEOUT_MS,
 			maxBufferBytes: MAX_GATEWAY_BUFFER_BYTES,
 			onConnect: () => {
+				this.reconnectAttempt = 0;
 				void setConnectionState(this, "gateway", true);
 				this.log.info("Connected to the Proscenic gateway.");
 			},
@@ -121,6 +140,7 @@ class Proscenic extends utils.Adapter {
 				void setConnectionState(this, "gateway", false);
 				if (!this.shuttingDown) {
 					this.log.warn("Proscenic gateway connection closed.");
+					this.scheduleReconnect("gateway close");
 				}
 			},
 			onError: error => {
@@ -131,6 +151,29 @@ class Proscenic extends utils.Adapter {
 			},
 		});
 		this.gatewayClient.connect();
+	}
+
+	private scheduleReconnect(reason: string): void {
+		if (this.shuttingDown || this.reconnectTimer) {
+			return;
+		}
+
+		this.reconnectAttempt += 1;
+		const delayMs = reconnectDelayMs(this.reconnectAttempt);
+		this.log.info(
+			`Scheduling Proscenic gateway reconnect in ${Math.round(delayMs / 1_000)} seconds after ${reason}.`,
+		);
+		this.reconnectTimer = setTimeout(() => {
+			this.reconnectTimer = undefined;
+			void this.connectReadOnlyGateway();
+		}, delayMs);
+	}
+
+	private clearReconnectTimer(): void {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = undefined;
+		}
 	}
 
 	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {

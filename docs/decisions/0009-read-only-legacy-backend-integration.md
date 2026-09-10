@@ -29,15 +29,16 @@ Wire the first read-only backend into the adapter runtime:
 - redact account, host, IP, and endpoint material before writing error states
   or logs.
 
-The first implementation does not add reconnect loops, command execution,
-maps, multi-device identity, or local Tuya support.
+The first implementation does not add command execution, maps, multi-device
+identity, or local Tuya support. Gateway reconnect behavior is added separately
+by ADR 0011.
 
 ## Consequences
 
 The adapter can now be installed in a private test environment and checked
-against live status events. It is still not release-ready because reconnect
-behavior, token renewal, detailed status semantics, command confirmation,
-multi-device behavior, and map policy remain pending.
+against live status events. It is still not release-ready because token renewal,
+detailed status semantics, command confirmation, multi-device behavior, and map
+policy remain pending.
 
 The gateway implementation is intentionally small and bounded. If the gateway
 closes, the adapter marks `connection.gateway` offline instead of silently
