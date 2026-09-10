@@ -52,6 +52,11 @@ and `30000`. Observed mode values include `sweep`, `pause`, `backcharge`, and
 robot is moving and may close the socket after sending a smaller idle/docked
 event set.
 
+The first deployed read-only adapter with ADR 0011 reconnect behavior was also
+validated on CM4-Node4. After a gateway socket close, the adapter scheduled a
+bounded reconnect, re-established the gateway connection, and continued updating
+cleaning status values while the robot was active.
+
 This evidence is sufficient to start designing a minimal read-only status
 contract. It is not sufficient for command support, self-emptying support, map
 publication, multi-device support, or release claims.
@@ -66,7 +71,7 @@ Before the PoC can inform production command or release behavior, record
 private, redacted evidence for:
 
 1. repeated startup and shutdown without leaked timers or sockets;
-2. reconnect after socket close or timeout;
+2. timeout-driven reconnect behavior;
 3. token refresh behavior after authentication/session failure;
 4. stable interpretation of candidate `infoType` 20001 status fields;
 5. authentication and gateway failure behavior with redacted errors;

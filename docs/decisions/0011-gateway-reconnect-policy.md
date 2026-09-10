@@ -66,3 +66,9 @@ yet documented for this adapter.
 Automated tests must cover the reconnect delay calculation. Adapter tests must
 continue to pass without live credentials. Real-device validation should confirm
 that status events resume after the gateway closes and reconnects.
+
+CM4-Node4 live validation on 2026-09-10 confirmed this behavior on the first M7
+Pro test device: after an observed gateway socket close, the adapter scheduled a
+five-second reconnect, re-established the gateway connection, and continued to
+update read-only cleaning status values. No raw payloads, map data, serial
+numbers, gateway endpoints, tokens, or private account data were recorded.
