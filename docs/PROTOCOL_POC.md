@@ -45,15 +45,16 @@ Private runs against one M7 Pro on 2026-09-10 verified:
 - event summaries for `infoType` 20001, `20002`, and `30000` without raw
   payloads, serial numbers, gateway data, or map contents.
 
-A later active-cleaning run reached the configured maximum of five gateway
-events in about two seconds. It observed repeated `infoType` 20001 status
-events, plus `infoType` 20002 and `30000`. This indicates that the gateway
-pushes events actively while the robot is moving; idle behavior still needs
-separate repeated observation.
+Later runs during active cleaning, pause, return-to-dock, and docked/charging
+states observed repeated `infoType` 20001 status events, plus `infoType` 20002
+and `30000`. Observed mode values include `sweep`, `pause`, `backcharge`, and
+`charge`. This indicates that the gateway pushes events actively while the
+robot is moving and may close the socket after sending a smaller idle/docked
+event set.
 
 This evidence is sufficient to start designing a minimal read-only status
-contract. It is not sufficient for command support, map publication,
-multi-device support, or release claims.
+contract. It is not sufficient for command support, self-emptying support, map
+publication, multi-device support, or release claims.
 
 Candidate read-only status fields are tracked in ADR 0006. They remain proposed
 until their value semantics, units, ranges, and enum labels are verified against
