@@ -1,6 +1,6 @@
 # General Project Definition
 
-Status: read-only gateway PoC verified, 2026-09-10
+Status: adapter skeleton created after read-only gateway PoC, 2026-09-10
 
 ## Identity
 
@@ -41,7 +41,7 @@ remain pending.
 1. Prove a read-only client for login, device enumeration, gateway discovery,
    framed socket reception, decryption, status normalization, timeout,
    reconnect, and clean shutdown.
-2. Generate a current official ioBroker TypeScript adapter skeleton and record
+2. Keep the official ioBroker TypeScript adapter skeleton buildable and record
    its tool/runtime baseline.
 3. Define and test a minimal public object contract before projecting device
    data.

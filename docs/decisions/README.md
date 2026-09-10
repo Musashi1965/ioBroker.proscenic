@@ -12,10 +12,11 @@ Current decisions:
 - [ADR 0005](0005-semantic-versioning.md): release classification
 - [ADR 0006](0006-initial-read-only-status-candidates.md): proposed initial
   read-only status candidates
+- [ADR 0007](0007-initial-adapter-skeleton.md): initial adapter skeleton
 
 Required future decisions include accepting the first public object contract,
-the runtime baseline after generator review, stable device identity, gateway
-reconnect and command confirmation behavior, and map privacy/storage.
+stable device identity, gateway reconnect and command confirmation behavior,
+and map privacy/storage.
 
 ## Template
 

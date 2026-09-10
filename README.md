@@ -5,18 +5,18 @@ Proscenic M7 Pro (`M7_PRO`, model `811_LDS`).
 
 ## Project status
 
-This repository is in the protocol-validation and project-foundation phase. It
-does **not** yet contain an installable ioBroker adapter.
+This repository is in the protocol-validation and adapter-skeleton phase. It
+contains an official ioBroker TypeScript adapter skeleton, but the production
+protocol implementation is not wired into the adapter runtime yet.
 
 A private real-device probe has verified the legacy European Proscenic cloud
 login, token acquisition, and device enumeration for one M7 Pro. Gateway status
 events, reconnect behavior, commands, map handling, and other models are not yet
 accepted as working.
 
-The implementation will be generated from the current official ioBroker
-adapter creator after the read-only protocol PoC has passed. Public ioBroker
-objects and writable controls will be added only with contract tests and
-real-device evidence.
+The initial implementation was generated with the official ioBroker adapter
+creator. Public ioBroker objects and writable controls will be added only with
+contract tests and real-device evidence.
 
 ## Planned identity
 

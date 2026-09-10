@@ -1,0 +1,111 @@
+{
+	"common": {
+		"name": "proscenic",
+		"version": "0.0.1",
+		"news": {
+			"0.0.1": {
+				"en": "initial release",
+				"de": "Erstveröffentlichung",
+				"ru": "Начальная версия",
+				"pt": "lançamento inicial",
+				"nl": "Eerste uitgave",
+				"fr": "Première version",
+				"it": "Versione iniziale",
+				"es": "Versión inicial",
+				"pl": "Pierwsze wydanie",
+				"uk": "Початкова версія",
+				"zh-cn": "首次出版"
+			}
+		},
+		"titleLang": {
+			"en": "Proscenic",
+			"de": "Proscenic",
+			"ru": "Proscenic",
+			"pt": "Proscenic",
+			"nl": "Proscenic",
+			"fr": "Proscenic",
+			"it": "Proscenic",
+			"es": "Proscenic",
+			"pl": "Proscenic",
+			"uk": "Proscenic",
+			"zh-cn": "浦桑尼克"
+		},
+		"desc": {
+			"en": "ioBroker adapter for Proscenic vacuum robots using the legacy Proscenic cloud gateway",
+			"de": "ioBroker-Adapter für Proscenic-Saugroboter unter Verwendung des alten Proscenic-Cloud-Gateways",
+			"ru": "Адаптер ioBroker для вакуумных роботов Proscenic с использованием устаревшего облачного шлюза Proscenic",
+			"pt": "Adaptador ioBroker para robôs a vácuo Proscenic usando o gateway de nuvem Proscenic legado",
+			"nl": "ioBroker-adapter voor Proscenic-vacuümrobots die de oudere Proscenic-cloudgateway gebruiken",
+			"fr": "Adaptateur ioBroker pour les robots aspirateurs Proscenic utilisant l'ancienne passerelle cloud Proscenic",
+			"it": "Adattatore ioBroker per robot aspirapolvere Proscenic che utilizzano il gateway cloud Proscenic legacy",
+			"es": "Adaptador ioBroker para robots aspiradores Proscenic que utilizan la puerta de enlace en la nube Proscenic heredada",
+			"pl": "Adapter ioBroker dla robotów próżniowych Proscenic korzystających ze starszej bramy chmurowej Proscenic",
+			"uk": "Адаптер ioBroker для вакуумних роботів Proscenic, які використовують застарілий хмарний шлюз Proscenic",
+			"zh-cn": "使用传统 Proscenic 云网关的 Proscenic 真空机器人的 ioBroker 适配器"
+		},
+		"authors": ["C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>"],
+		"keywords": ["iobroker", "proscenic", "vacuum", "robot", "m7 pro", "smarthome"],
+		"licenseInformation": {
+			"type": "free",
+			"license": "MIT"
+		},
+		"platform": "Javascript/Node.js",
+		"icon": "proscenic.png",
+		"enabled": true,
+		"extIcon": "https://raw.githubusercontent.com/Musashi1965/ioBroker.proscenic/main/admin/proscenic.png",
+		"readme": "https://github.com/Musashi1965/ioBroker.proscenic/blob/main/README.md",
+		"loglevel": "info",
+		"tier": 3,
+		"mode": "daemon",
+		"type": "household",
+		"compact": true,
+		"connectionType": "cloud",
+		"dataSource": "push",
+		"adminUI": {
+			"config": "json"
+		},
+		"protectedNative": ["password"],
+		"encryptedNative": ["password"],
+		"dependencies": [
+			{
+				"js-controller": ">=6.0.11"
+			}
+		],
+		"globalDependencies": [
+			{
+				"admin": ">=7.0.23"
+			}
+		]
+	},
+	"native": {
+		"region": "eu",
+		"vendor": "proscenic",
+		"username": "",
+		"password": "",
+		"deviceCode": "M7_PRO"
+	},
+	"objects": [],
+	"instanceObjects": [
+		{
+			"_id": "info",
+			"type": "channel",
+			"common": {
+				"name": "Information"
+			},
+			"native": {}
+		},
+		{
+			"_id": "info.connection",
+			"type": "state",
+			"common": {
+				"role": "indicator.connected",
+				"name": "Device or service connected",
+				"type": "boolean",
+				"read": true,
+				"write": false,
+				"def": false
+			},
+			"native": {}
+		}
+	]
+}

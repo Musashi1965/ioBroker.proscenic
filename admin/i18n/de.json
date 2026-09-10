@@ -1,0 +1,9 @@
+{
+	"proscenic adapter settings": "Proscenic Adaptereinstellungen",
+	"region": "Region",
+	"appVendor": "App-Anbieter",
+	"cloudEmail": "Cloud-E-Mail-Adresse",
+	"cloudPassword": "Cloud-Passwort",
+	"preferredDeviceCode": "Bevorzugter Gerätecode",
+	"preferredDeviceCodeHelp": "Optionaler Filter für das erste unterstützte Zielgerät. Für den verifizierten Proscenic M7 Pro M7_PRO beibehalten."
+}

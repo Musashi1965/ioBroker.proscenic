@@ -1,0 +1,77 @@
+{
+	"i18n": true,
+	"type": "panel",
+	"items": {
+		"region": {
+			"type": "select",
+			"label": "region",
+			"options": [
+				{
+					"label": "Europe",
+					"value": "eu"
+				},
+				{
+					"label": "United States",
+					"value": "us"
+				},
+				{
+					"label": "China",
+					"value": "cn"
+				}
+			],
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"vendor": {
+			"type": "select",
+			"label": "appVendor",
+			"options": [
+				{
+					"label": "Proscenic",
+					"value": "proscenic"
+				}
+			],
+			"newLine": false,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"username": {
+			"type": "text",
+			"label": "cloudEmail",
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 6,
+			"xl": 6
+		},
+		"password": {
+			"type": "password",
+			"label": "cloudPassword",
+			"newLine": false,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 6,
+			"xl": 6
+		},
+		"deviceCode": {
+			"type": "text",
+			"label": "preferredDeviceCode",
+			"help": "preferredDeviceCodeHelp",
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 6,
+			"xl": 6
+		}
+	}
+}
