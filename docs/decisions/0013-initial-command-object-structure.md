@@ -30,8 +30,14 @@ Expose the confirmed command candidates as boolean ioBroker button states:
 | `commands.deepCleaning` | deep cleaning |
 | `commands.collectDust` | dust collection |
 
-An external write of `true` with `ack=false` sends exactly one command. The
-adapter then resets the button to `false` with `ack=true`.
+An external write of a trigger value with `ack=false` sends exactly one command.
+The adapter accepts the boolean value `true`, numeric `1`, and the strings
+`true`, `1`, and `on` as trigger values because visualization tools may not
+preserve the exact boolean type. False-like values (boolean `false`, numeric
+`0`, string `false`, string `0`, string `off`, and an empty string) are
+normalized back to `false` with `ack=true` without sending a command. After
+every accepted command trigger, the adapter also resets the button to `false`
+with `ack=true`.
 
 Expose command result metadata as read-only states:
 

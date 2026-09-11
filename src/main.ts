@@ -5,7 +5,12 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
-import { buildCommandRequest, commandForStateId, type RobotCommand } from "./domain/commands";
+import {
+	buildCommandRequest,
+	commandForStateId,
+	normalizeCommandButtonValue,
+	type RobotCommand,
+} from "./domain/commands";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
@@ -235,7 +240,13 @@ class Proscenic extends utils.Adapter {
 			return;
 		}
 
-		if (state.val !== true) {
+		const trigger = normalizeCommandButtonValue(state.val);
+		if (trigger === false) {
+			void this.setStateAsync(relativeId, { val: false, ack: true });
+			return;
+		}
+		if (trigger === undefined) {
+			this.log.debug(`Ignoring unsupported command button value for ${relativeId}.`);
 			return;
 		}
 

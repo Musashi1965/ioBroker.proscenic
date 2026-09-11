@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { buildCommandRequest, commandForStateId } from "./commands";
+import { buildCommandRequest, commandForStateId, normalizeCommandButtonValue } from "./commands";
 
 describe("buildCommandRequest", () => {
 	it("builds the first public adapter command requests", () => {
@@ -63,5 +63,30 @@ describe("commandForStateId", () => {
 		expect(commandForStateId("commands.start")).to.equal("start");
 		expect(commandForStateId("commands.fan.standard")).to.equal("fanStandard");
 		expect(commandForStateId("status.mode")).to.equal(undefined);
+	});
+});
+
+describe("normalizeCommandButtonValue", () => {
+	it("accepts common button values produced by object UIs and visualizations", () => {
+		expect(normalizeCommandButtonValue(true)).to.equal(true);
+		expect(normalizeCommandButtonValue(1)).to.equal(true);
+		expect(normalizeCommandButtonValue("true")).to.equal(true);
+		expect(normalizeCommandButtonValue("1")).to.equal(true);
+		expect(normalizeCommandButtonValue("on")).to.equal(true);
+	});
+
+	it("normalizes common false-like button values without triggering a command", () => {
+		expect(normalizeCommandButtonValue(false)).to.equal(false);
+		expect(normalizeCommandButtonValue(0)).to.equal(false);
+		expect(normalizeCommandButtonValue("false")).to.equal(false);
+		expect(normalizeCommandButtonValue("0")).to.equal(false);
+		expect(normalizeCommandButtonValue("off")).to.equal(false);
+		expect(normalizeCommandButtonValue("")).to.equal(false);
+		expect(normalizeCommandButtonValue(null)).to.equal(false);
+	});
+
+	it("rejects unknown button values", () => {
+		expect(normalizeCommandButtonValue("toggle")).to.equal(undefined);
+		expect(normalizeCommandButtonValue(2)).to.equal(undefined);
 	});
 });

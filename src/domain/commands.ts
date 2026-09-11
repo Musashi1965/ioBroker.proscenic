@@ -36,6 +36,28 @@ export function commandForStateId(id: string): RobotCommand | undefined {
 	return COMMAND_DEFINITIONS.find(definition => definition.id === id)?.command;
 }
 
+export function normalizeCommandButtonValue(value: ioBroker.StateValue | undefined): boolean | undefined {
+	if (value === true || value === 1) {
+		return true;
+	}
+
+	if (value === false || value === 0 || value === null) {
+		return false;
+	}
+
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === "true" || normalized === "1" || normalized === "on") {
+			return true;
+		}
+		if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "") {
+			return false;
+		}
+	}
+
+	return undefined;
+}
+
 export function buildCommandRequest(
 	command: RobotCommand,
 	serial: string,
