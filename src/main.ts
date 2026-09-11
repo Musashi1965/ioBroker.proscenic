@@ -5,6 +5,7 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
+import { buildCommandRequest, commandForStateId, type RobotCommand } from "./domain/commands";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
@@ -28,6 +29,11 @@ class Proscenic extends utils.Adapter {
 	private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 	private reconnectAttempt = 0;
 	private reconnectInProgress = false;
+	private commandInProgress = false;
+	private commandEnabled = false;
+	private commandClient: ProscenicRestClient | undefined;
+	private commandToken: string | undefined;
+	private commandSerial: string | undefined;
 	private shuttingDown = false;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -51,6 +57,7 @@ class Proscenic extends utils.Adapter {
 		await setConnectionState(this, "cloud", false);
 		await setConnectionState(this, "gateway", false);
 		await setInitialCapabilityStates(this);
+		this.subscribeStates("commands.*");
 
 		if (!this.config.username || !this.config.password) {
 			this.log.warn("Proscenic cloud credentials are not configured yet.");
@@ -71,6 +78,7 @@ class Proscenic extends utils.Adapter {
 			this.clearReconnectTimer();
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
+			this.clearCommandSession();
 			callback();
 		} catch (error) {
 			this.log.error(`Error during unloading: ${(error as Error).message}`);
@@ -88,6 +96,7 @@ class Proscenic extends utils.Adapter {
 		try {
 			await this.startReadOnlyGateway();
 		} catch (error) {
+			this.clearCommandSession();
 			await setLastError(this, error);
 			await setConnectionState(this, "cloud", false);
 			await setConnectionState(this, "gateway", false);
@@ -108,6 +117,9 @@ class Proscenic extends utils.Adapter {
 
 		this.log.info("Connecting to the Proscenic legacy cloud.");
 		const token = await client.login();
+		this.commandEnabled = false;
+		this.commandClient = client;
+		this.commandToken = token;
 		await setConnectionState(this, "cloud", true);
 
 		const devices = await client.listDevices();
@@ -117,6 +129,9 @@ class Proscenic extends utils.Adapter {
 		if (!device.sn) {
 			throw new Error("Selected device cannot be used because its protocol serial is missing");
 		}
+		this.commandSerial = device.sn;
+		this.commandEnabled = isM7Pro(device);
+		await this.setStateAsync("capabilities.commands", { val: this.commandEnabled, ack: true });
 
 		const gateway = await client.getGateway(token, device.sn);
 		const endpoint = selectGatewayEndpoint(gateway);
@@ -209,12 +224,84 @@ class Proscenic extends utils.Adapter {
 	 * @param state - State object
 	 */
 	private onStateChange(id: string, state: ioBroker.State | null | undefined): void {
-		if (state) {
-			if (state.ack === false) {
-				this.log.debug(`Ignoring unsupported state command for ${id}.`);
+		if (!state || state.ack !== false) {
+			return;
+		}
+
+		const relativeId = this.relativeStateId(id);
+		const command = commandForStateId(relativeId);
+		if (!command) {
+			this.log.debug(`Ignoring unsupported state command for ${relativeId}.`);
+			return;
+		}
+
+		if (state.val !== true) {
+			return;
+		}
+
+		void this.executeCommand(relativeId, command);
+	}
+
+	private relativeStateId(id: string): string {
+		const prefix = `${this.namespace}.`;
+		return id.startsWith(prefix) ? id.slice(prefix.length) : id;
+	}
+
+	private async executeCommand(stateId: string, command: RobotCommand): Promise<void> {
+		if (this.commandInProgress) {
+			await this.setCommandFailure(
+				stateId,
+				command,
+				new Error("Another Proscenic command is already in progress"),
+			);
+			return;
+		}
+
+		this.commandInProgress = true;
+		await this.setStateAsync("commands.lastCommand", { val: command, ack: true });
+		await this.setStateAsync("commands.lastResult", { val: "running", ack: true });
+		await this.setStateAsync("commands.lastError", { val: "", ack: true });
+		await this.setStateAsync("commands.lastExecution", { val: new Date().toISOString(), ack: true });
+
+		try {
+			if (!this.commandClient || !this.commandToken || !this.commandSerial || !this.config.username) {
+				throw new Error("Proscenic command session is not ready");
 			}
+			if (!this.commandEnabled) {
+				throw new Error("Proscenic commands are not enabled for the selected device");
+			}
+
+			const request = buildCommandRequest(command, this.commandSerial, this.config.username);
+			const result = await this.commandClient.sendCommand(this.commandToken, request);
+			await this.setStateAsync("commands.lastResult", {
+				val: result.code === undefined || result.code === 0 ? "sent" : `api-code-${result.code}`,
+				ack: true,
+			});
+			await this.setStateAsync(stateId, { val: false, ack: true });
+		} catch (error) {
+			await this.setCommandFailure(stateId, command, error);
+		} finally {
+			this.commandInProgress = false;
 		}
 	}
+
+	private async setCommandFailure(stateId: string, command: RobotCommand, error: unknown): Promise<void> {
+		const message = redactedErrorMessage(error);
+		await this.setStateAsync("commands.lastCommand", { val: command, ack: true });
+		await this.setStateAsync("commands.lastResult", { val: "failed", ack: true });
+		await this.setStateAsync("commands.lastError", { val: message, ack: true });
+		await this.setStateAsync("commands.lastExecution", { val: new Date().toISOString(), ack: true });
+		await this.setStateAsync(stateId, { val: false, ack: true });
+		this.log.warn(`Proscenic command ${command} failed: ${message}`);
+	}
+
+	private clearCommandSession(): void {
+		this.commandEnabled = false;
+		this.commandClient = undefined;
+		this.commandToken = undefined;
+		this.commandSerial = undefined;
+	}
+
 	// If you need to accept messages in your adapter, uncomment the following block and the corresponding line in the constructor.
 	// /**
 	//  * Some message was sent to this instance over message box. Used by email, pushover, text2speech, ...
@@ -247,6 +334,10 @@ function selectDevice(devices: DeviceRecord[], deviceCode: string): DeviceRecord
 	}
 
 	return selected;
+}
+
+function isM7Pro(device: DeviceRecord): boolean {
+	return device.code === "M7_PRO" && device.model === "811_LDS";
 }
 
 function selectGatewayEndpoint(gateway: GatewayData): GatewayEndpoint {

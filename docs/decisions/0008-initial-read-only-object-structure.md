@@ -26,7 +26,9 @@ Top-level object groups:
 - `device.*`: non-secret selected-device metadata;
 - `connection.*`: redacted cloud/gateway connection health;
 - `capabilities.*`: booleans for features that are actually exposed;
-- `status.*`: normalized read-only status from verified gateway events.
+- `status.*`: normalized read-only status from verified gateway events;
+- `commands.*`: confirmed command test buttons and read-only command result
+  metadata, as defined by ADR 0013.
 
 Initial states:
 
@@ -58,8 +60,8 @@ Initial states:
 | `status.features.cleanComponents` | boolean | `indicator` |  | `infoType` 20001 |
 
 All states are read-only and are written by the adapter with `ack=true`.
-Writable commands, map objects, positions, raw events, and full upstream JSON
-remain out of scope.
+Map objects, positions, raw events, and full upstream JSON remain out of
+scope. Writable command buttons are now defined separately by ADR 0013.
 
 ## Consequences
 

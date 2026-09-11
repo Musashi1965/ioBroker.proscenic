@@ -1,3 +1,6 @@
+import type { CommandDefinition } from "../domain/commands";
+import { COMMAND_DEFINITIONS } from "../domain/commands";
+
 export interface StateDefinition {
 	id: string;
 	object: ioBroker.StateObject;
@@ -20,6 +23,9 @@ export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [
 	channel("status.fan", "Fan"),
 	channel("status.error", "Error"),
 	channel("status.features", "Features"),
+	channel("status.maintenance", "Maintenance"),
+	channel("commands", "Commands"),
+	channel("commands.fan", "Fan commands"),
 ];
 
 export const STATE_DEFINITIONS: readonly StateDefinition[] = [
@@ -45,8 +51,16 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("status.mop.mode", "Mop mode", "number", "state", { min: 0 }),
 	state("status.fan.mode", "Fan mode", "string", "state"),
 	state("status.error.rawCount", "Raw error count", "number", "value", { min: 0 }),
+	state("status.maintenance.hasWarning", "Has maintenance warning", "boolean", "indicator"),
+	state("status.maintenance.warningCount", "Maintenance warning count", "number", "value", { min: 0 }),
+	state("status.maintenance.message", "Maintenance message", "string", "text"),
 	state("status.features.autoBoost", "Auto boost", "boolean", "indicator"),
 	state("status.features.cleanComponents", "Clean components", "boolean", "indicator"),
+	...COMMAND_DEFINITIONS.map(definition => commandButton(definition)),
+	state("commands.lastCommand", "Last command", "string", "text"),
+	state("commands.lastResult", "Last command result", "string", "text"),
+	state("commands.lastError", "Last command error", "string", "text"),
+	state("commands.lastExecution", "Last command execution", "string", "date"),
 ];
 
 export async function extendAdapterObjects(adapter: ioBroker.Adapter): Promise<void> {
@@ -92,6 +106,25 @@ function state(
 				read: true,
 				write: false,
 				...options,
+			},
+			native: {},
+		},
+	};
+}
+
+function commandButton(definition: CommandDefinition): StateDefinition {
+	return {
+		id: definition.id,
+		object: {
+			_id: definition.id,
+			type: "state",
+			common: {
+				name: definition.command,
+				type: "boolean",
+				role: "button",
+				read: true,
+				write: true,
+				def: false,
 			},
 			native: {},
 		},

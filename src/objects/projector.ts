@@ -26,6 +26,9 @@ export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStat
 	await setIfDefined(adapter, "status.mop.mode", status.mopMode);
 	await setIfDefined(adapter, "status.fan.mode", status.fanMode);
 	await setIfDefined(adapter, "status.error.rawCount", status.errorRawCount);
+	await setIfDefined(adapter, "status.maintenance.hasWarning", status.maintenanceWarning);
+	await setIfDefined(adapter, "status.maintenance.warningCount", status.maintenanceWarningCount);
+	await setIfDefined(adapter, "status.maintenance.message", status.maintenanceMessage);
 	await setIfDefined(adapter, "status.features.autoBoost", status.autoBoost);
 	await setIfDefined(adapter, "status.features.cleanComponents", status.cleanComponents);
 	await adapter.setStateAsync("connection.lastStatusEvent", { val: new Date().toISOString(), ack: true });

@@ -2,6 +2,22 @@
 	"i18n": true,
 	"type": "panel",
 	"items": {
+		"adapterLogo": {
+			"type": "staticImage",
+			"src": "proscenic.png",
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12,
+			"style": {
+				"width": 140,
+				"height": 140,
+				"objectFit": "contain",
+				"margin": "8px 0 16px 0"
+			}
+		},
 		"region": {
 			"type": "select",
 			"label": "region",

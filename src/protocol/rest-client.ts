@@ -1,4 +1,5 @@
 import { request as httpsRequest } from "node:https";
+import type { CommandRequest } from "../domain/commands";
 import { md5Hex } from "./crypto";
 import type { DeviceListData, DeviceRecord, GatewayData, LoginData, ProscenicEnvelope } from "./types";
 
@@ -77,6 +78,17 @@ export class ProscenicRestClient {
 		return response.data ?? {};
 	}
 
+	public async sendCommand(token: string, command: CommandRequest): Promise<ProscenicEnvelope> {
+		if (command.contentType) {
+			return this.request(command.path, command.body, {
+				"Content-Type": command.contentType,
+				token,
+			});
+		}
+
+		return this.postFormPath(command.path, command.body, { token });
+	}
+
 	private async postJson<T>(
 		path: string,
 		body: Record<string, unknown>,
@@ -93,7 +105,15 @@ export class ProscenicRestClient {
 		body: Record<string, string>,
 		headers: Record<string, string> = {},
 	): Promise<ProscenicEnvelope<T>> {
-		return this.request<T>(path, new URLSearchParams(body).toString(), {
+		return this.postFormPath<T>(path, new URLSearchParams(body).toString(), headers);
+	}
+
+	private async postFormPath<T>(
+		path: string,
+		body: string,
+		headers: Record<string, string> = {},
+	): Promise<ProscenicEnvelope<T>> {
+		return this.request<T>(path, body, {
 			"Content-Type": "application/x-www-form-urlencoded",
 			...headers,
 		});

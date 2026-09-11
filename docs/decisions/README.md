@@ -22,10 +22,12 @@ Current decisions:
 - [ADR 0011](0011-gateway-reconnect-policy.md): gateway reconnect policy
 - [ADR 0012](0012-command-proof-of-concept.md): command proof of concept before
   public controls
+- [ADR 0013](0013-initial-command-object-structure.md): initial command object
+  structure
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, command confirmation behavior, public
-command states, and map privacy/storage.
+command failure semantics, and map privacy/storage.
 
 ## Template
 

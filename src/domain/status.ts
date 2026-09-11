@@ -11,6 +11,9 @@ export interface RobotStatus {
 	mopMode?: number;
 	fanMode?: string;
 	errorRawCount?: number;
+	maintenanceWarning?: boolean;
+	maintenanceWarningCount?: number;
+	maintenanceMessage?: string;
 	autoBoost?: boolean;
 	cleanComponents?: boolean;
 }
@@ -39,6 +42,9 @@ export function normalizeStatus20001(data: unknown): RobotStatus | undefined {
 
 	if (Array.isArray(record.errorState)) {
 		status.errorRawCount = record.errorState.length;
+		status.maintenanceWarningCount = record.errorState.length;
+		status.maintenanceWarning = record.errorState.length > 0;
+		status.maintenanceMessage = record.errorState.length > 0 ? "Maintenance warning reported by robot" : "";
 	}
 
 	return Object.keys(status).length > 0 ? status : undefined;

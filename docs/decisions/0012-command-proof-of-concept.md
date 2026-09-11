@@ -70,7 +70,6 @@ performed the dust collection behavior, and then continued cleaning. No raw
 command payloads, tokens, serial numbers, private account data, gateway
 endpoints, maps, or private device names were recorded.
 
-Public ioBroker command states remain pending until command acknowledgement and
-result-state semantics are designed and tested in the adapter. The PoC evidence
-confirms trigger behavior, not yet the final public object IDs, roles,
-acknowledgement states, or failure semantics.
+ADR 0013 defines the first adapter command object structure for test-host
+validation. The PoC evidence confirms trigger behavior, not yet release-ready
+failure semantics or final user-facing command documentation.
