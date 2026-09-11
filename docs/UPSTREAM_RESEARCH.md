@@ -17,6 +17,17 @@ copied or distributed.
 implementation, including message types and candidate status fields. It has no
 identified license and is a behavioral reference only.
 
+Behavioral map/status findings from these sources and our own probes:
+
+- `infoType` 20001 carries status-like values and an `errorState` array that is
+  a candidate source for maintenance warnings.
+- `infoType` 20002 carries map metadata such as map/path IDs, dimensions,
+  resolution, area list, compressed length, and an encoded map body.
+- Known map renderers treat the encoded map body as private robot map data and
+  combine it with coordinate fields and path/charger positions. The MIT adapter
+  therefore exposes only safe metadata until a separate local-only map rendering
+  decision is accepted.
+
 Independent implementation rule: derive project requirements from observable
 requests/responses, public documentation, independently written tests, and our
 own real-device probes. Do not translate or mechanically port reference code.

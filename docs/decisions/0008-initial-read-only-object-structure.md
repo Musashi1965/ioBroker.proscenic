@@ -28,7 +28,8 @@ Top-level object groups:
 - `capabilities.*`: booleans for features that are actually exposed;
 - `status.*`: normalized read-only status from verified gateway events;
 - `commands.*`: confirmed command test buttons and read-only command result
-  metadata, as defined by ADR 0013.
+  metadata, as defined by ADR 0013;
+- `map.*`: safe `infoType` 20002 metadata only, as defined by ADR 0014.
 
 Initial states:
 
@@ -58,9 +59,23 @@ Initial states:
 | `status.error.rawCount` | number | `value` |  | derived from `errorState` |
 | `status.features.autoBoost` | boolean | `indicator` |  | `infoType` 20001 |
 | `status.features.cleanComponents` | boolean | `indicator` |  | `infoType` 20001 |
+| `status.maintenance.hasWarning` | boolean | `indicator` |  | derived from `errorState` |
+| `status.maintenance.warningCount` | number | `value` |  | derived from `errorState` |
+| `status.maintenance.message` | string | `text` |  | generic maintenance warning |
+| `status.maintenance.details` | string | `text` |  | redacted diagnostic summary |
+| `map.available` | boolean | `indicator` |  | derived from `infoType` 20002 |
+| `map.id` | number | `value` |  | `infoType` 20002 metadata |
+| `map.pathId` | number | `value` |  | `infoType` 20002 metadata |
+| `map.width` | number | `value` |  | `infoType` 20002 metadata |
+| `map.height` | number | `value` |  | `infoType` 20002 metadata |
+| `map.resolution` | number | `value` |  | `infoType` 20002 metadata |
+| `map.areaCount` | number | `value` |  | derived from `infoType` 20002 `area` length |
+| `map.compressedBytes` | number | `value` | `B` | `infoType` 20002 metadata |
+| `map.encodedBytes` | number | `value` | `B` | derived from encoded map length |
+| `map.updated` | string | `date` |  | last safe map metadata update |
 
 All states are read-only and are written by the adapter with `ack=true`.
-Map objects, positions, raw events, and full upstream JSON remain out of
+Raw map objects, positions, raw events, and full upstream JSON remain out of
 scope. Writable command buttons are now defined separately by ADR 0013.
 
 ## Consequences

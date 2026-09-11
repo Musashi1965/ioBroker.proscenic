@@ -71,8 +71,16 @@ The Proscenic app also reported a maintenance warning equivalent to "dust bag
 full, please replace". The project has not yet identified which safe upstream
 field carries this condition. Candidate sources include derived `errorState`
 content, station-related `infoType` 20001 fields, or a separate cloud/app data
-source. The adapter must not publish guessed maintenance messages before this
-mapping is proven with redacted private evidence.
+source. The adapter now exposes a bounded and redacted
+`status.maintenance.details` diagnostic state to speed up this mapping. It must
+not publish guessed maintenance messages before the mapping is proven with
+redacted private evidence.
+
+`infoType` 20002 is also used for safe map metadata. The adapter may publish map
+availability, dimensions, resolution, IDs, area count, encoded size, compressed
+size, and update timestamp. It must not publish raw base64 maps, decompressed
+map images, coordinates, paths, charger positions, serial numbers, or complete
+20002 payloads.
 
 The first deployed read-only adapter with ADR 0011 reconnect behavior was also
 validated on CM4-Node4. After a gateway socket close, the adapter scheduled a
@@ -80,8 +88,9 @@ bounded reconnect, re-established the gateway connection, and continued updating
 cleaning status values while the robot was active.
 
 This evidence is sufficient to start designing a minimal read-only status
-contract. It is not sufficient for command support, self-emptying support, map
-publication, multi-device support, or release claims.
+contract and safe map metadata. It is not sufficient for self-emptying status
+semantics, raw map rendering/publication, multi-device support, or release
+claims.
 
 Candidate read-only status fields are tracked in ADR 0006. They remain proposed
 until their value semantics, units, ranges, and enum labels are verified against

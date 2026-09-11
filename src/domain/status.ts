@@ -14,6 +14,7 @@ export interface RobotStatus {
 	maintenanceWarning?: boolean;
 	maintenanceWarningCount?: number;
 	maintenanceMessage?: string;
+	maintenanceDetails?: string;
 	autoBoost?: boolean;
 	cleanComponents?: boolean;
 }
@@ -45,9 +46,59 @@ export function normalizeStatus20001(data: unknown): RobotStatus | undefined {
 		status.maintenanceWarningCount = record.errorState.length;
 		status.maintenanceWarning = record.errorState.length > 0;
 		status.maintenanceMessage = record.errorState.length > 0 ? "Maintenance warning reported by robot" : "";
+		status.maintenanceDetails = summarizeErrorState(record.errorState);
 	}
 
 	return Object.keys(status).length > 0 ? status : undefined;
+}
+
+function summarizeErrorState(errorState: unknown[]): string {
+	if (errorState.length === 0) {
+		return "";
+	}
+
+	return JSON.stringify(
+		errorState.slice(0, 5).map((entry, index) => ({
+			index,
+			...summarizeErrorEntry(entry),
+		})),
+	);
+}
+
+function summarizeErrorEntry(entry: unknown): Record<string, unknown> {
+	if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+		return {
+			type: typeof entry,
+		};
+	}
+
+	const record = entry as Record<string, unknown>;
+	const keys = Object.keys(record)
+		.filter(key => !isSensitiveDiagnosticKey(key))
+		.sort();
+	const values: Record<string, string | number | boolean | null> = {};
+
+	for (const key of keys) {
+		const value = record[key];
+		if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+			values[key] = typeof value === "string" ? redactDiagnosticString(value) : value;
+		}
+	}
+
+	return {
+		keys,
+		values,
+	};
+}
+
+function isSensitiveDiagnosticKey(key: string): boolean {
+	return /(?:sn|serial|token|password|pwd|username|email|map|pos|position|path|addr|ip|host)/iu.test(key);
+}
+
+function redactDiagnosticString(value: string): string {
+	return value
+		.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gu, "<redacted-email>")
+		.replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/gu, "<redacted-address>");
 }
 
 function copyNumber<T extends object>(

@@ -24,10 +24,12 @@ Current decisions:
   public controls
 - [ADR 0013](0013-initial-command-object-structure.md): initial command object
   structure
+- [ADR 0014](0014-safe-maintenance-and-map-metadata.md): safe maintenance
+  diagnostics and map metadata
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, command confirmation behavior, public
-command failure semantics, and map privacy/storage.
+command failure semantics, and raw map rendering/storage.
 
 ## Template
 

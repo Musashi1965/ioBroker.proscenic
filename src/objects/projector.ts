@@ -1,3 +1,4 @@
+import type { MapMetadata } from "../domain/map";
 import type { RobotStatus } from "../domain/status";
 import type { DeviceRecord } from "../protocol/types";
 
@@ -29,9 +30,24 @@ export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStat
 	await setIfDefined(adapter, "status.maintenance.hasWarning", status.maintenanceWarning);
 	await setIfDefined(adapter, "status.maintenance.warningCount", status.maintenanceWarningCount);
 	await setIfDefined(adapter, "status.maintenance.message", status.maintenanceMessage);
+	await setIfDefined(adapter, "status.maintenance.details", status.maintenanceDetails);
 	await setIfDefined(adapter, "status.features.autoBoost", status.autoBoost);
 	await setIfDefined(adapter, "status.features.cleanComponents", status.cleanComponents);
 	await adapter.setStateAsync("connection.lastStatusEvent", { val: new Date().toISOString(), ack: true });
+}
+
+export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMetadata): Promise<void> {
+	await setIfDefined(adapter, "map.available", map.available);
+	await setIfDefined(adapter, "map.id", map.mapId);
+	await setIfDefined(adapter, "map.pathId", map.pathId);
+	await setIfDefined(adapter, "map.width", map.width);
+	await setIfDefined(adapter, "map.height", map.height);
+	await setIfDefined(adapter, "map.resolution", map.resolution);
+	await setIfDefined(adapter, "map.areaCount", map.areaCount);
+	await setIfDefined(adapter, "map.compressedBytes", map.compressedBytes);
+	await setIfDefined(adapter, "map.encodedBytes", map.encodedBytes);
+	await adapter.setStateAsync("map.updated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
 }
 
 export async function setConnectionState(

@@ -35,7 +35,8 @@ from proposed to accepted after value-level real-device verification.
 | `water` | `status.water.level` | number | `level` |  | candidate | Likely mopping water level; range pending. |
 | `mop` | `status.mop.mode` | number | `state` |  | candidate | Mopping-related mode; semantics pending. |
 | `workNoisy` | `status.fan.mode` | string | `state` |  | candidate | Likely suction/fan mode; enum values pending. |
-| `errorState` | `status.error.rawCount` | number | `value` |  | candidate | Expose only derived count initially, not raw vendor error array. |
+| `errorState` | `status.error.rawCount` | number | `value` |  | candidate | Expose only derived count, not raw vendor error array. |
+| `errorState` | `status.maintenance.details` | string | `text` |  | diagnostic | Bounded, redacted diagnostic summary for maintenance mapping. |
 | `autoBoost` | `status.features.autoBoost` | boolean | `indicator` |  | observed | Boolean feature/status flag; label pending. |
 | `cleanComponents` | `status.features.cleanComponents` | boolean | `indicator` |  | observed | Boolean feature/status flag; label pending. |
 
@@ -69,10 +70,9 @@ returned to the station before continuing cleaning. This confirms command
 trigger behavior, but not a public station-operation status field.
 
 The Proscenic app displayed a maintenance warning equivalent to "dust bag full,
-please replace". The public object contract needs a maintenance/warning area,
-but this ADR does not yet accept a concrete state because the project has not
-identified whether the safe source is `errorState`, a station-related field,
-or another cloud/app data source.
+please replace". ADR 0014 adds a safe diagnostic maintenance details state to
+help identify the source, but the adapter must not translate unknown diagnostic
+content into a concrete user-facing warning before the mapping is proven.
 
 All accepted states will be read-only and published with `ack=true`. Commands
 remain out of scope for this ADR.

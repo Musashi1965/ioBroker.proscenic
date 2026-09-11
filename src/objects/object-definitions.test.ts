@@ -39,10 +39,21 @@ describe("initial object definitions", () => {
 		]);
 	});
 
-	it("does not expose maps, positions, serials, or gateway endpoints", () => {
+	it("exposes only safe map metadata without raw maps, positions, serials, or gateway endpoints", () => {
 		const ids = STATE_DEFINITIONS.map(definition => definition.id);
 
+		expect(ids).to.include("map.available");
+		expect(ids).to.include("map.id");
+		expect(ids).to.include("map.pathId");
+		expect(ids).to.include("map.width");
+		expect(ids).to.include("map.height");
+		expect(ids).to.include("map.resolution");
+		expect(ids).to.include("map.areaCount");
+		expect(ids).to.include("map.compressedBytes");
+		expect(ids).to.include("map.encodedBytes");
+		expect(ids).to.include("map.updated");
 		expect(ids).to.not.include("map.raw");
+		expect(ids).to.not.include("map.image");
 		expect(ids).to.not.include("status.position");
 		expect(ids).to.not.include("device.serial");
 		expect(ids).to.not.include("connection.gatewayEndpoint");

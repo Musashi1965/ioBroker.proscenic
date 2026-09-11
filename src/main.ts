@@ -11,11 +11,13 @@ import {
 	normalizeCommandButtonValue,
 	type RobotCommand,
 } from "./domain/commands";
+import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
+	projectMapMetadata,
 	projectStatus,
 	redactedErrorMessage,
 	setConnectionState,
@@ -197,13 +199,19 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {
-		if (infoType !== 20001) {
+		if (infoType === 20001) {
+			const status = normalizeStatus20001(data);
+			if (status) {
+				await projectStatus(this, status);
+			}
 			return;
 		}
 
-		const status = normalizeStatus20001(data);
-		if (status) {
-			await projectStatus(this, status);
+		if (infoType === 20002) {
+			const map = normalizeMap20002(data);
+			if (map) {
+				await projectMapMetadata(this, map);
+			}
 		}
 	}
 

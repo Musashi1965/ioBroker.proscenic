@@ -31,6 +31,8 @@ describe("normalizeStatus20001", () => {
 			cleanTime: 34,
 			errorRawCount: 2,
 			fanMode: "strong",
+			maintenanceDetails:
+				'[{"index":0,"keys":["code"],"values":{"code":1}},{"index":1,"keys":["code"],"values":{"code":2}}]',
 			maintenanceMessage: "Maintenance warning reported by robot",
 			maintenanceWarning: true,
 			maintenanceWarningCount: 2,
@@ -47,5 +49,24 @@ describe("normalizeStatus20001", () => {
 		expect(normalizeStatus20001(null)).to.equal(undefined);
 		expect(normalizeStatus20001([])).to.equal(undefined);
 		expect(normalizeStatus20001("status")).to.equal(undefined);
+	});
+
+	it("redacts sensitive maintenance diagnostics", () => {
+		const status = normalizeStatus20001({
+			errorState: [
+				{
+					code: 42,
+					email: "person@example.com",
+					host: "gateway.example.com",
+					message: "Contact user@example.com at 192.0.2.10:443",
+					pos: [1, 2],
+					SN: "private-serial",
+				},
+			],
+		});
+
+		expect(status?.maintenanceDetails).to.equal(
+			'[{"index":0,"keys":["code","message"],"values":{"code":42,"message":"Contact <redacted-email> at <redacted-address>"}}]',
+		);
 	});
 });
