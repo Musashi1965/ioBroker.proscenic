@@ -72,6 +72,7 @@ async function main(): Promise<void> {
   });
 
   console.log(`Gateway events: ${captureResult.events.length}`);
+  console.log(`Gateway frame errors: ${captureResult.frameErrors.length}`);
   console.log("Gateway completion:", JSON.stringify({
     reason: captureResult.completionReason,
     elapsedMs: captureResult.elapsedMs,
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
         cycles: captureResult.cycles,
       },
       eventCount: captureResult.events.length,
+      frameErrorCount: captureResult.frameErrors.length,
     });
   }
 
@@ -212,6 +214,7 @@ async function readGatewayEndpoints(options: {
       reason: result.completionReason,
       elapsedMs: result.elapsedMs,
       events: result.events.length,
+      frameErrors: result.frameErrors.length,
     }));
 
     lastResult = result;
@@ -240,6 +243,7 @@ async function readGatewayCapture(options: {
   printSafeStatusValues: boolean;
 }): Promise<{
   events: Awaited<ReturnType<typeof readGatewayEvents>>["events"];
+  frameErrors: Awaited<ReturnType<typeof readGatewayEvents>>["frameErrors"];
   completionReason: string;
   elapsedMs: number;
   cycles: number;
@@ -249,6 +253,7 @@ async function readGatewayCapture(options: {
     ? startedAt + options.listenSeconds * 1000
     : startedAt + options.captureSeconds * 1000;
   const events: Awaited<ReturnType<typeof readGatewayEvents>>["events"] = [];
+  const frameErrors: Awaited<ReturnType<typeof readGatewayEvents>>["frameErrors"] = [];
   let token = options.initialToken;
   let cycles = 0;
   let lastCompletionReason = "not-started";
@@ -287,10 +292,15 @@ async function readGatewayCapture(options: {
       events.push(event);
       await printGatewayEvent(events.length, event, options.printSafeStatusValues, options.privateCapture);
     }
+    for (const frameError of result.frameErrors) {
+      frameErrors.push(frameError);
+      await printGatewayFrameError(frameErrors.length, frameError, options.privateCapture);
+    }
 
     if (events.length >= options.maxEvents) {
       return {
         events,
+        frameErrors,
         completionReason: "max-events-reached",
         elapsedMs: Date.now() - startedAt,
         cycles,
@@ -310,6 +320,7 @@ async function readGatewayCapture(options: {
 
   return {
     events,
+    frameErrors,
     completionReason: Date.now() >= deadlineMs ? "capture-window-elapsed" : lastCompletionReason,
     elapsedMs: Date.now() - startedAt,
     cycles,
@@ -356,6 +367,24 @@ async function printGatewayEvent(
       encrypted: event.encrypted,
       infoType: event.infoType ?? null,
       decrypted: event.decrypted ?? null,
+    });
+  }
+}
+
+async function printGatewayFrameError(
+  index: number,
+  frameError: Awaited<ReturnType<typeof readGatewayEvents>>["frameErrors"][number],
+  privateCapture: Awaited<ReturnType<typeof createPrivateCaptureWriter>>,
+): Promise<void> {
+  console.log(`Frame error ${index}:`, JSON.stringify({
+    message: frameError.message,
+  }));
+
+  if (privateCapture) {
+    await privateCapture.write({
+      kind: "frame-error",
+      index,
+      message: frameError.message,
     });
   }
 }

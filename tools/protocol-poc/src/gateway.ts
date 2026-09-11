@@ -12,6 +12,10 @@ export interface GatewayEvent {
   decrypted?: Record<string, unknown>;
 }
 
+export interface GatewayFrameError {
+  message: string;
+}
+
 export type GatewayProbeCompletionReason =
   | "listen-window-elapsed"
   | "max-events-reached"
@@ -20,6 +24,7 @@ export type GatewayProbeCompletionReason =
 
 export interface GatewayProbeResult {
   events: GatewayEvent[];
+  frameErrors: GatewayFrameError[];
   completionReason: GatewayProbeCompletionReason;
   elapsedMs: number;
 }
@@ -38,6 +43,7 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
   return new Promise((resolve, reject) => {
     const socket = new Socket();
     const events: GatewayEvent[] = [];
+    const frameErrors: GatewayFrameError[] = [];
     let buffer = "";
     let settled = false;
     let connected = false;
@@ -57,6 +63,7 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
       } else {
         resolve({
           events,
+          frameErrors,
           completionReason,
           elapsedMs: Date.now() - startedAt,
         });
@@ -97,9 +104,16 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
           continue;
         }
 
-        const event = parseGatewayFrame(frame, options.token);
-        if (event) {
-          events.push(event);
+        const result = parseGatewayFrameResult(frame, options.token);
+        if (result.error) {
+          frameErrors.push({
+            message: safeFrameErrorMessage(result.error),
+          });
+          continue;
+        }
+
+        if (result.event) {
+          events.push(result.event);
         }
 
         if (events.length >= options.maxEvents) {
@@ -120,6 +134,23 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
     socket.on("close", () => finish("socket-closed"));
     socket.connect(options.endpoint.port, options.endpoint.host);
   });
+}
+
+export interface GatewayFrameParseResult {
+  event?: GatewayEvent;
+  error?: Error;
+}
+
+export function parseGatewayFrameResult(frame: string, token?: string): GatewayFrameParseResult {
+  try {
+    return {
+      event: parseGatewayFrame(frame, token),
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
 }
 
 export function parseGatewayFrame(frame: string, token?: string): GatewayEvent | undefined {
@@ -150,4 +181,18 @@ export function parseGatewayFrame(frame: string, token?: string): GatewayEvent |
     infoType: decrypted.infoType,
     decrypted,
   };
+}
+
+function safeFrameErrorMessage(error: Error): string {
+  if (error.message.includes("bad decrypt") || error.message.includes("wrong final block length")) {
+    return "decrypt failed";
+  }
+  if (error.message.includes("Unexpected") || error.message.includes("JSON")) {
+    return "json parse failed";
+  }
+
+  return error.message
+    .replace(/[A-Za-z0-9+/=]{24,}/gu, "<redacted-blob>")
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gu, "<redacted-email>")
+    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/gu, "<redacted-address>");
 }

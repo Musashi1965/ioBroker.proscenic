@@ -67,6 +67,10 @@ closes early, the tool waits for `PROSCENIC_RECONNECT_DELAY_MS`, refreshes the
 login token, discovers the gateway again, and starts another redacted capture
 cycle. The private JSONL file is kept open across cycles.
 
+Malformed frames, bad decrypts, and invalid JSON are counted as frame errors so
+one bad gateway message cannot abort a long capture. The PoC records only a
+short safe error category, never the raw offending frame.
+
 Private capture mode is for owner-local protocol research only. It may contain
 serial numbers, map data, positions, and raw decrypted payloads. The directory
 is ignored by Git and must not be copied into issues, documentation, commits,

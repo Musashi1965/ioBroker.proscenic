@@ -1,7 +1,7 @@
 import { createCipheriv } from "node:crypto";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readGatewayEvents, parseGatewayFrame } from "./gateway.js";
+import { readGatewayEvents, parseGatewayFrame, parseGatewayFrameResult } from "./gateway.js";
 import type { AddressInfo } from "node:net";
 import { createServer } from "node:net";
 
@@ -34,6 +34,16 @@ describe("gateway frame parser", () => {
       },
     });
   });
+
+  it("returns parse errors without throwing", () => {
+    const result = parseGatewayFrameResult(
+      JSON.stringify({ encrypt: true, data: "not-valid-ciphertext" }),
+      "0123456789abcdef",
+    );
+
+    assert.equal(result.event, undefined);
+    assert.ok(result.error);
+  });
 });
 
 describe("gateway reader", () => {
@@ -65,6 +75,7 @@ describe("gateway reader", () => {
 
       assert.equal(result.completionReason, "listen-window-elapsed");
       assert.equal(result.events.length, 0);
+      assert.equal(result.frameErrors.length, 0);
       assert.ok(result.elapsedMs >= 900);
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -99,7 +110,44 @@ describe("gateway reader", () => {
 
       assert.equal(result.completionReason, "socket-closed");
       assert.equal(result.events.length, 0);
+      assert.equal(result.frameErrors.length, 0);
       assert.ok(result.elapsedMs < 1_000);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
+
+  it("continues reading after a bad encrypted frame", async () => {
+    const server = createServer((socket) => {
+      socket.on("data", () => {
+        socket.write(`${JSON.stringify({ encrypt: true, data: "not-valid-ciphertext" })}#\t#`);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    try {
+      const address = server.address();
+      assert.equal(typeof address, "object");
+      assert.ok(address);
+      const { port } = address as AddressInfo;
+      const result = await readGatewayEvents({
+        endpoint: {
+          host: "127.0.0.1",
+          port,
+        },
+        token: "0123456789abcdef",
+        serial: "serial",
+        listenSeconds: 1,
+        maxEvents: 1,
+        timeoutMs: 100,
+        maxBufferBytes: 1024,
+      });
+
+      assert.equal(result.completionReason, "listen-window-elapsed");
+      assert.equal(result.events.length, 0);
+      assert.deepEqual(result.frameErrors, [{ message: "decrypt failed" }]);
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());
