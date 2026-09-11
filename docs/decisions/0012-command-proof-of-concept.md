@@ -58,3 +58,14 @@ useful.
 Automated tests must cover command request construction without live
 credentials. Real-device validation must be private and redacted and must
 record one command at a time.
+
+Initial private validation on the first M7 Pro test device confirmed the
+`start`, `pause`, and `return` command candidates through the command PoC. The
+tests confirmed visible robot behavior and corresponding read-only status
+updates where available. No raw command payloads, tokens, serial numbers,
+private account data, gateway endpoints, maps, or private device names were
+recorded.
+
+The `continue` candidate remains pending. Public ioBroker command states remain
+pending until command acknowledgement and result-state semantics are designed
+and tested in the adapter.

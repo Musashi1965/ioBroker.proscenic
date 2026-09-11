@@ -36,6 +36,10 @@ The PoC must not:
 Command validation is intentionally separated into `tools/command-poc`. The
 protocol PoC remains read-only.
 
+Initial command PoC runs have confirmed `start`, `pause`, and `return` on the
+first M7 Pro test device. These are still PoC results, not yet public adapter
+commands.
+
 ## Verified Evidence
 
 Private runs against one M7 Pro on 2026-09-10 verified:
@@ -78,7 +82,8 @@ private, redacted evidence for:
 3. token refresh behavior after authentication/session failure;
 4. stable interpretation of candidate `infoType` 20001 status fields;
 5. authentication and gateway failure behavior with redacted errors;
-6. every command separately, including confirmation and failure semantics.
+6. the remaining command candidates and adapter-level command acknowledgement
+   and failure semantics.
 
 Only after the candidate status fields are interpreted should the project
 freeze the first public ioBroker status contract in a new ADR.
