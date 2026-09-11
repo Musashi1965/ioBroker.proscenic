@@ -39,6 +39,10 @@ Optional settings:
 - `PROSCENIC_LISTEN_SECONDS`: gateway listen duration, default `30`.
 - `PROSCENIC_MAX_EVENTS`: maximum encrypted gateway events to summarize,
   default `3`.
+- `PROSCENIC_CAPTURE_SECONDS`: optional total capture window across reconnect
+  cycles. When unset, the PoC keeps the previous single-window behavior.
+- `PROSCENIC_RECONNECT_DELAY_MS`: delay between capture reconnect cycles,
+  default `2000`.
 - `PROSCENIC_TIMEOUT_MS`: REST/socket timeout, default `10000`.
 - `PROSCENIC_PRINT_SAFE_STATUS_VALUES`: print selected `infoType` 20001 live
   values when set to `1`.
@@ -55,6 +59,13 @@ was reached, the socket timed out, or the gateway closed the connection.
 If the cloud returns multiple gateway endpoints, the PoC tries them in order
 and reports only the attempt number and completion reason, never the endpoint
 address.
+
+For longer owner-local research sessions, set `PROSCENIC_CAPTURE_SECONDS`
+together with `PROSCENIC_PRIVATE_CAPTURE=1`. The PoC then keeps capturing until
+the total capture window or the maximum event count is reached. If the gateway
+closes early, the tool waits for `PROSCENIC_RECONNECT_DELAY_MS`, refreshes the
+login token, discovers the gateway again, and starts another redacted capture
+cycle. The private JSONL file is kept open across cycles.
 
 Private capture mode is for owner-local protocol research only. It may contain
 serial numbers, map data, positions, and raw decrypted payloads. The directory

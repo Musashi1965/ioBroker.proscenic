@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { ProscenicClient, type Region } from "./client.js";
-import { readGatewayEvents, type GatewayEndpoint } from "./gateway.js";
+import { readGatewayEvents, type GatewayEndpoint, type GatewayEvent } from "./gateway.js";
 import { promptHidden, promptLine } from "./input.js";
 import { createPrivateCaptureWriter } from "./private-capture.js";
 import { summarizeObjectShape } from "./redaction.js";
@@ -9,6 +9,7 @@ import { extractSafeStatus20001Values, summarizeStatus20001 } from "./status-can
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LISTEN_SECONDS = 30;
 const DEFAULT_MAX_EVENTS = 3;
+const DEFAULT_RECONNECT_DELAY_MS = 2_000;
 const MAX_BUFFER_BYTES = 512 * 1024;
 
 async function main(): Promise<void> {
@@ -18,6 +19,11 @@ async function main(): Promise<void> {
   const timeoutMs = parsePositiveInt(process.env.PROSCENIC_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const listenSeconds = parsePositiveInt(process.env.PROSCENIC_LISTEN_SECONDS, DEFAULT_LISTEN_SECONDS);
   const maxEvents = parsePositiveInt(process.env.PROSCENIC_MAX_EVENTS, DEFAULT_MAX_EVENTS);
+  const captureSeconds = parseOptionalPositiveInt(process.env.PROSCENIC_CAPTURE_SECONDS);
+  const reconnectDelayMs = parseNonNegativeInt(
+    process.env.PROSCENIC_RECONNECT_DELAY_MS,
+    DEFAULT_RECONNECT_DELAY_MS,
+  );
   const deviceIndex = parseNonNegativeInt(process.env.PROSCENIC_DEVICE_INDEX, 0);
   const printSafeStatusValues = parseBooleanFlag(process.env.PROSCENIC_PRINT_SAFE_STATUS_VALUES);
   const privateCapture = await createPrivateCaptureWriter(parseBooleanFlag(process.env.PROSCENIC_PRIVATE_CAPTURE));
@@ -52,25 +58,26 @@ async function main(): Promise<void> {
     status: device.status ?? null,
   }));
 
-  const gateway = await client.getGateway(token, device.sn);
-  const endpoints = selectGatewayEndpoints(gateway.addr_list);
-  console.log("Gateway: endpoints received and validated:", endpoints.length);
-
-  const gatewayResult = await readGatewayEndpoints({
-    endpoints,
-    token,
+  const captureResult = await readGatewayCapture({
+    client,
+    initialToken: token,
     serial: device.sn,
     listenSeconds,
+    captureSeconds,
     maxEvents,
     timeoutMs,
-    maxBufferBytes: MAX_BUFFER_BYTES,
+    reconnectDelayMs,
+    privateCapture,
+    printSafeStatusValues,
   });
 
-  console.log(`Gateway events: ${gatewayResult.events.length}`);
+  console.log(`Gateway events: ${captureResult.events.length}`);
   console.log("Gateway completion:", JSON.stringify({
-    reason: gatewayResult.completionReason,
-    elapsedMs: gatewayResult.elapsedMs,
+    reason: captureResult.completionReason,
+    elapsedMs: captureResult.elapsedMs,
     listenSeconds,
+    captureSeconds: captureSeconds ?? null,
+    cycles: captureResult.cycles,
   }));
   if (privateCapture) {
     await privateCapture.write({
@@ -83,50 +90,14 @@ async function main(): Promise<void> {
         status: device.status ?? null,
       },
       gatewayCompletion: {
-        reason: gatewayResult.completionReason,
-        elapsedMs: gatewayResult.elapsedMs,
+        reason: captureResult.completionReason,
+        elapsedMs: captureResult.elapsedMs,
         listenSeconds,
+        captureSeconds: captureSeconds ?? null,
+        cycles: captureResult.cycles,
       },
-      eventCount: gatewayResult.events.length,
+      eventCount: captureResult.events.length,
     });
-  }
-  for (const [index, event] of gatewayResult.events.entries()) {
-    console.log(`Event ${index + 1}:`, JSON.stringify({
-      encrypted: event.encrypted,
-      infoType: event.infoType ?? null,
-      dataShape: summarizeObjectShape(event.decrypted?.data),
-    }));
-
-    if (event.infoType === 20001) {
-      const statusSummary = summarizeStatus20001(event.decrypted?.data);
-      if (statusSummary) {
-        console.log("Status 20001 candidates:", JSON.stringify({
-          observedFields: statusSummary.observedCandidateFields.map((candidate) => ({
-            upstreamField: candidate.upstreamField,
-            candidateStateId: candidate.candidateStateId,
-            valueType: candidate.valueType,
-            role: candidate.candidateRole,
-            unit: candidate.unit ?? null,
-            confidence: candidate.confidence,
-          })),
-          unknownFields: statusSummary.unknownFields,
-        }));
-      }
-
-      if (printSafeStatusValues) {
-        console.log("Status 20001 safe values:", JSON.stringify(extractSafeStatus20001Values(event.decrypted?.data)));
-      }
-    }
-
-    if (privateCapture) {
-      await privateCapture.write({
-        kind: "event",
-        index: index + 1,
-        encrypted: event.encrypted,
-        infoType: event.infoType ?? null,
-        decrypted: event.decrypted ?? null,
-      });
-    }
   }
 
   if (privateCapture) {
@@ -145,6 +116,19 @@ function parseRegion(value: string): Region {
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`Expected positive integer, got ${value}`);
+  }
+
+  return parsed;
+}
+
+function parseOptionalPositiveInt(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
   }
 
   const parsed = Number.parseInt(value, 10);
@@ -241,6 +225,143 @@ async function readGatewayEndpoints(options: {
   }
 
   return lastResult;
+}
+
+async function readGatewayCapture(options: {
+  client: ProscenicClient;
+  initialToken: string;
+  serial: string;
+  listenSeconds: number;
+  captureSeconds: number | undefined;
+  maxEvents: number;
+  timeoutMs: number;
+  reconnectDelayMs: number;
+  privateCapture: Awaited<ReturnType<typeof createPrivateCaptureWriter>>;
+  printSafeStatusValues: boolean;
+}): Promise<{
+  events: Awaited<ReturnType<typeof readGatewayEvents>>["events"];
+  completionReason: string;
+  elapsedMs: number;
+  cycles: number;
+}> {
+  const startedAt = Date.now();
+  const deadlineMs = options.captureSeconds === undefined
+    ? startedAt + options.listenSeconds * 1000
+    : startedAt + options.captureSeconds * 1000;
+  const events: Awaited<ReturnType<typeof readGatewayEvents>>["events"] = [];
+  let token = options.initialToken;
+  let cycles = 0;
+  let lastCompletionReason = "not-started";
+
+  while (Date.now() < deadlineMs && events.length < options.maxEvents) {
+    cycles += 1;
+    if (cycles > 1) {
+      console.log("Login: refreshing token for capture cycle");
+      token = await options.client.login();
+      console.log("Login: success, token received: true");
+    }
+
+    const gateway = await options.client.getGateway(token, options.serial);
+    const endpoints = selectGatewayEndpoints(gateway.addr_list);
+    console.log("Gateway: endpoints received and validated:", endpoints.length);
+    console.log("Gateway capture cycle:", JSON.stringify({
+      cycle: cycles,
+      elapsedMs: Date.now() - startedAt,
+      remainingMs: Math.max(0, deadlineMs - Date.now()),
+      events: events.length,
+    }));
+
+    const remainingSeconds = Math.max(1, Math.ceil((deadlineMs - Date.now()) / 1000));
+    const result = await readGatewayEndpoints({
+      endpoints,
+      token,
+      serial: options.serial,
+      listenSeconds: Math.min(options.listenSeconds, remainingSeconds),
+      maxEvents: options.maxEvents - events.length,
+      timeoutMs: options.timeoutMs,
+      maxBufferBytes: MAX_BUFFER_BYTES,
+    });
+    lastCompletionReason = result.completionReason;
+
+    for (const event of result.events) {
+      events.push(event);
+      await printGatewayEvent(events.length, event, options.printSafeStatusValues, options.privateCapture);
+    }
+
+    if (events.length >= options.maxEvents) {
+      return {
+        events,
+        completionReason: "max-events-reached",
+        elapsedMs: Date.now() - startedAt,
+        cycles,
+      };
+    }
+
+    if (options.captureSeconds === undefined || result.completionReason === "listen-window-elapsed") {
+      break;
+    }
+
+    const delayMs = Math.min(options.reconnectDelayMs, Math.max(0, deadlineMs - Date.now()));
+    if (delayMs > 0) {
+      console.log("Gateway reconnect delay:", JSON.stringify({ delayMs }));
+      await delay(delayMs);
+    }
+  }
+
+  return {
+    events,
+    completionReason: Date.now() >= deadlineMs ? "capture-window-elapsed" : lastCompletionReason,
+    elapsedMs: Date.now() - startedAt,
+    cycles,
+  };
+}
+
+async function printGatewayEvent(
+  index: number,
+  event: GatewayEvent,
+  printSafeStatusValues: boolean,
+  privateCapture: Awaited<ReturnType<typeof createPrivateCaptureWriter>>,
+): Promise<void> {
+  console.log(`Event ${index}:`, JSON.stringify({
+    encrypted: event.encrypted,
+    infoType: event.infoType ?? null,
+    dataShape: summarizeObjectShape(event.decrypted?.data),
+  }));
+
+  if (event.infoType === 20001) {
+    const statusSummary = summarizeStatus20001(event.decrypted?.data);
+    if (statusSummary) {
+      console.log("Status 20001 candidates:", JSON.stringify({
+        observedFields: statusSummary.observedCandidateFields.map((candidate) => ({
+          upstreamField: candidate.upstreamField,
+          candidateStateId: candidate.candidateStateId,
+          valueType: candidate.valueType,
+          role: candidate.candidateRole,
+          unit: candidate.unit ?? null,
+          confidence: candidate.confidence,
+        })),
+        unknownFields: statusSummary.unknownFields,
+      }));
+    }
+
+    if (printSafeStatusValues) {
+      console.log("Status 20001 safe values:", JSON.stringify(extractSafeStatus20001Values(event.decrypted?.data)));
+    }
+  }
+
+  if (privateCapture) {
+    await privateCapture.write({
+      kind: "event",
+      index,
+      encrypted: event.encrypted,
+      infoType: event.infoType ?? null,
+      decrypted: event.decrypted ?? null,
+    });
+  }
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 main().catch((error: unknown) => {
