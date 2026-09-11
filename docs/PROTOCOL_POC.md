@@ -36,11 +36,12 @@ The PoC must not:
 Command validation is intentionally separated into `tools/command-poc`. The
 protocol PoC remains read-only.
 
-Initial command PoC runs have confirmed `start`, `pause`, `continue`, and
-`return` on the first M7 Pro test device. The `fan-quiet`, `fan-standard`, and
-`fan-strong` fan-speed candidates plus `deep-cleaning` and `collect-dust` are
-available for the next private real-device command validation. These are still
-PoC results, not yet public adapter commands.
+Command PoC runs have confirmed `start`, `pause`, `continue`, `return`,
+`fan-quiet`, `fan-standard`, `fan-strong`, `deep-cleaning`, and `collect-dust`
+on the first M7 Pro test device. `collect-dust` was also confirmed during an
+active cleaning run: the robot returned to the station, performed dust
+collection, and continued cleaning afterward. These are still PoC results, not
+yet public adapter commands.
 
 ## Verified Evidence
 
@@ -60,6 +61,18 @@ and `30000`. Observed mode values include `sweep`, `pause`, `backcharge`, and
 `charge`. This indicates that the gateway pushes events actively while the
 robot is moving and may close the socket after sending a smaller idle/docked
 event set.
+
+Later adapter observation found `status.mode` reporting `dormant` even while
+the robot was doing other visible work. Therefore `mode` must be treated as a
+raw upstream mode candidate and not as a reliable public activity state until
+the project identifies the correct app-equivalent state derivation.
+
+The Proscenic app also reported a maintenance warning equivalent to "dust bag
+full, please replace". The project has not yet identified which safe upstream
+field carries this condition. Candidate sources include derived `errorState`
+content, station-related `infoType` 20001 fields, or a separate cloud/app data
+source. The adapter must not publish guessed maintenance messages before this
+mapping is proven with redacted private evidence.
 
 The first deployed read-only adapter with ADR 0011 reconnect behavior was also
 validated on CM4-Node4. After a gateway socket close, the adapter scheduled a
@@ -82,10 +95,13 @@ private, redacted evidence for:
 1. repeated startup and shutdown without leaked timers or sockets;
 2. timeout-driven reconnect behavior;
 3. token refresh behavior after authentication/session failure;
-4. stable interpretation of candidate `infoType` 20001 status fields;
+4. stable interpretation of candidate `infoType` 20001 status fields,
+   including an app-equivalent activity state instead of relying blindly on
+   upstream `mode`;
 5. authentication and gateway failure behavior with redacted errors;
-6. the remaining command candidates and adapter-level command acknowledgement
-   and failure semantics.
+6. maintenance and warning conditions such as a full dust bag, without
+   exposing raw vendor error payloads;
+7. adapter-level command acknowledgement and failure semantics.
 
 Only after the candidate status fields are interpreted should the project
 freeze the first public ioBroker status contract in a new ADR.

@@ -30,7 +30,7 @@ from proposed to accepted after value-level real-device verification.
 | `allTime` | `status.clean.totalTime` | number | `value` | `s` | candidate | Likely accumulated time in seconds; exact meaning pending. |
 | `elec` | `status.battery.percent` | number | `value.battery` | `%` | candidate | Likely displayed battery percentage. |
 | `elecReal` | `status.battery.rawPercent` | number | `value.battery` | `%` | candidate | Second battery-like value; public value pending. |
-| `mode` | `status.mode` | string | `state` |  | observed | Observed values: `charge`, `sweep`, `pause`, `backcharge`. |
+| `mode` | `status.mode` | string | `state` |  | candidate | Observed values include `charge`, `sweep`, `pause`, `backcharge`, and `dormant`; not reliable enough by itself as app-equivalent activity state. |
 | `subMode` | `status.subMode` | string | `state` |  | observed | Observed values: `total`, literal string `null`. |
 | `water` | `status.water.level` | number | `level` |  | candidate | Likely mopping water level; range pending. |
 | `mop` | `status.mop.mode` | number | `state` |  | candidate | Mopping-related mode; semantics pending. |
@@ -62,6 +62,17 @@ plausible but still require comparison with the app before acceptance.
 
 Self-emptying or self-cleaning did not start during the observed dock test, so
 no dust-bin or station operation state is accepted by this ADR.
+
+Later command PoC validation confirmed dust collection behavior, including a
+case where `collect-dust` was triggered during active cleaning and the robot
+returned to the station before continuing cleaning. This confirms command
+trigger behavior, but not a public station-operation status field.
+
+The Proscenic app displayed a maintenance warning equivalent to "dust bag full,
+please replace". The public object contract needs a maintenance/warning area,
+but this ADR does not yet accept a concrete state because the project has not
+identified whether the safe source is `errorState`, a station-related field,
+or another cloud/app data source.
 
 All accepted states will be read-only and published with `ack=true`. Commands
 remain out of scope for this ADR.
@@ -95,8 +106,12 @@ during at least these remaining states:
 - a low-risk error or unavailable condition, if it occurs naturally.
 
 Active cleaning, pause, return-to-dock, and docked/charging have produced
-redacted `infoType` 20001 value observations. Before accepting this ADR, compare
-the proposed public fields with the Proscenic app labels and ranges.
+redacted `infoType` 20001 value observations. A later adapter observation found
+`status.mode` stuck at `dormant` despite visible robot activity, so the
+accepted contract must either derive a separate app-equivalent activity state
+or clearly label `mode` as raw/candidate upstream state. Before accepting this
+ADR, compare the proposed public fields with the Proscenic app labels and
+ranges.
 
 Record only redacted field names, types, enum labels, and semantic conclusions.
 Do not record raw maps, serial numbers, gateway endpoints, or complete payloads.

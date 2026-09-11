@@ -61,13 +61,16 @@ credentials. Real-device validation must be private and redacted and must
 record one command at a time.
 
 Initial private validation on the first M7 Pro test device confirmed the
-`start`, `pause`, `continue`, and `return` command candidates through the
-command PoC. The tests confirmed visible robot behavior and corresponding
-read-only status updates where available. No raw command payloads, tokens,
-serial numbers, private account data, gateway endpoints, maps, or private
-device names were recorded.
+`start`, `pause`, `continue`, `return`, `fan-quiet`, `fan-standard`,
+`fan-strong`, `deep-cleaning`, and `collect-dust` command candidates through
+the command PoC. The tests confirmed visible robot behavior and corresponding
+read-only status updates where available. The `collect-dust` candidate also
+worked while the robot was cleaning: the robot returned to the station,
+performed the dust collection behavior, and then continued cleaning. No raw
+command payloads, tokens, serial numbers, private account data, gateway
+endpoints, maps, or private device names were recorded.
 
-The `fan-quiet`, `fan-standard`, `fan-strong`, `deep-cleaning`, and
-`collect-dust` candidates remain pending. Public ioBroker command states remain
-pending until command acknowledgement and result-state semantics are designed
-and tested in the adapter.
+Public ioBroker command states remain pending until command acknowledgement and
+result-state semantics are designed and tested in the adapter. The PoC evidence
+confirms trigger behavior, not yet the final public object IDs, roles,
+acknowledgement states, or failure semantics.
