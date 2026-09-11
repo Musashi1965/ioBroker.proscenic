@@ -35,6 +35,35 @@ describe("gateway frame parser", () => {
     });
   });
 
+  it("tries token candidates for encrypted gateway frames", () => {
+    const token = "0123456789abcdef";
+    const plaintext = JSON.stringify({
+      infoType: 20001,
+      data: {
+        mode: "sweep",
+      },
+    });
+    const cipher = createCipheriv("aes-128-ecb", Buffer.from(token), null);
+    const encrypted = Buffer.concat([
+      cipher.update(plaintext, "utf8"),
+      cipher.final(),
+    ]).toString("base64");
+
+    assert.deepEqual(parseGatewayFrame(JSON.stringify({
+      encrypt: true,
+      data: encrypted,
+    }), ["fedcba9876543210", token]), {
+      encrypted: true,
+      infoType: 20001,
+      decrypted: {
+        infoType: 20001,
+        data: {
+          mode: "sweep",
+        },
+      },
+    });
+  });
+
   it("returns parse errors without throwing", () => {
     const result = parseGatewayFrameResult(
       JSON.stringify({ encrypt: true, data: "not-valid-ciphertext" }),

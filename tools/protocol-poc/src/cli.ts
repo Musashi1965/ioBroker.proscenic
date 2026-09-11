@@ -187,6 +187,7 @@ function selectGatewayEndpoints(addresses: unknown): GatewayEndpoint[] {
 async function readGatewayEndpoints(options: {
   endpoints: GatewayEndpoint[];
   token: string;
+  tokenCandidates?: string[];
   serial: string;
   listenSeconds: number;
   maxEvents: number;
@@ -203,6 +204,7 @@ async function readGatewayEndpoints(options: {
     const result = await readGatewayEvents({
       endpoint,
       token: options.token,
+      tokenCandidates: options.tokenCandidates,
       serial: options.serial,
       listenSeconds: options.listenSeconds,
       maxEvents: options.maxEvents,
@@ -255,6 +257,7 @@ async function readGatewayCapture(options: {
   const events: Awaited<ReturnType<typeof readGatewayEvents>>["events"] = [];
   const frameErrors: Awaited<ReturnType<typeof readGatewayEvents>>["frameErrors"] = [];
   let token = options.initialToken;
+  const tokenHistory = [token];
   let cycles = 0;
   let lastCompletionReason = "not-started";
 
@@ -263,6 +266,8 @@ async function readGatewayCapture(options: {
     if (cycles > 1) {
       console.log("Login: refreshing token for capture cycle");
       token = await options.client.login();
+      tokenHistory.unshift(token);
+      tokenHistory.splice(4);
       console.log("Login: success, token received: true");
     }
 
@@ -274,12 +279,14 @@ async function readGatewayCapture(options: {
       elapsedMs: Date.now() - startedAt,
       remainingMs: Math.max(0, deadlineMs - Date.now()),
       events: events.length,
+      tokenCandidates: tokenHistory.length,
     }));
 
     const remainingSeconds = Math.max(1, Math.ceil((deadlineMs - Date.now()) / 1000));
     const result = await readGatewayEndpoints({
       endpoints,
       token,
+      tokenCandidates: tokenHistory,
       serial: options.serial,
       listenSeconds: Math.min(options.listenSeconds, remainingSeconds),
       maxEvents: options.maxEvents - events.length,

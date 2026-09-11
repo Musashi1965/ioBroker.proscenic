@@ -32,6 +32,7 @@ export interface GatewayProbeResult {
 export interface GatewayProbeOptions {
   endpoint: GatewayEndpoint;
   token: string;
+  tokenCandidates?: string[];
   serial: string;
   listenSeconds: number;
   maxEvents: number;
@@ -104,7 +105,7 @@ export async function readGatewayEvents(options: GatewayProbeOptions): Promise<G
           continue;
         }
 
-        const result = parseGatewayFrameResult(frame, options.token);
+        const result = parseGatewayFrameResult(frame, tokenCandidates(options.token, options.tokenCandidates));
         if (result.error) {
           frameErrors.push({
             message: safeFrameErrorMessage(result.error),
@@ -141,7 +142,7 @@ export interface GatewayFrameParseResult {
   error?: Error;
 }
 
-export function parseGatewayFrameResult(frame: string, token?: string): GatewayFrameParseResult {
+export function parseGatewayFrameResult(frame: string, token?: string | string[]): GatewayFrameParseResult {
   try {
     return {
       event: parseGatewayFrame(frame, token),
@@ -153,7 +154,7 @@ export function parseGatewayFrameResult(frame: string, token?: string): GatewayF
   }
 }
 
-export function parseGatewayFrame(frame: string, token?: string): GatewayEvent | undefined {
+export function parseGatewayFrame(frame: string, token?: string | string[]): GatewayEvent | undefined {
   const envelope = parseJsonObject(frame);
   if (envelope.encrypt !== true && !("encrypt" in envelope)) {
     return {
@@ -167,20 +168,39 @@ export function parseGatewayFrame(frame: string, token?: string): GatewayEvent |
     return undefined;
   }
 
-  if (!token) {
+  const tokens = Array.isArray(token) ? token : token ? [token] : [];
+  if (tokens.length === 0) {
     return {
       encrypted: true,
     };
   }
 
-  const decryptedText = decryptGatewayPayload(envelope.data, token);
-  const decrypted = parseJsonObject(decryptedText);
+  const decrypted = decryptWithTokenCandidates(envelope.data, tokens);
 
   return {
     encrypted: true,
     infoType: decrypted.infoType,
     decrypted,
   };
+}
+
+function decryptWithTokenCandidates(base64Payload: string, tokens: string[]): Record<string, unknown> {
+  let lastError: unknown;
+
+  for (const token of tokens) {
+    try {
+      const decryptedText = decryptGatewayPayload(base64Payload, token);
+      return parseJsonObject(decryptedText);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+function tokenCandidates(currentToken: string, additionalTokens: string[] | undefined): string[] {
+  return [...new Set([currentToken, ...(additionalTokens ?? [])])];
 }
 
 function safeFrameErrorMessage(error: Error): string {
