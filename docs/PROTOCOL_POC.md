@@ -36,9 +36,11 @@ The PoC must not:
 Command validation is intentionally separated into `tools/command-poc`. The
 protocol PoC remains read-only.
 
-Initial command PoC runs have confirmed `start`, `pause`, and `return` on the
-first M7 Pro test device. These are still PoC results, not yet public adapter
-commands.
+Initial command PoC runs have confirmed `start`, `pause`, `continue`, and
+`return` on the first M7 Pro test device. The `fan-quiet`, `fan-standard`, and
+`fan-strong` fan-speed candidates plus `deep-cleaning` and `collect-dust` are
+available for the next private real-device command validation. These are still
+PoC results, not yet public adapter commands.
 
 ## Verified Evidence
 

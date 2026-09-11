@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   }
 
   console.log("Command send: starting");
-  const result = await client.sendCommand(token, request.path, request.body);
+  const result = await client.sendCommand(token, request);
   console.log("Command send: completed", JSON.stringify({
     code: result.code ?? null,
     success: result.code === undefined || result.code === 0,
@@ -84,7 +84,9 @@ function parseCliOptions(args: string[]): CliOptions {
       case "--command": {
         const value = args[index + 1];
         if (!value || !isCommandName(value)) {
-          throw new Error(`Expected command: start, pause, continue, or return`);
+          throw new Error(
+            "Expected command: start, pause, continue, return, fan-quiet, fan-standard, fan-strong, deep-cleaning, or collect-dust",
+          );
         }
         options.command = value;
         index += 1;
@@ -145,7 +147,7 @@ function parseNonNegativeInt(value: string | undefined, fallback: number): numbe
 }
 
 function printUsage(): void {
-  console.log(`Usage: npm start -- --command <start|pause|continue|return> [--confirm]
+  console.log(`Usage: npm start -- --command <start|pause|continue|return|fan-quiet|fan-standard|fan-strong|deep-cleaning|collect-dust> [--confirm]
 
 Environment:
   PROSCENIC_EMAIL          Proscenic account e-mail

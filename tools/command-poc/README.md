@@ -13,6 +13,11 @@ The first supported test candidates are:
 - `pause`
 - `continue`
 - `return`
+- `fan-quiet`
+- `fan-standard`
+- `fan-strong`
+- `deep-cleaning`
+- `collect-dust`
 
 Example:
 

@@ -23,8 +23,9 @@ tests. The existing `tools/protocol-poc` remains read-only.
 The command PoC:
 
 - authenticates and selects one device using the existing legacy cloud flow;
-- supports only the first command candidates `start`, `pause`, `continue`, and
-  `return`;
+- supports only explicitly listed command candidates, starting with `start`,
+  `pause`, `continue`, `return`, `fan-quiet`, `fan-standard`, and
+  `fan-strong`, followed by `deep-cleaning` and `collect-dust`;
 - defaults to dry-run behavior and requires `--confirm` before sending exactly
   one command;
 - prints only redacted-safe execution summaries;
@@ -60,12 +61,13 @@ credentials. Real-device validation must be private and redacted and must
 record one command at a time.
 
 Initial private validation on the first M7 Pro test device confirmed the
-`start`, `pause`, and `return` command candidates through the command PoC. The
-tests confirmed visible robot behavior and corresponding read-only status
-updates where available. No raw command payloads, tokens, serial numbers,
-private account data, gateway endpoints, maps, or private device names were
-recorded.
+`start`, `pause`, `continue`, and `return` command candidates through the
+command PoC. The tests confirmed visible robot behavior and corresponding
+read-only status updates where available. No raw command payloads, tokens,
+serial numbers, private account data, gateway endpoints, maps, or private
+device names were recorded.
 
-The `continue` candidate remains pending. Public ioBroker command states remain
+The `fan-quiet`, `fan-standard`, `fan-strong`, `deep-cleaning`, and
+`collect-dust` candidates remain pending. Public ioBroker command states remain
 pending until command acknowledgement and result-state semantics are designed
 and tested in the adapter.

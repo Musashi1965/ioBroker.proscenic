@@ -1,4 +1,5 @@
 import { request as httpsRequest } from "node:https";
+import type { CommandRequest } from "./commands.js";
 import type { DeviceListData, DeviceRecord, LoginData, ProscenicEnvelope } from "./protocol.js";
 import { md5Hex } from "./protocol.js";
 
@@ -58,8 +59,15 @@ export class ProscenicCommandClient {
     return response.data?.content ?? [];
   }
 
-  public async sendCommand(token: string, path: string, body: string): Promise<ProscenicEnvelope> {
-    return await this.postFormPath(path, body, { token });
+  public async sendCommand(token: string, command: CommandRequest): Promise<ProscenicEnvelope> {
+    if (command.contentType) {
+      return await this.request(command.path, command.body, {
+        "Content-Type": command.contentType,
+        token,
+      });
+    }
+
+    return await this.postFormPath(command.path, command.body, { token });
   }
 
   private async postJson<T>(
