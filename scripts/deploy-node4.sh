@@ -4,7 +4,7 @@ set -euo pipefail
 readonly ADAPTER_NAME="proscenic"
 readonly PACKAGE_NAME="iobroker.proscenic"
 readonly IOBROKER_ROOT="${PROSCENIC_IOBROKER_ROOT:-/opt/iobroker}"
-readonly EXPECTED_HOSTNAME="${PROSCENIC_DEPLOY_EXPECTED_HOSTNAME:-CM4-Node4}"
+readonly EXPECTED_HOSTNAME="${PROSCENIC_DEPLOY_EXPECTED_HOSTNAME:-CM4-Node-04}"
 readonly REMOTE_EVIDENCE_ROOT="${PROSCENIC_DEPLOY_EVIDENCE_ROOT:-/opt/iobroker-proscenic-deploy}"
 readonly SSH_TARGET="${PROSCENIC_DEPLOY_TARGET:?Set PROSCENIC_DEPLOY_TARGET, for example root@host}"
 readonly MIN_FREE_KB="${PROSCENIC_DEPLOY_MIN_FREE_KB:-524288}"
