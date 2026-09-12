@@ -30,6 +30,8 @@ export interface RenderMapResult {
     bitOffsetCount: number;
     coordinateOffsetCount: number;
     filteredCoordinateOffsetCount: number;
+    evolutionContactSheets: string[];
+    evolutionStats: EvolutionStats[];
     contactSheets: string[];
   };
   privacy: {
@@ -43,7 +45,19 @@ interface MapSample {
   width: number;
   height: number;
   resolution: number | undefined;
+  pathId: number | undefined;
   encoded: string;
+}
+
+export interface EvolutionStats {
+  group: "all-events" | "latest-path";
+  offset: number;
+  events: number;
+  uniquePoints: number;
+  stablePoints: number;
+  majorityPoints: number;
+  transientPoints: number;
+  stableRatio: number;
 }
 
 export async function renderLatestPrivateMap(): Promise<RenderMapResult> {
@@ -53,7 +67,8 @@ export async function renderLatestPrivateMap(): Promise<RenderMapResult> {
 }
 
 export async function renderMapFromPrivateCapture(options: RenderMapOptions): Promise<RenderMapResult> {
-  const sample = await readMapSample(options.capturePath, options.eventIndex);
+  const samples = await readMapSamples(options.capturePath);
+  const sample = selectMapSample(samples, options.capturePath, options.eventIndex);
   const outputDirectory = options.outputDirectory ?? join(dirname(options.capturePath), "rendered-maps", basename(options.capturePath, ".jsonl"));
   await mkdir(outputDirectory, { recursive: true });
 
@@ -108,6 +123,39 @@ export async function renderMapFromPrivateCapture(options: RenderMapOptions): Pr
   ));
   files.push(filteredCoordinateContactSheet);
 
+  const evolutionContactSheets: string[] = [];
+  const evolutionStats: EvolutionStats[] = [];
+  if (options.eventIndex === undefined && samples.length > 1) {
+    const allEvolutionContactSheet = join(outputDirectory, "xy-points-evolution-all-events-contact-sheet.png");
+    await writeFile(allEvolutionContactSheet, createContactSheet(
+      COORDINATE_PROBE_OFFSETS.map((offset) => renderCoordinateEvolutionProbe(samples, offset)),
+      sample.width,
+      sample.height,
+      4,
+    ));
+    files.push(allEvolutionContactSheet);
+    evolutionContactSheets.push(allEvolutionContactSheet);
+    evolutionStats.push(
+      ...COORDINATE_PROBE_OFFSETS.map((offset) => coordinateEvolutionStats("all-events", samples, offset)),
+    );
+
+    const latestPathSamples = latestPathSegment(samples);
+    if (latestPathSamples.length > 1 && latestPathSamples.length < samples.length) {
+      const pathEvolutionContactSheet = join(outputDirectory, "xy-points-evolution-latest-path-contact-sheet.png");
+      await writeFile(pathEvolutionContactSheet, createContactSheet(
+        COORDINATE_PROBE_OFFSETS.map((offset) => renderCoordinateEvolutionProbe(latestPathSamples, offset)),
+        sample.width,
+        sample.height,
+        4,
+      ));
+      files.push(pathEvolutionContactSheet);
+      evolutionContactSheets.push(pathEvolutionContactSheet);
+      evolutionStats.push(
+        ...COORDINATE_PROBE_OFFSETS.map((offset) => coordinateEvolutionStats("latest-path", latestPathSamples, offset)),
+      );
+    }
+  }
+
   return {
     captureFile: basename(options.capturePath),
     eventIndex: sample.eventIndex,
@@ -124,6 +172,8 @@ export async function renderMapFromPrivateCapture(options: RenderMapOptions): Pr
       bitOffsetCount: PROBE_OFFSETS.length,
       coordinateOffsetCount: coordinateFiles.length,
       filteredCoordinateOffsetCount: filteredCoordinateFiles.length,
+      evolutionContactSheets,
+      evolutionStats,
       contactSheets: [bitContactSheet, coordinateContactSheet, filteredCoordinateContactSheet],
     },
     privacy: {
@@ -137,9 +187,9 @@ export async function renderMapFromPrivateCapture(options: RenderMapOptions): Pr
   };
 }
 
-async function readMapSample(capturePath: string, requestedEventIndex: number | undefined): Promise<MapSample> {
+async function readMapSamples(capturePath: string): Promise<MapSample[]> {
   const text = await readFile(capturePath, "utf8");
-  let latest: MapSample | undefined;
+  const samples: MapSample[] = [];
 
   for (const line of text.split(/\r?\n/u)) {
     if (line.trim().length === 0) {
@@ -166,19 +216,29 @@ async function readMapSample(capturePath: string, requestedEventIndex: number | 
       width,
       height,
       resolution: typeof data.resolution === "number" ? data.resolution : undefined,
+      pathId: typeof data.pathId === "number" ? data.pathId : undefined,
       encoded,
     };
-    if (requestedEventIndex === undefined || requestedEventIndex === eventIndex) {
-      latest = sample;
-    }
+    samples.push(sample);
   }
 
-  if (!latest) {
+  return samples;
+}
+
+function selectMapSample(
+  samples: MapSample[],
+  capturePath: string,
+  requestedEventIndex: number | undefined,
+): MapSample {
+  const selected = requestedEventIndex === undefined
+    ? samples.at(-1)
+    : samples.find((sample) => sample.eventIndex === requestedEventIndex);
+  if (!selected) {
     const suffix = requestedEventIndex === undefined ? "" : ` for event ${requestedEventIndex}`;
     throw new Error(`No renderable infoType 20002 map payload found in ${capturePath}${suffix}`);
   }
 
-  return latest;
+  return selected;
 }
 
 function parseRecord(line: string): Record<string, unknown> | undefined {
@@ -234,6 +294,129 @@ function renderFilteredCoordinatePointProbe(bytes: Buffer, width: number, height
     }
   }
   return pixels;
+}
+
+function renderCoordinateEvolutionProbe(samples: MapSample[], offset: number): Buffer {
+  const reference = samples.at(-1);
+  if (!reference) {
+    throw new Error("No map samples available for coordinate evolution rendering");
+  }
+
+  const counts = new Uint16Array(reference.width * reference.height);
+  for (const sample of samples) {
+    const decoded = Buffer.from(sample.encoded, "base64");
+    const seenInSample = new Set<number>();
+    for (let index = offset; index + 1 < decoded.length; index += 2) {
+      const x = decoded[index];
+      const y = decoded[index + 1];
+      if (isRenderableCoordinate(x, y, reference.width, reference.height)) {
+        seenInSample.add(y * reference.width + x);
+      }
+    }
+    for (const position of seenInSample) {
+      counts[position] += 1;
+    }
+  }
+
+  const pixels = Buffer.alloc(reference.width * reference.height, 0xf8);
+  const sampleCount = samples.length;
+  for (let index = 0; index < counts.length; index++) {
+    const count = counts[index];
+    if (count === 0) {
+      continue;
+    }
+    if (count === sampleCount) {
+      pixels[index] = 0x10;
+      continue;
+    }
+    if (count >= Math.ceil(sampleCount / 2)) {
+      pixels[index] = 0x60;
+      continue;
+    }
+    pixels[index] = 0xb0;
+  }
+
+  return pixels;
+}
+
+function coordinateEvolutionStats(group: EvolutionStats["group"], samples: MapSample[], offset: number): EvolutionStats {
+  const reference = samples.at(-1);
+  if (!reference) {
+    throw new Error("No map samples available for coordinate evolution stats");
+  }
+
+  const counts = coordinateOccurrenceCounts(samples, offset, reference.width, reference.height);
+  let stablePoints = 0;
+  let majorityPoints = 0;
+  let transientPoints = 0;
+  for (const count of counts.values()) {
+    if (count === samples.length) {
+      stablePoints += 1;
+    } else if (count >= Math.ceil(samples.length / 2)) {
+      majorityPoints += 1;
+    } else {
+      transientPoints += 1;
+    }
+  }
+
+  return {
+    group,
+    offset,
+    events: samples.length,
+    uniquePoints: counts.size,
+    stablePoints,
+    majorityPoints,
+    transientPoints,
+    stableRatio: roundRatio(stablePoints, counts.size),
+  };
+}
+
+function coordinateOccurrenceCounts(
+  samples: MapSample[],
+  offset: number,
+  width: number,
+  height: number,
+): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const sample of samples) {
+    const decoded = Buffer.from(sample.encoded, "base64");
+    const seenInSample = new Set<number>();
+    for (let index = offset; index + 1 < decoded.length; index += 2) {
+      const x = decoded[index];
+      const y = decoded[index + 1];
+      if (isRenderableCoordinate(x, y, width, height)) {
+        seenInSample.add(y * width + x);
+      }
+    }
+    for (const position of seenInSample) {
+      counts.set(position, (counts.get(position) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+function roundRatio(numerator: number, denominator: number): number {
+  if (denominator === 0) {
+    return 0;
+  }
+  return Math.round((numerator / denominator) * 1000) / 1000;
+}
+
+function latestPathSegment(samples: MapSample[]): MapSample[] {
+  const latest = samples.at(-1);
+  if (!latest) {
+    return [];
+  }
+
+  const segment: MapSample[] = [];
+  for (let index = samples.length - 1; index >= 0; index--) {
+    const sample = samples[index];
+    if (sample.pathId !== latest.pathId) {
+      break;
+    }
+    segment.unshift(sample);
+  }
+  return segment;
 }
 
 function isRenderableCoordinate(x: number, y: number, width: number, height: number): boolean {

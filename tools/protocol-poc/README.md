@@ -120,10 +120,17 @@ private home layout data. Keep them local, ignored, and out of commits, issues,
 packages, releases, and adapter logs.
 
 This is currently a reverse-engineering probe, not a proven application-map
-renderer. It intentionally creates multiple bit-offset, coordinate-pair, and
-filtered coordinate-pair views of the private map block, plus contact sheets,
-so the binary format can be identified without printing or committing the raw
-payload. The public adapter still exposes only safe map metadata.
+renderer. It intentionally creates multiple bit-offset, coordinate-pair,
+filtered coordinate-pair, and multi-event coordinate-evolution views of the
+private map block, plus contact sheets, so the binary format can be identified
+without printing or committing the raw payload. The public adapter still
+exposes only safe map metadata.
+
+The renderer also prints derived coordinate-evolution statistics. Stable
+points are seen in every compared map event, majority points in at least half
+of the events, and transient points only briefly. These counts are useful for
+distinguishing persistent map structure from changing path/run overlays without
+printing the private coordinates themselves.
 
 ## Safety Boundaries
 
