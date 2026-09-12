@@ -25,6 +25,18 @@ const SAFE_STATUS_NUMBER_FIELDS = [
   "workstationType",
 ] as const;
 const SAFE_STATUS_BOOLEAN_FIELDS = ["autoBoost", "cleanComponents"] as const;
+const STATUS_SEQUENCE_FIELDS = [
+  "mode",
+  "subMode",
+  "workNoisy",
+  "cleanTime",
+  "cleanArea",
+  "elec",
+  "elecReal",
+  "water",
+  "mop",
+  "errorStateLength",
+] as const;
 const MAP_METADATA_FIELDS = [
   "autoAreaId",
   "base64_len",
@@ -34,6 +46,14 @@ const MAP_METADATA_FIELDS = [
   "pathId",
   "resolution",
   "width",
+] as const;
+const MAP_SEQUENCE_FIELDS = [
+  "mapId",
+  "pathId",
+  "base64_len",
+  "lz4_len",
+  "areaCount",
+  "encodedBytes",
 ] as const;
 
 export interface CaptureAnalysis {
@@ -66,6 +86,7 @@ export interface CaptureAnalysis {
     numberRanges: Record<string, NumberRange>;
     booleanCounts: Record<string, BooleanCounts>;
     errorStateLengths: Record<string, number>;
+    sequences: Record<string, FieldSequence>;
   };
   map20002: {
     count: number;
@@ -73,6 +94,7 @@ export interface CaptureAnalysis {
     metadataRanges: Record<string, NumberRange>;
     areaCounts: Record<string, number>;
     encodedByteRanges: NumberRange | undefined;
+    sequences: Record<string, FieldSequence>;
   };
   privacy: {
     outputContainsRawPayloads: false;
@@ -89,6 +111,22 @@ export interface NumberRange {
 export interface BooleanCounts {
   true: number;
   false: number;
+}
+
+export type SafeSequenceValue = string | number | boolean | null;
+
+export interface FieldSequence {
+  first: SafeSequenceValue;
+  last: SafeSequenceValue;
+  observations: number;
+  changes: number;
+  transitions: FieldTransition[];
+}
+
+export interface FieldTransition {
+  event: number;
+  from: SafeSequenceValue;
+  to: SafeSequenceValue;
 }
 
 export async function analyzeCaptureFile(filePath: string): Promise<CaptureAnalysis> {
@@ -174,6 +212,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       numberRanges: {},
       booleanCounts: {},
       errorStateLengths: {},
+      sequences: {},
     },
     map20002: {
       count: 0,
@@ -181,6 +220,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       metadataRanges: {},
       areaCounts: {},
       encodedByteRanges: undefined,
+      sequences: {},
     },
     privacy: {
       outputContainsRawPayloads: false,
@@ -230,6 +270,7 @@ function analyzeFrameErrorRecord(analysis: CaptureAnalysis, record: Record<strin
 
 function analyzeEventRecord(analysis: CaptureAnalysis, record: Record<string, unknown>): void {
   analysis.records.events += 1;
+  const eventIndex = typeof record.index === "number" ? record.index : analysis.records.events;
   const infoType = String(record.infoType ?? "unknown");
   increment(analysis.events.infoTypes, infoType);
 
@@ -239,14 +280,14 @@ function analyzeEventRecord(analysis: CaptureAnalysis, record: Record<string, un
   countFieldOccurrences(analysis, infoType, data);
 
   if (record.infoType === 20001) {
-    analyzeStatus20001(analysis, data);
+    analyzeStatus20001(analysis, data, eventIndex);
   }
   if (record.infoType === 20002) {
-    analyzeMap20002(analysis, data);
+    analyzeMap20002(analysis, data, eventIndex);
   }
 }
 
-function analyzeStatus20001(analysis: CaptureAnalysis, data: unknown): void {
+function analyzeStatus20001(analysis: CaptureAnalysis, data: unknown, eventIndex: number): void {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     return;
   }
@@ -279,9 +320,14 @@ function analyzeStatus20001(analysis: CaptureAnalysis, data: unknown): void {
   if (Array.isArray(record.errorState)) {
     increment(analysis.status20001.errorStateLengths, String(record.errorState.length));
   }
+
+  const sequenceValues = safeStatusSequenceValues(record, safeValues);
+  for (const field of STATUS_SEQUENCE_FIELDS) {
+    updateSequenceIfDefined(analysis.status20001.sequences, field, sequenceValues[field], eventIndex);
+  }
 }
 
-function analyzeMap20002(analysis: CaptureAnalysis, data: unknown): void {
+function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: number): void {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     return;
   }
@@ -306,6 +352,60 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown): void {
   if (Array.isArray(record.area)) {
     increment(analysis.map20002.areaCounts, String(record.area.length));
   }
+
+  const sequenceValues = safeMapSequenceValues(record);
+  for (const field of MAP_SEQUENCE_FIELDS) {
+    updateSequenceIfDefined(analysis.map20002.sequences, field, sequenceValues[field], eventIndex);
+  }
+}
+
+function safeStatusSequenceValues(
+  record: Record<string, unknown>,
+  safeValues: ReturnType<typeof extractSafeStatus20001Values>,
+): Partial<Record<(typeof STATUS_SEQUENCE_FIELDS)[number], SafeSequenceValue>> {
+  const values: Partial<Record<(typeof STATUS_SEQUENCE_FIELDS)[number], SafeSequenceValue>> = {};
+
+  for (const field of ["mode", "subMode", "workNoisy"] as const) {
+    const value = safeValues?.[field];
+    if (typeof value === "string") {
+      values[field] = value;
+    }
+  }
+
+  for (const field of ["cleanTime", "cleanArea", "elec", "elecReal", "water", "mop"] as const) {
+    const value = record[field];
+    if (typeof value === "number") {
+      values[field] = value;
+    }
+  }
+
+  if (Array.isArray(record.errorState)) {
+    values.errorStateLength = record.errorState.length;
+  }
+
+  return values;
+}
+
+function safeMapSequenceValues(
+  record: Record<string, unknown>,
+): Partial<Record<(typeof MAP_SEQUENCE_FIELDS)[number], SafeSequenceValue>> {
+  const values: Partial<Record<(typeof MAP_SEQUENCE_FIELDS)[number], SafeSequenceValue>> = {};
+
+  for (const field of ["mapId", "pathId", "base64_len", "lz4_len"] as const) {
+    const value = record[field];
+    if (typeof value === "number") {
+      values[field] = value;
+    }
+  }
+
+  if (Array.isArray(record.area)) {
+    values.areaCount = record.area.length;
+  }
+  if (typeof record.map === "string") {
+    values.encodedBytes = Buffer.byteLength(record.map, "utf8");
+  }
+
+  return values;
 }
 
 function countFieldOccurrences(analysis: CaptureAnalysis, infoType: string, data: unknown): void {
@@ -345,6 +445,40 @@ function addEnum(bucket: Record<string, string[]>, key: string, value: string): 
 
 function updateRange(bucket: Record<string, NumberRange>, key: string, value: number): void {
   bucket[key] = mergeRange(bucket[key], value);
+}
+
+function updateSequenceIfDefined(
+  bucket: Record<string, FieldSequence>,
+  key: string,
+  value: SafeSequenceValue | undefined,
+  eventIndex: number,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  const current = bucket[key];
+  if (!current) {
+    bucket[key] = {
+      first: value,
+      last: value,
+      observations: 1,
+      changes: 0,
+      transitions: [],
+    };
+    return;
+  }
+
+  current.observations += 1;
+  if (current.last !== value) {
+    current.transitions.push({
+      event: eventIndex,
+      from: current.last,
+      to: value,
+    });
+    current.last = value;
+    current.changes += 1;
+  }
 }
 
 function mergeRange(range: NumberRange | undefined, value: number): NumberRange {

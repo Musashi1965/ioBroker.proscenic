@@ -27,6 +27,22 @@ describe("capture analysis", () => {
       JSON.stringify({
         kind: "event",
         index: 2,
+        infoType: 20001,
+        decrypted: {
+          infoType: 20001,
+          data: {
+            cleanArea: 13,
+            cleanTime: 40,
+            elec: 87,
+            errorState: [],
+            mode: "pause",
+            workNoisy: "strong",
+          },
+        },
+      }),
+      JSON.stringify({
+        kind: "event",
+        index: 3,
         infoType: 20002,
         decrypted: {
           infoType: 20002,
@@ -47,6 +63,22 @@ describe("capture analysis", () => {
         },
       }),
       JSON.stringify({
+        kind: "event",
+        index: 4,
+        infoType: 20002,
+        decrypted: {
+          infoType: 20002,
+          data: {
+            area: [{ id: 1 }, { id: 2 }],
+            base64_len: 23,
+            lz4_len: 4580,
+            map: "fixture-map-payload-new",
+            mapId: 1756629262,
+            pathId: 1789117424,
+          },
+        },
+      }),
+      JSON.stringify({
         kind: "frame-error",
         index: 1,
         message: "decrypt failed",
@@ -62,22 +94,43 @@ describe("capture analysis", () => {
       "{malformed",
     ], "capture.jsonl");
 
-    assert.equal(analysis.records.total, 5);
+    assert.equal(analysis.records.total, 7);
     assert.equal(analysis.records.malformed, 1);
-    assert.equal(analysis.records.events, 2);
+    assert.equal(analysis.records.events, 4);
     assert.equal(analysis.records.frameErrors, 1);
-    assert.equal(analysis.status20001.safeEnums.mode[0], "sweep");
+    assert.deepEqual(analysis.status20001.safeEnums.mode, ["pause", "sweep"]);
     assert.equal(analysis.status20001.numberRanges.cleanArea.min, 12);
+    assert.equal(analysis.status20001.numberRanges.cleanArea.max, 13);
     assert.equal(analysis.status20001.errorStateLengths["1"], 1);
-    assert.equal(analysis.map20002.availableCount, 1);
-    assert.equal(analysis.map20002.metadataRanges.base64_len.max, 19);
+    assert.equal(analysis.status20001.sequences.mode.last, "pause");
+    assert.deepEqual(analysis.status20001.sequences.mode.transitions, [
+      {
+        event: 2,
+        from: "sweep",
+        to: "pause",
+      },
+    ]);
+    assert.equal(analysis.status20001.sequences.cleanTime.first, 34);
+    assert.equal(analysis.status20001.sequences.cleanTime.last, 40);
+    assert.equal(analysis.map20002.availableCount, 2);
+    assert.equal(analysis.map20002.metadataRanges.base64_len.max, 23);
     assert.equal(analysis.map20002.metadataRanges.width.max, 205);
+    assert.equal(analysis.map20002.sequences.pathId.changes, 1);
+    assert.deepEqual(analysis.map20002.sequences.pathId.transitions, [
+      {
+        event: 4,
+        from: 1789117423,
+        to: 1789117424,
+      },
+    ]);
+    assert.equal(analysis.map20002.sequences.areaCount.last, 2);
     assert.equal(analysis.gateway.frameErrorMessages["decrypt failed"], 1);
 
     const serialized = JSON.stringify(analysis);
     assert.equal(serialized.includes("fixture-serial"), false);
     assert.equal(serialized.includes("fixture-token"), false);
     assert.equal(serialized.includes("fixture-map-payload"), false);
+    assert.equal(serialized.includes("fixture-map-payload-new"), false);
     assert.equal(serialized.includes("fixture warning"), false);
     assert.equal(serialized.includes("[1,2]"), false);
     assert.equal(serialized.includes("[3,4]"), false);

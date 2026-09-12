@@ -87,8 +87,12 @@ The analyzer reads raw private records locally, but prints only derived data:
 - `infoType` distribution and redacted payload shapes;
 - field occurrence counts;
 - safe `infoType` 20001 enum values and numeric ranges;
+- safe first/last values and transition events for selected status fields such
+  as `mode`, `subMode`, `workNoisy`, `cleanTime`, `cleanArea`, and battery;
 - `errorState` length distribution;
 - safe `infoType` 20002 map metadata ranges;
+- safe first/last values and transition events for selected map metadata such
+  as `pathId`, `base64_len`, `lz4_len`, and area count;
 - frame-error categories.
 
 It does not print raw map data, robot positions, path coordinates, serials,
