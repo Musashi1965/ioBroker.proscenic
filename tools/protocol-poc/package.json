@@ -7,6 +7,7 @@
   "scripts": {
     "analyze": "npm run build && node dist/analyze-capture.js",
     "build": "tsc -p tsconfig.json",
+    "render-map": "npm run build && node dist/render-map.js",
     "test": "npm run build && node --test dist/**/*.test.js",
     "start": "npm run build && node dist/cli.js"
   },

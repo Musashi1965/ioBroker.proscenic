@@ -103,6 +103,25 @@ serial numbers, map data, positions, and raw decrypted payloads. The directory
 is ignored by Git and must not be copied into issues, documentation, commits,
 packages, releases, or adapter logs.
 
+## Private map rendering probes
+
+Experimental map rendering is available only for owner-local private captures:
+
+```sh
+npm run render-map -- --latest
+npm run render-map -- .poc-private/protocol-poc/<capture>.jsonl
+```
+
+The renderer writes PNG probe images below
+`.poc-private/protocol-poc/rendered-maps/` by default. These images may reveal
+private home layout data. Keep them local, ignored, and out of commits, issues,
+packages, releases, and adapter logs.
+
+This is currently a reverse-engineering probe, not a proven application-map
+renderer. It intentionally creates multiple bit-offset views of the private map
+block so the binary format can be identified without printing or committing the
+raw payload. The public adapter still exposes only safe map metadata.
+
 ## Safety Boundaries
 
 This PoC is intentionally read-only. Command endpoints, maps, persistent
