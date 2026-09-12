@@ -27,6 +27,17 @@ Behavioral map/status findings from these sources and our own probes:
   combine it with coordinate fields and path/charger positions. The MIT adapter
   therefore exposes only safe metadata until a separate local-only map rendering
   decision is accepted.
+- A separate, older Proscenic 790T Home Assistant integration reports that the
+  cloud is used to generate the cleaning map. A Home Assistant community thread
+  for that generation describes Proscenic map data as dot-like rather than as a
+  ready-made picture. This is only a behavioral hint for our independently
+  observed M7 Pro `infoType` 20002 data; it is not an implementation source.
+- Private M7 Pro captures from 2026-09-10 to 2026-09-12 repeatedly show stable
+  `mapId`, stable dimensions, stable resolution, and changing self-contained
+  map blocks whose `pathId` can change between cleaning runs. The current
+  evidence suggests repeated map snapshots with a base-map identity and
+  path/run overlay, not merely a single live position value. The exact binary
+  map format remains unresolved.
 
 Independent implementation rule: derive project requirements from observable
 requests/responses, public documentation, independently written tests, and our
@@ -71,6 +82,8 @@ Relevant primary sources:
 - https://github.com/ioBroker/create-adapter
 - https://github.com/ioBroker/ioBroker.repositories
 - https://github.com/ioBroker/ioBroker.docs/blob/master/docs/en/dev/adaptersecurity.md
+- https://github.com/deblockt/hass-proscenic-790T-vacuum
+- https://community.home-assistant.io/t/proscenic-790t-integration/82969?page=2
 
 ## Required proofs before production protocol adoption
 

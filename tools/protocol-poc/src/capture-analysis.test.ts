@@ -115,6 +115,9 @@ describe("capture analysis", () => {
     assert.equal(analysis.map20002.availableCount, 2);
     assert.equal(analysis.map20002.metadataRanges.base64_len.max, 23);
     assert.equal(analysis.map20002.metadataRanges.width.max, 205);
+    assert.equal(analysis.map20002.blockSignals.samples, 2);
+    assert.equal(analysis.map20002.blockSignals.adjacentChangedPayload, 1);
+    assert.equal(analysis.map20002.blockSignals.interpretation, "snapshot-like");
     assert.equal(analysis.map20002.sequences.pathId.changes, 1);
     assert.deepEqual(analysis.map20002.sequences.pathId.transitions, [
       {

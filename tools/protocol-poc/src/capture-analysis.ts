@@ -55,6 +55,7 @@ const MAP_SEQUENCE_FIELDS = [
   "areaCount",
   "encodedBytes",
 ] as const;
+const MAP_BLOCK_STATE = Symbol("mapBlockState");
 
 export interface CaptureAnalysis {
   source: {
@@ -95,12 +96,33 @@ export interface CaptureAnalysis {
     areaCounts: Record<string, number>;
     encodedByteRanges: NumberRange | undefined;
     sequences: Record<string, FieldSequence>;
+    blockSignals: MapBlockSignals;
   };
   privacy: {
     outputContainsRawPayloads: false;
     notes: string[];
   };
 }
+
+export interface MapBlockSignals {
+  samples: number;
+  stablePrefixBytes: number | undefined;
+  adjacentSameDecodedSize: number;
+  adjacentChangedDecodedSize: number;
+  adjacentSamePayload: number;
+  adjacentChangedPayload: number;
+  interpretation: "snapshot-like" | "movement-only-possible" | "insufficient-evidence";
+  notes: string[];
+}
+
+interface MapBlockState {
+  firstPayload: Buffer | undefined;
+  previousPayload: Buffer | undefined;
+}
+
+type AnalysisWithPrivateState = CaptureAnalysis & {
+  [MAP_BLOCK_STATE]: MapBlockState;
+};
 
 export interface NumberRange {
   min: number;
@@ -182,7 +204,7 @@ export async function findLatestPrivateCapture(directory = ".poc-private/protoco
 }
 
 function createEmptyAnalysis(filePath: string): CaptureAnalysis {
-  return {
+  const analysis: AnalysisWithPrivateState = {
     source: {
       file: filePath,
     },
@@ -221,6 +243,16 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       areaCounts: {},
       encodedByteRanges: undefined,
       sequences: {},
+      blockSignals: {
+        samples: 0,
+        stablePrefixBytes: undefined,
+        adjacentSameDecodedSize: 0,
+        adjacentChangedDecodedSize: 0,
+        adjacentSamePayload: 0,
+        adjacentChangedPayload: 0,
+        interpretation: "insufficient-evidence",
+        notes: [],
+      },
     },
     privacy: {
       outputContainsRawPayloads: false,
@@ -229,7 +261,13 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
         "Raw payload values, map bytes, positions, serials, tokens, accounts, and endpoints are intentionally omitted.",
       ],
     },
+    [MAP_BLOCK_STATE]: {
+      firstPayload: undefined,
+      previousPayload: undefined,
+    },
   };
+
+  return analysis;
 }
 
 function parseRecord(line: string): Record<string, unknown> | undefined {
@@ -340,6 +378,7 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: n
       analysis.map20002.encodedByteRanges,
       Buffer.byteLength(record.map, "utf8"),
     );
+    analyzeMapBlockSignals(analysis as AnalysisWithPrivateState, record.map);
   }
 
   for (const field of MAP_METADATA_FIELDS) {
@@ -357,6 +396,49 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: n
   for (const field of MAP_SEQUENCE_FIELDS) {
     updateSequenceIfDefined(analysis.map20002.sequences, field, sequenceValues[field], eventIndex);
   }
+}
+
+function analyzeMapBlockSignals(analysis: AnalysisWithPrivateState, encodedMap: string): void {
+  const payload = Buffer.from(encodedMap, "base64");
+  const signals = analysis.map20002.blockSignals;
+  const state = analysis[MAP_BLOCK_STATE];
+
+  signals.samples += 1;
+  if (!state.firstPayload) {
+    state.firstPayload = payload;
+    signals.stablePrefixBytes = payload.length;
+  } else {
+    signals.stablePrefixBytes = Math.min(
+      signals.stablePrefixBytes ?? payload.length,
+      commonPrefixLength(state.firstPayload, payload),
+    );
+  }
+
+  if (state.previousPayload) {
+    if (state.previousPayload.length === payload.length) {
+      signals.adjacentSameDecodedSize += 1;
+    } else {
+      signals.adjacentChangedDecodedSize += 1;
+    }
+
+    if (state.previousPayload.equals(payload)) {
+      signals.adjacentSamePayload += 1;
+    } else {
+      signals.adjacentChangedPayload += 1;
+    }
+  }
+
+  state.previousPayload = payload;
+}
+
+function commonPrefixLength(left: Buffer, right: Buffer): number {
+  const limit = Math.min(left.length, right.length);
+  for (let index = 0; index < limit; index++) {
+    if (left[index] !== right[index]) {
+      return index;
+    }
+  }
+  return limit;
 }
 
 function safeStatusSequenceValues(
@@ -521,6 +603,37 @@ function sortAnalysis(analysis: CaptureAnalysis): void {
   for (const [key, values] of Object.entries(analysis.status20001.safeEnums)) {
     analysis.status20001.safeEnums[key] = values.sort();
   }
+  finalizeMapBlockSignals(analysis);
+}
+
+function finalizeMapBlockSignals(analysis: CaptureAnalysis): void {
+  const signals = analysis.map20002.blockSignals;
+  signals.notes = [];
+
+  if (signals.samples < 2) {
+    signals.interpretation = "insufficient-evidence";
+    signals.notes.push("Need at least two map samples to compare whether the map block behaves like a snapshot or a delta.");
+    return;
+  }
+
+  const dimensionsStable =
+    (analysis.map20002.metadataRanges.width?.min === analysis.map20002.metadataRanges.width?.max) &&
+    (analysis.map20002.metadataRanges.height?.min === analysis.map20002.metadataRanges.height?.max);
+  const mapIdStable = analysis.map20002.sequences.mapId?.changes === 0;
+  const pathChanges = analysis.map20002.sequences.pathId?.changes ?? 0;
+  const payloadChanges = signals.adjacentChangedPayload;
+
+  if (dimensionsStable && mapIdStable && payloadChanges > 0) {
+    signals.interpretation = "snapshot-like";
+    signals.notes.push("Stable dimensions and mapId with changing self-contained map blocks suggest repeated map snapshots with run/path overlay.");
+    if (pathChanges > 0) {
+      signals.notes.push("A pathId change was observed while the mapId stayed stable, which separates base map identity from the active path/run.");
+    }
+    return;
+  }
+
+  signals.interpretation = "movement-only-possible";
+  signals.notes.push("The observed fields do not yet prove a complete base-map snapshot; compare additional captures and rendered coordinate probes.");
 }
 
 function sortNumberRecord(record: Record<string, number>): Record<string, number> {

@@ -93,6 +93,8 @@ The analyzer reads raw private records locally, but prints only derived data:
 - safe `infoType` 20002 map metadata ranges;
 - safe first/last values and transition events for selected map metadata such
   as `pathId`, `base64_len`, `lz4_len`, and area count;
+- derived map-block signals such as stable prefix length, adjacent payload
+  changes, and a conservative snapshot-vs-delta interpretation;
 - frame-error categories.
 
 It does not print raw map data, robot positions, path coordinates, serials,
