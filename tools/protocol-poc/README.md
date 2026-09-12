@@ -71,6 +71,29 @@ Malformed frames, bad decrypts, and invalid JSON are counted as frame errors so
 one bad gateway message cannot abort a long capture. The PoC records only a
 short safe error category, never the raw offending frame.
 
+## Private capture analysis
+
+Use the analyzer to turn a private JSONL capture into a safe summary that can
+be shared for development:
+
+```sh
+npm run analyze -- --latest
+npm run analyze -- .poc-private/protocol-poc/<capture>.jsonl
+```
+
+The analyzer reads raw private records locally, but prints only derived data:
+
+- record, event, run, and frame-error counts;
+- `infoType` distribution and redacted payload shapes;
+- field occurrence counts;
+- safe `infoType` 20001 enum values and numeric ranges;
+- `errorState` length distribution;
+- safe `infoType` 20002 map metadata ranges;
+- frame-error categories.
+
+It does not print raw map data, robot positions, path coordinates, serials,
+tokens, account data, gateway endpoints, or complete upstream payloads.
+
 Private capture mode is for owner-local protocol research only. It may contain
 serial numbers, map data, positions, and raw decrypted payloads. The directory
 is ignored by Git and must not be copied into issues, documentation, commits,
