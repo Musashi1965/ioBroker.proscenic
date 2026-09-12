@@ -118,9 +118,10 @@ private home layout data. Keep them local, ignored, and out of commits, issues,
 packages, releases, and adapter logs.
 
 This is currently a reverse-engineering probe, not a proven application-map
-renderer. It intentionally creates multiple bit-offset views of the private map
-block so the binary format can be identified without printing or committing the
-raw payload. The public adapter still exposes only safe map metadata.
+renderer. It intentionally creates multiple bit-offset, coordinate-pair, and
+filtered coordinate-pair views of the private map block, plus contact sheets,
+so the binary format can be identified without printing or committing the raw
+payload. The public adapter still exposes only safe map metadata.
 
 ## Safety Boundaries
 

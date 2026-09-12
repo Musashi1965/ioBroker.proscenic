@@ -6,6 +6,7 @@ import { findLatestPrivateCapture } from "./capture-analysis.js";
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const CRC_TABLE = createCrcTable();
 const PROBE_OFFSETS = [0, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 64] as const;
+const COORDINATE_PROBE_OFFSETS = [0, 16, 24, 32, 39, 40, 48, 64] as const;
 
 export interface RenderMapOptions {
   capturePath: string;
@@ -24,6 +25,12 @@ export interface RenderMapResult {
     resolution: number | undefined;
     encodedBytes: number;
     decodedBytes: number;
+  };
+  probes: {
+    bitOffsetCount: number;
+    coordinateOffsetCount: number;
+    filteredCoordinateOffsetCount: number;
+    contactSheets: string[];
   };
   privacy: {
     outputContainsRawPayloads: false;
@@ -58,6 +65,48 @@ export async function renderMapFromPrivateCapture(options: RenderMapOptions): Pr
     await writeFile(outputPath, encodeGrayscalePng(sample.width, sample.height, pixels));
     files.push(outputPath);
   }
+  const coordinateFiles: string[] = [];
+  const filteredCoordinateFiles: string[] = [];
+  for (const offset of COORDINATE_PROBE_OFFSETS) {
+    const pixels = renderCoordinatePointProbe(decoded, sample.width, sample.height, offset);
+    const outputPath = join(outputDirectory, `event-${sample.eventIndex}-xy-points-offset-${offset}.png`);
+    await writeFile(outputPath, encodeGrayscalePng(sample.width, sample.height, pixels));
+    files.push(outputPath);
+    coordinateFiles.push(outputPath);
+
+    const filteredPixels = renderFilteredCoordinatePointProbe(decoded, sample.width, sample.height, offset);
+    const filteredOutputPath = join(outputDirectory, `event-${sample.eventIndex}-xy-points-filtered-offset-${offset}.png`);
+    await writeFile(filteredOutputPath, encodeGrayscalePng(sample.width, sample.height, filteredPixels));
+    files.push(filteredOutputPath);
+    filteredCoordinateFiles.push(filteredOutputPath);
+  }
+
+  const bitContactSheet = join(outputDirectory, `event-${sample.eventIndex}-bit-offsets-contact-sheet.png`);
+  await writeFile(bitContactSheet, createContactSheet(
+    PROBE_OFFSETS.map((offset) => renderBitProbe(decoded, sample.width, sample.height, offset)),
+    sample.width,
+    sample.height,
+    4,
+  ));
+  files.push(bitContactSheet);
+
+  const coordinateContactSheet = join(outputDirectory, `event-${sample.eventIndex}-xy-points-contact-sheet.png`);
+  await writeFile(coordinateContactSheet, createContactSheet(
+    COORDINATE_PROBE_OFFSETS.map((offset) => renderCoordinatePointProbe(decoded, sample.width, sample.height, offset)),
+    sample.width,
+    sample.height,
+    4,
+  ));
+  files.push(coordinateContactSheet);
+
+  const filteredCoordinateContactSheet = join(outputDirectory, `event-${sample.eventIndex}-xy-points-filtered-contact-sheet.png`);
+  await writeFile(filteredCoordinateContactSheet, createContactSheet(
+    COORDINATE_PROBE_OFFSETS.map((offset) => renderFilteredCoordinatePointProbe(decoded, sample.width, sample.height, offset)),
+    sample.width,
+    sample.height,
+    4,
+  ));
+  files.push(filteredCoordinateContactSheet);
 
   return {
     captureFile: basename(options.capturePath),
@@ -70,6 +119,12 @@ export async function renderMapFromPrivateCapture(options: RenderMapOptions): Pr
       resolution: sample.resolution,
       encodedBytes: Buffer.byteLength(sample.encoded, "utf8"),
       decodedBytes: decoded.length,
+    },
+    probes: {
+      bitOffsetCount: PROBE_OFFSETS.length,
+      coordinateOffsetCount: coordinateFiles.length,
+      filteredCoordinateOffsetCount: filteredCoordinateFiles.length,
+      contactSheets: [bitContactSheet, coordinateContactSheet, filteredCoordinateContactSheet],
     },
     privacy: {
       outputContainsRawPayloads: false,
@@ -155,6 +210,81 @@ function renderBitProbe(bytes: Buffer, width: number, height: number, offset: nu
     }
   }
   return pixels;
+}
+
+function renderCoordinatePointProbe(bytes: Buffer, width: number, height: number, offset: number): Buffer {
+  const pixels = Buffer.alloc(width * height, 0xf4);
+  for (let index = offset; index + 1 < bytes.length; index += 2) {
+    const x = bytes[index];
+    const y = bytes[index + 1];
+    if (x < width && y < height) {
+      pixels[y * width + x] = 0x18;
+    }
+  }
+  return pixels;
+}
+
+function renderFilteredCoordinatePointProbe(bytes: Buffer, width: number, height: number, offset: number): Buffer {
+  const pixels = Buffer.alloc(width * height, 0xf4);
+  for (let index = offset; index + 1 < bytes.length; index += 2) {
+    const x = bytes[index];
+    const y = bytes[index + 1];
+    if (isRenderableCoordinate(x, y, width, height)) {
+      plotThickPoint(pixels, width, height, x, y, 0x18);
+    }
+  }
+  return pixels;
+}
+
+function isRenderableCoordinate(x: number, y: number, width: number, height: number): boolean {
+  if (x >= width || y >= height) {
+    return false;
+  }
+  if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+    return false;
+  }
+  return x !== 0xff && y !== 0xff;
+}
+
+function plotThickPoint(
+  pixels: Buffer,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  color: number,
+): void {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const px = x + dx;
+      const py = y + dy;
+      if (px >= 0 && px < width && py >= 0 && py < height) {
+        pixels[py * width + px] = Math.min(pixels[py * width + px], color);
+      }
+    }
+  }
+}
+
+function createContactSheet(images: Buffer[], imageWidth: number, imageHeight: number, columns: number): Buffer {
+  const rows = Math.ceil(images.length / columns);
+  const sheetWidth = imageWidth * columns;
+  const sheetHeight = imageHeight * rows;
+  const sheet = Buffer.alloc(sheetWidth * sheetHeight, 0xff);
+
+  images.forEach((image, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    for (let y = 0; y < imageHeight; y++) {
+      image.copy(
+        sheet,
+        (row * imageHeight + y) * sheetWidth + column * imageWidth,
+        y * imageWidth,
+        (y + 1) * imageWidth,
+      );
+    }
+  });
+
+  return encodeGrayscalePng(sheetWidth, sheetHeight, sheet);
 }
 
 export function encodeGrayscalePng(width: number, height: number, pixels: Buffer): Buffer {

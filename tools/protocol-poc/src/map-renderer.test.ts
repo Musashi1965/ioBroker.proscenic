@@ -37,7 +37,11 @@ describe("map renderer", () => {
 
       const result = await renderMapFromPrivateCapture({ capturePath, outputDirectory });
       assert.equal(result.eventIndex, 7);
-      assert.equal(result.files.length, 12);
+      assert.equal(result.files.length, 31);
+      assert.equal(result.probes.bitOffsetCount, 12);
+      assert.equal(result.probes.coordinateOffsetCount, 8);
+      assert.equal(result.probes.filteredCoordinateOffsetCount, 8);
+      assert.equal(result.probes.contactSheets.length, 3);
       assert.equal(result.privacy.outputContainsRawPayloads, false);
 
       const firstFile = await readFile(result.files[0]);
