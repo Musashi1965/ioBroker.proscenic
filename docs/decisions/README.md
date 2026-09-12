@@ -26,6 +26,8 @@ Current decisions:
   structure
 - [ADR 0014](0014-safe-maintenance-and-map-metadata.md): safe maintenance
   diagnostics and map metadata
+- [ADR 0015](0015-private-captures-for-reverse-engineering.md): private
+  captures for owner-local reverse engineering
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, command confirmation behavior, public

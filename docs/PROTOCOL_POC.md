@@ -33,6 +33,11 @@ The PoC must not:
 - run as public CI because it requires a private account and a live vendor
   service.
 
+Per ADR 0015, owner-local private captures are an approved reverse-engineering
+input. They may contain raw payloads and other private data for local analysis,
+but only redacted or derived conclusions may be copied into tracked files,
+issues, release artifacts, adapter logs, or chat excerpts.
+
 Command validation is intentionally separated into `tools/command-poc`. The
 protocol PoC remains read-only.
 

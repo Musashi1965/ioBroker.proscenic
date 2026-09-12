@@ -32,6 +32,12 @@ Independent implementation rule: derive project requirements from observable
 requests/responses, public documentation, independently written tests, and our
 own real-device probes. Do not translate or mechanically port reference code.
 
+ADR 0015 accepts owner-local private captures as a first-class
+reverse-engineering input. These captures may be inspected locally to understand
+the undocumented protocol, but tracked code, tests, and documentation may only
+contain independently implemented behavior plus redacted or derived
+conclusions.
+
 ## Tuya-local sources
 
 `edenhaus/ha-prosenic` and the maintained `PhilippThaler/ha-proscenic` fork use
