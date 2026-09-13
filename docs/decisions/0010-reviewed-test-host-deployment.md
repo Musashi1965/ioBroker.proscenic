@@ -7,7 +7,7 @@
 
 Deploying to the shared ioBroker test host changes external state and must not
 use undocumented one-off shell commands. The project needs a repeatable local
-deployment path before the first adapter runtime can be verified on CM4-Node4.
+deployment path before the first adapter runtime can be verified on CM4-Node-04.
 
 ## Decision
 

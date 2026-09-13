@@ -40,8 +40,10 @@ Expose only safe, derived maintenance and map information in the adapter:
 
 Do not expose or persist the raw base64 map, decompressed map image, robot
 position, path coordinates, charger/station coordinates, serial number, or
-complete 20002 payload in public states, tests, fixtures, logs, commits, or
-release artifacts.
+complete 20002 payload in normal public states, tests, fixtures, logs, commits,
+or release artifacts. ADR 0016 adds a deliberately named local-development
+exception for a rendered `map.live.*` debug image in the ioBroker object tree;
+raw payloads and generated private artifacts remain excluded.
 
 The map capability state may become `true` when safe metadata is observed. This
 does not imply public map image rendering support.
@@ -51,7 +53,8 @@ does not imply public map image rendering support.
 The adapter gains enough safe signal to diagnose maintenance/warning payloads
 and build the next map work without committing private home data. Public map
 image rendering remains a separate decision that must define local-only storage,
-redaction, object IDs, update frequency, and retention.
+redaction, object IDs, update frequency, and retention. ADR 0016 records the
+first local-development-only step.
 
 `status.maintenance.details` is diagnostic, not a localized user-facing
 translation. It must not claim that an unknown warning means "dust bag full"
@@ -69,6 +72,7 @@ is low-risk and helps validate dimensions, map/path changes, and update timing.
 ## Validation
 
 Unit tests must cover redaction and the absence of raw map/private fields from
-normalization. Object definition tests must continue to reject raw map, image,
-position, serial, and gateway endpoint states. Full adapter checks are required
-because this changes public states and gateway event handling.
+normalization. Object definition tests must continue to reject raw map payload,
+undocumented generic image, position, serial, and gateway endpoint states. Full
+adapter checks are required because this changes public states and gateway event
+handling.

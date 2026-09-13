@@ -41,8 +41,9 @@ HTTP or socket functions directly.
   heartbeat/reconnect, and cleanup.
 - `objects`: versioned ioBroker definitions and idempotent projection.
 - `security`: redaction and credential/session boundaries.
-- `maps`: optional bounded decoding/rendering isolated from core status; not
-  part of the first milestone.
+- `maps`: optional bounded decoding/rendering isolated from core status. The
+  first implementation is the ADR 0016 local-development `map.live.*` PNG data
+  URL for VIS debugging, not a finalized public release contract.
 
 ## Lifecycle
 
@@ -108,6 +109,7 @@ through a bounded authentication path. See ADR 0004.
 - exact runtime and js-controller baseline after skeleton generation;
 - gateway heartbeat and reconnect policy after repeated read-only PoC runs;
 - command confirmation semantics;
-- map storage, serving, size limits, and privacy policy;
+- final map storage, serving, opt-in controls, size limits, and privacy policy
+  before public release;
 - multi-device/account/region behavior;
 - whether a future Tuya-local backend belongs in this adapter.

@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { decodeMapPayload } from "./map-payload.js";
 import { summarizeObjectShape } from "./redaction.js";
 import { extractSafeStatus20001Values } from "./status-candidates.js";
 
@@ -56,6 +57,19 @@ const MAP_SEQUENCE_FIELDS = [
   "encodedBytes",
 ] as const;
 const MAP_BLOCK_STATE = Symbol("mapBlockState");
+const EXTRA_SAFE_SEQUENCE_FIELDS = [
+  "code",
+  "cmd",
+  "command",
+  "data",
+  "error",
+  "message",
+  "mode",
+  "result",
+  "status",
+  "subMode",
+  "type",
+] as const;
 
 export interface CaptureAnalysis {
   source: {
@@ -80,6 +94,7 @@ export interface CaptureAnalysis {
     infoTypes: Record<string, number>;
     dataShapes: Record<string, unknown>;
     fieldOccurrences: Record<string, Record<string, number>>;
+    extraSequences: Record<string, Record<string, FieldSequence>>;
   };
   status20001: {
     count: number;
@@ -96,6 +111,7 @@ export interface CaptureAnalysis {
     areaCounts: Record<string, number>;
     encodedByteRanges: NumberRange | undefined;
     sequences: Record<string, FieldSequence>;
+    pathSegments: MapPathSegment[];
     blockSignals: MapBlockSignals;
   };
   privacy: {
@@ -115,9 +131,21 @@ export interface MapBlockSignals {
   notes: string[];
 }
 
+export interface MapPathSegment {
+  label: string;
+  pathId: SafeSequenceValue;
+  firstEvent: number;
+  lastEvent: number;
+  events: number;
+  encodedBytes: NumberRange | undefined;
+  decodedBytes: NumberRange | undefined;
+  areaCounts: Record<string, number>;
+}
+
 interface MapBlockState {
   firstPayload: Buffer | undefined;
   previousPayload: Buffer | undefined;
+  currentPathSegment: MapPathSegment | undefined;
 }
 
 type AnalysisWithPrivateState = CaptureAnalysis & {
@@ -227,6 +255,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       infoTypes: {},
       dataShapes: {},
       fieldOccurrences: {},
+      extraSequences: {},
     },
     status20001: {
       count: 0,
@@ -243,6 +272,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       areaCounts: {},
       encodedByteRanges: undefined,
       sequences: {},
+      pathSegments: [],
       blockSignals: {
         samples: 0,
         stablePrefixBytes: undefined,
@@ -264,6 +294,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
     [MAP_BLOCK_STATE]: {
       firstPayload: undefined,
       previousPayload: undefined,
+      currentPathSegment: undefined,
     },
   };
 
@@ -316,12 +347,52 @@ function analyzeEventRecord(analysis: CaptureAnalysis, record: Record<string, un
   const data = decrypted?.data;
   analysis.events.dataShapes[infoType] = summarizeObjectShape(data);
   countFieldOccurrences(analysis, infoType, data);
+  analyzeExtraInfoTypeSequences(analysis, infoType, data, eventIndex);
 
   if (record.infoType === 20001) {
     analyzeStatus20001(analysis, data, eventIndex);
   }
   if (record.infoType === 20002) {
     analyzeMap20002(analysis, data, eventIndex);
+  }
+}
+
+function analyzeExtraInfoTypeSequences(
+  analysis: CaptureAnalysis,
+  infoType: string,
+  data: unknown,
+  eventIndex: number,
+): void {
+  if (infoType === "20001" || infoType === "20002") {
+    return;
+  }
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return;
+  }
+
+  const record = data as Record<string, unknown>;
+  const bucket = analysis.events.extraSequences[infoType] ?? {};
+  analysis.events.extraSequences[infoType] = bucket;
+
+  for (const field of EXTRA_SAFE_SEQUENCE_FIELDS) {
+    const value = safeExtraSequenceValue(field, record[field]);
+    updateSequenceIfDefined(bucket, field, value, eventIndex);
+  }
+
+  for (const [field, value] of Object.entries(record)) {
+    if (EXTRA_SAFE_SEQUENCE_FIELDS.includes(field as (typeof EXTRA_SAFE_SEQUENCE_FIELDS)[number])) {
+      continue;
+    }
+    const safeValue = safeExtraSequenceValue(field, value);
+    if (safeValue !== undefined) {
+      updateSequenceIfDefined(bucket, field, safeValue, eventIndex);
+    }
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      for (const [childField, childValue] of Object.entries(value as Record<string, unknown>)) {
+        const nestedValue = safeExtraSequenceValue(childField, childValue);
+        updateSequenceIfDefined(bucket, `${field}.${childField}`, nestedValue, eventIndex);
+      }
+    }
   }
 }
 
@@ -380,6 +451,7 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: n
     );
     analyzeMapBlockSignals(analysis as AnalysisWithPrivateState, record.map);
   }
+  updateMapPathSegment(analysis as AnalysisWithPrivateState, record, eventIndex);
 
   for (const field of MAP_METADATA_FIELDS) {
     const value = record[field];
@@ -398,8 +470,48 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: n
   }
 }
 
+function updateMapPathSegment(
+  analysis: AnalysisWithPrivateState,
+  record: Record<string, unknown>,
+  eventIndex: number,
+): void {
+  const pathIdValue = safeExtraSequenceValue("pathId", record.pathId) ?? "unknown";
+  const state = analysis[MAP_BLOCK_STATE];
+  const current = state.currentPathSegment;
+
+  if (!current || current.pathId !== pathIdValue) {
+    const label = `path-${String(pathIdValue)}-from-${eventIndex}`;
+    state.currentPathSegment = {
+      label,
+      pathId: pathIdValue,
+      firstEvent: eventIndex,
+      lastEvent: eventIndex,
+      events: 0,
+      encodedBytes: undefined,
+      decodedBytes: undefined,
+      areaCounts: {},
+    };
+    analysis.map20002.pathSegments.push(state.currentPathSegment);
+  }
+
+  const segment = state.currentPathSegment;
+  if (!segment) {
+    throw new Error("Internal map path segment state was not initialized");
+  }
+  segment.events += 1;
+  segment.lastEvent = eventIndex;
+
+  if (typeof record.map === "string") {
+    segment.encodedBytes = mergeRange(segment.encodedBytes, Buffer.byteLength(record.map, "utf8"));
+    segment.decodedBytes = mergeRange(segment.decodedBytes, decodeMapPayload(record.map).compressed.length);
+  }
+  if (Array.isArray(record.area)) {
+    increment(segment.areaCounts, String(record.area.length));
+  }
+}
+
 function analyzeMapBlockSignals(analysis: AnalysisWithPrivateState, encodedMap: string): void {
-  const payload = Buffer.from(encodedMap, "base64");
+  const payload = decodeMapPayload(encodedMap).compressed;
   const signals = analysis.map20002.blockSignals;
   const state = analysis[MAP_BLOCK_STATE];
 
@@ -513,6 +625,38 @@ function getNumber(record: Record<string, unknown> | undefined, key: string): nu
   return typeof value === "number" ? value : undefined;
 }
 
+function safeExtraSequenceValue(key: string, value: unknown): SafeSequenceValue | undefined {
+  if (typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    if (/message|msg|title|text/iu.test(key)) {
+      return `<string:${value.length}>`;
+    }
+    if (value.length > 80) {
+      return `<string:${value.length}>`;
+    }
+    if (looksPrivateString(value)) {
+      return "<redacted>";
+    }
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return `array:${value.length}`;
+  }
+  if (value !== null && typeof value === "object") {
+    return "object";
+  }
+  return undefined;
+}
+
+function looksPrivateString(value: string): boolean {
+  return /@|token|secret|password|[a-f0-9]{24,}/iu.test(value);
+}
+
 function increment(bucket: Record<string, number>, key: string): void {
   bucket[key] = (bucket[key] ?? 0) + 1;
 }
@@ -597,13 +741,27 @@ function sortAnalysis(analysis: CaptureAnalysis): void {
   analysis.gateway.frameErrorMessages = sortNumberRecord(analysis.gateway.frameErrorMessages);
   analysis.events.infoTypes = sortNumberRecord(analysis.events.infoTypes);
   analysis.events.fieldOccurrences = sortNestedNumberRecord(analysis.events.fieldOccurrences);
+  analysis.events.extraSequences = sortNestedSequenceRecord(analysis.events.extraSequences);
   analysis.status20001.errorStateLengths = sortNumberRecord(analysis.status20001.errorStateLengths);
   analysis.map20002.areaCounts = sortNumberRecord(analysis.map20002.areaCounts);
+  analysis.map20002.pathSegments = analysis.map20002.pathSegments.map((segment) => ({
+    ...segment,
+    areaCounts: sortNumberRecord(segment.areaCounts),
+  }));
 
   for (const [key, values] of Object.entries(analysis.status20001.safeEnums)) {
     analysis.status20001.safeEnums[key] = values.sort();
   }
   finalizeMapBlockSignals(analysis);
+}
+
+function sortNestedSequenceRecord(record: Record<string, Record<string, FieldSequence>>): Record<string, Record<string, FieldSequence>> {
+  return Object.fromEntries(
+    Object.entries(record)
+      .filter(([, value]) => Object.keys(value).length > 0)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))]),
+  );
 }
 
 function finalizeMapBlockSignals(analysis: CaptureAnalysis): void {

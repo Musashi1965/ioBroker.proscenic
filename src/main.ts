@@ -11,12 +11,14 @@ import {
 	normalizeCommandButtonValue,
 	type RobotCommand,
 } from "./domain/commands";
+import { extractRobotPose20001, renderLiveMapImage20002, type RobotPose } from "./domain/live-map";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
+	projectLiveMapImage,
 	projectMapMetadata,
 	projectStatus,
 	redactedErrorMessage,
@@ -30,6 +32,7 @@ import type { DeviceRecord, GatewayData, GatewayEndpoint } from "./protocol/type
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
+const MAX_LIVE_MAP_POSES = 1_000;
 
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
@@ -42,6 +45,8 @@ class Proscenic extends utils.Adapter {
 	private commandToken: string | undefined;
 	private commandSerial: string | undefined;
 	private shuttingDown = false;
+	private recentRobotPoses: RobotPose[] = [];
+	private latestMapData: unknown;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -200,6 +205,15 @@ class Proscenic extends utils.Adapter {
 
 	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {
 		if (infoType === 20001) {
+			const pose = extractRobotPose20001(data);
+			if (pose) {
+				this.recentRobotPoses.push(pose);
+				if (this.recentRobotPoses.length > MAX_LIVE_MAP_POSES) {
+					this.recentRobotPoses = this.recentRobotPoses.slice(-MAX_LIVE_MAP_POSES);
+				}
+				await this.projectLatestLiveMapImage();
+			}
+
 			const status = normalizeStatus20001(data);
 			if (status) {
 				await projectStatus(this, status);
@@ -208,10 +222,27 @@ class Proscenic extends utils.Adapter {
 		}
 
 		if (infoType === 20002) {
+			this.latestMapData = data;
 			const map = normalizeMap20002(data);
 			if (map) {
 				await projectMapMetadata(this, map);
 			}
+			await this.projectLatestLiveMapImage();
+		}
+	}
+
+	private async projectLatestLiveMapImage(): Promise<void> {
+		if (!this.latestMapData) {
+			return;
+		}
+
+		try {
+			const image = renderLiveMapImage20002(this.latestMapData, this.recentRobotPoses);
+			if (image) {
+				await projectLiveMapImage(this, image);
+			}
+		} catch (error) {
+			this.log.debug(`Could not render experimental live map image: ${redactedErrorMessage(error)}`);
 		}
 	}
 

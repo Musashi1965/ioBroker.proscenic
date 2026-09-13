@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { projectMapMetadata, redactedErrorMessage, setConnectionState } from "./projector";
+import { projectLiveMapImage, projectMapMetadata, redactedErrorMessage, setConnectionState } from "./projector";
 
 describe("redactedErrorMessage", () => {
 	it("redacts account and endpoint material from public errors", () => {
@@ -63,6 +63,35 @@ describe("projectMapMetadata", () => {
 		expect(states.get("map.encodedBytes")).to.deep.equal({ val: 19, ack: true });
 		expect(states.get("map.updated")?.ack).to.equal(true);
 		expect(states.get("map.updated")?.val).to.be.a("string");
+		expect(states.get("capabilities.maps")).to.deep.equal({ val: true, ack: true });
+	});
+});
+
+describe("projectLiveMapImage", () => {
+	it("publishes the experimental rendered map image and render diagnostics", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectLiveMapImage(adapter, {
+			dataUrl: "data:image/png;base64,fixture",
+			width: 2,
+			height: 2,
+			poseCount: 3,
+			orientation: "flip-y",
+			decompressedBytes: 4,
+		});
+
+		expect(states.get("map.live.image")).to.deep.equal({ val: "data:image/png;base64,fixture", ack: true });
+		expect(states.get("map.live.updated")?.ack).to.equal(true);
+		expect(states.get("map.live.updated")?.val).to.be.a("string");
+		expect(states.get("map.live.orientation")).to.deep.equal({ val: "flip-y", ack: true });
+		expect(states.get("map.live.poseCount")).to.deep.equal({ val: 3, ack: true });
+		expect(states.get("map.live.decompressedBytes")).to.deep.equal({ val: 4, ack: true });
 		expect(states.get("capabilities.maps")).to.deep.equal({ val: true, ack: true });
 	});
 });

@@ -32,7 +32,18 @@ describe("map renderer", () => {
             width: 4,
             height: 4,
             resolution: 0.05,
+            x_min: -0.1,
+            y_min: -0.1,
             pathId: 1,
+            area: [{
+              vertexs: [
+                [-50, -50],
+                [0, -50],
+                [0, 0],
+                [-50, 0],
+              ],
+            }],
+            chargeHandlePos: [50, 50],
           },
         },
       })}\n${JSON.stringify({
@@ -47,25 +58,45 @@ describe("map renderer", () => {
             width: 4,
             height: 4,
             resolution: 0.05,
+            x_min: -0.1,
+            y_min: -0.1,
             pathId: 1,
+            area: [{
+              vertexs: [
+                [-50, -50],
+                [0, -50],
+                [0, 0],
+                [-50, 0],
+              ],
+            }],
+            chargeHandlePos: [50, 50],
           },
         },
       })}\n`);
 
       const result = await renderMapFromPrivateCapture({ capturePath, outputDirectory });
       assert.equal(result.eventIndex, 8);
-      assert.equal(result.files.length, 32);
+      assert.equal(result.files.length, 52);
+      assert.equal(result.metadata.areaCount, 1);
+      assert.equal(result.metadata.hasCoordinateMetadata, true);
+      assert.equal(result.metadata.robotPoseCount, 0);
+      assert.equal(result.metadata.occupancyChangedCellsFromFirst, undefined);
       assert.equal(result.probes.bitOffsetCount, 12);
       assert.equal(result.probes.coordinateOffsetCount, 8);
       assert.equal(result.probes.filteredCoordinateOffsetCount, 8);
-      assert.equal(result.probes.evolutionContactSheets.length, 1);
-      assert.equal(result.probes.evolutionStats.length, 8);
+      assert.equal(result.probes.evolutionContactSheets.length, 2);
+      assert.equal(result.probes.evolutionStats.length, 16);
       assert.equal(result.probes.evolutionStats[0].group, "all-events");
-      assert.equal(result.probes.contactSheets.length, 3);
+      assert.equal(result.probes.candidateStats.length, 24);
+      assert.equal(result.probes.contactSheets.length, 5);
       assert.equal(result.privacy.outputContainsRawPayloads, false);
 
       const firstFile = await readFile(result.files[0]);
       assert.equal(firstFile.subarray(1, 4).toString("ascii"), "PNG");
+      const overlayPath = result.files.find((file) => file.endsWith("coordinate-metadata-overlay.png"));
+      assert.ok(overlayPath);
+      const overlayFile = await readFile(overlayPath);
+      assert.equal(overlayFile.subarray(1, 4).toString("ascii"), "PNG");
 
       const serialized = JSON.stringify(result);
       assert.equal(serialized.includes(encoded), false);

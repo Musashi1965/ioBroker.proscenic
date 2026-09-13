@@ -84,11 +84,40 @@ redacted private evidence.
 `infoType` 20002 is also used for safe map metadata. The adapter may publish map
 availability, dimensions, resolution, IDs, area count, encoded size, compressed
 size, and update timestamp. It must not publish raw base64 maps, decompressed
-map images, coordinates, paths, charger positions, serial numbers, or complete
-20002 payloads.
+map bytes, coordinates, paths, charger positions, serial numbers, or complete
+20002 payloads. ADR 0016 adds an explicit local-development exception for
+`map.live.*`: a bounded rendered PNG data URL for VIS debugging. That rendered
+image is private owner data and is not a raw payload or final release contract.
+
+Private map rendering probes on 2026-09-13 compared a long capture with an
+owner-provided Proscenic app screenshot. The app view shows a large filled
+occupancy-style area with an outline, a no-go zone, and the dock/robot marker.
+The map payload required one important transport normalization step: whitespace
+inside the base64 map string represents `+` characters. After restoring those
+characters, the decoded map length matches `lz4_len`, and raw LZ4 at offset 0
+decompresses to exactly `width * height` bytes. The observed occupancy grid
+uses three cell values and renders a recognizable floor plan that matches the
+app screenshot geometry. The raw occupancy raster orientation and the
+coordinate overlay orientation are not the same, so the local renderer emits
+explicit orientation variants (`raw`, `flip-x`, `flip-y`, and `flip-xy`) for
+comparison. `area.vertexs` and `chargeHandlePos` project into that grid with
+`x_min`, `y_min`, and `resolution`, matching the no-go zone and dock position
+without changing the coordinate projection. The app-conform orientation for the
+observed M7 Pro is `flip-y`. Local file renderings are owner-private
+reverse-engineering artifacts and must remain under ignored private paths.
+
+`infoType` 20001 `pos` values use the same coordinate scale and can be
+projected with the same `x_min`, `y_min`, and `resolution` metadata. A private
+900-second capture projected nearly all observed positions into the map bounds
+and can render a coarse robot trail plus latest pose. However, the dense
+parallel cleaning lines shown by the Proscenic app are not yet proven to be
+available as a ready-made overlay. First-to-last occupancy-grid deltas changed
+only a small subset of cells in that capture, so the adapter must treat route
+rendering as a separate reconstruction problem until more app-aligned captures
+prove the exact path source.
 
 The first deployed read-only adapter with ADR 0011 reconnect behavior was also
-validated on CM4-Node4. After a gateway socket close, the adapter scheduled a
+validated on CM4-Node-04. After a gateway socket close, the adapter scheduled a
 bounded reconnect, re-established the gateway connection, and continued updating
 cleaning status values while the robot was active.
 

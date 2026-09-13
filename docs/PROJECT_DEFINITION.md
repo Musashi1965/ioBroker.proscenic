@@ -57,8 +57,10 @@ remain pending.
 - No assumption that the legacy cloud API is stable or officially supported.
 - No firmware modification, certificate-validation bypass, credential
   interception, or DRM/security circumvention.
-- No map or home-layout publication in logs, tests, fixtures, states, or issue
-  reports.
+- No raw map or home-layout publication in logs, tests, fixtures, commits, or
+  issue reports. ADR 0016 permits an explicitly named local-development
+  `map.live.*` rendered image state for VIS debugging; this is private owner
+  data and not a final release contract.
 - No local-control claim until a separate PoC verifies it on this exact model.
 - No full feature set before the lifecycle and status foundation is stable.
 

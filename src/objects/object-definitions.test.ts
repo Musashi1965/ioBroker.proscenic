@@ -39,7 +39,7 @@ describe("initial object definitions", () => {
 		]);
 	});
 
-	it("exposes only safe map metadata without raw maps, positions, serials, or gateway endpoints", () => {
+	it("exposes safe map metadata and an explicit experimental live image without raw maps, positions, serials, or gateway endpoints", () => {
 		const ids = STATE_DEFINITIONS.map(definition => definition.id);
 
 		expect(ids).to.include("map.available");
@@ -52,8 +52,14 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.compressedBytes");
 		expect(ids).to.include("map.encodedBytes");
 		expect(ids).to.include("map.updated");
+		expect(ids).to.include("map.live.image");
+		expect(ids).to.include("map.live.updated");
+		expect(ids).to.include("map.live.orientation");
+		expect(ids).to.include("map.live.poseCount");
+		expect(ids).to.include("map.live.decompressedBytes");
 		expect(ids).to.not.include("map.raw");
 		expect(ids).to.not.include("map.image");
+		expect(ids).to.not.include("map.payload");
 		expect(ids).to.not.include("status.position");
 		expect(ids).to.not.include("device.serial");
 		expect(ids).to.not.include("connection.gatewayEndpoint");

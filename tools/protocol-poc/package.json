@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "analyze": "npm run build && node dist/analyze-capture.js",
+    "analyze-map-format": "npm run build && node dist/analyze-map-format.js",
     "build": "tsc -p tsconfig.json",
     "render-map": "npm run build && node dist/render-map.js",
     "test": "npm run build && node --test dist/**/*.test.js",

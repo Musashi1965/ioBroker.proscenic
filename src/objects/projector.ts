@@ -1,4 +1,5 @@
 import type { MapMetadata } from "../domain/map";
+import type { LiveMapImage } from "../domain/live-map";
 import type { RobotStatus } from "../domain/status";
 import type { DeviceRecord } from "../protocol/types";
 
@@ -47,6 +48,15 @@ export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMeta
 	await setIfDefined(adapter, "map.compressedBytes", map.compressedBytes);
 	await setIfDefined(adapter, "map.encodedBytes", map.encodedBytes);
 	await adapter.setStateAsync("map.updated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
+}
+
+export async function projectLiveMapImage(adapter: ioBroker.Adapter, image: LiveMapImage): Promise<void> {
+	await adapter.setStateAsync("map.live.image", { val: image.dataUrl, ack: true });
+	await adapter.setStateAsync("map.live.updated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("map.live.orientation", { val: image.orientation, ack: true });
+	await adapter.setStateAsync("map.live.poseCount", { val: image.poseCount, ack: true });
+	await adapter.setStateAsync("map.live.decompressedBytes", { val: image.decompressedBytes, ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
 }
 

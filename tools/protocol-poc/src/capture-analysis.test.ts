@@ -79,6 +79,23 @@ describe("capture analysis", () => {
         },
       }),
       JSON.stringify({
+        kind: "event",
+        index: 5,
+        infoType: 21017,
+        decrypted: {
+          infoType: 21017,
+          data: {
+            status: "returning",
+            message: "safe fixture text",
+            msg: {
+              code: 42,
+              message: "nested fixture text",
+            },
+            count: 2,
+          },
+        },
+      }),
+      JSON.stringify({
         kind: "frame-error",
         index: 1,
         message: "decrypt failed",
@@ -94,9 +111,9 @@ describe("capture analysis", () => {
       "{malformed",
     ], "capture.jsonl");
 
-    assert.equal(analysis.records.total, 7);
+    assert.equal(analysis.records.total, 8);
     assert.equal(analysis.records.malformed, 1);
-    assert.equal(analysis.records.events, 4);
+    assert.equal(analysis.records.events, 5);
     assert.equal(analysis.records.frameErrors, 1);
     assert.deepEqual(analysis.status20001.safeEnums.mode, ["pause", "sweep"]);
     assert.equal(analysis.status20001.numberRanges.cleanArea.min, 12);
@@ -118,6 +135,9 @@ describe("capture analysis", () => {
     assert.equal(analysis.map20002.blockSignals.samples, 2);
     assert.equal(analysis.map20002.blockSignals.adjacentChangedPayload, 1);
     assert.equal(analysis.map20002.blockSignals.interpretation, "snapshot-like");
+    assert.equal(analysis.map20002.pathSegments.length, 2);
+    assert.equal(analysis.map20002.pathSegments[0].events, 1);
+    assert.equal(analysis.map20002.pathSegments[1].pathId, 1789117424);
     assert.equal(analysis.map20002.sequences.pathId.changes, 1);
     assert.deepEqual(analysis.map20002.sequences.pathId.transitions, [
       {
@@ -127,6 +147,11 @@ describe("capture analysis", () => {
       },
     ]);
     assert.equal(analysis.map20002.sequences.areaCount.last, 2);
+    assert.equal(analysis.events.extraSequences["21017"].status.last, "returning");
+    assert.equal(analysis.events.extraSequences["21017"].message.last, "<string:17>");
+    assert.equal(analysis.events.extraSequences["21017"]["msg.code"].last, 42);
+    assert.equal(analysis.events.extraSequences["21017"]["msg.message"].last, "<string:19>");
+    assert.equal(analysis.events.extraSequences["21017"].count.last, 2);
     assert.equal(analysis.gateway.frameErrorMessages["decrypt failed"], 1);
 
     const serialized = JSON.stringify(analysis);
@@ -135,6 +160,8 @@ describe("capture analysis", () => {
     assert.equal(serialized.includes("fixture-map-payload"), false);
     assert.equal(serialized.includes("fixture-map-payload-new"), false);
     assert.equal(serialized.includes("fixture warning"), false);
+    assert.equal(serialized.includes("safe fixture text"), false);
+    assert.equal(serialized.includes("nested fixture text"), false);
     assert.equal(serialized.includes("[1,2]"), false);
     assert.equal(serialized.includes("[3,4]"), false);
   });
