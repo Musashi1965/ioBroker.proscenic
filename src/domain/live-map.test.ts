@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { inflateSync } from "node:zlib";
 import { extractRobotPose20001, renderLiveMapImage20002 } from "./live-map";
 
 describe("live map rendering", () => {
@@ -39,6 +40,37 @@ describe("live map rendering", () => {
 		});
 		expect(extractRobotPose20001({ pos: "redacted" })).to.equal(undefined);
 	});
+
+	it("renders no-go areas translucent so map pixels stay visible below them", () => {
+		const grid = Buffer.alloc(25, 127);
+		const image = renderLiveMapImage20002({
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			width: 5,
+			height: 5,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				{
+					vertexs: [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					],
+				},
+			],
+		});
+
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+		const center = pixelAt(pixels, 5, 2, 2);
+
+		expect(center).to.not.deep.equal([169, 200, 235]);
+		expect(center).to.not.deep.equal([209, 106, 133]);
+		expect(center[0]).to.be.greaterThan(169);
+		expect(center[1]).to.be.lessThan(200);
+		expect(center[2]).to.be.lessThan(235);
+	});
 });
 
 function encodeLiteralOnlyLz4(payload: Buffer): Buffer {
@@ -63,4 +95,39 @@ function decodePngDataUrl(dataUrl: string | undefined): Buffer {
 	expect(dataUrl).to.be.a("string");
 	const encoded = dataUrl?.slice("data:image/png;base64,".length) ?? "";
 	return Buffer.from(encoded, "base64");
+}
+
+function decodeRgbPngDataUrl(dataUrl: string | undefined, width: number, height: number): Buffer {
+	const png = decodePngDataUrl(dataUrl);
+	const idat = extractPngChunk(png, "IDAT");
+	const scanlines = inflateSync(idat);
+	const pixels = Buffer.alloc(width * height * 3);
+	const rowBytes = width * 3;
+
+	for (let y = 0; y < height; y++) {
+		expect(scanlines[y * (rowBytes + 1)]).to.equal(0);
+		scanlines.copy(pixels, y * rowBytes, y * (rowBytes + 1) + 1, y * (rowBytes + 1) + 1 + rowBytes);
+	}
+
+	return pixels;
+}
+
+function extractPngChunk(png: Buffer, type: string): Buffer {
+	let offset = 8;
+	while (offset + 8 <= png.length) {
+		const length = png.readUInt32BE(offset);
+		const chunkType = png.subarray(offset + 4, offset + 8).toString("ascii");
+		const dataStart = offset + 8;
+		const dataEnd = dataStart + length;
+		if (chunkType === type) {
+			return png.subarray(dataStart, dataEnd);
+		}
+		offset = dataEnd + 4;
+	}
+	throw new Error(`PNG chunk ${type} not found`);
+}
+
+function pixelAt(pixels: Buffer, width: number, x: number, y: number): [number, number, number] {
+	const offset = (y * width + x) * 3;
+	return [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
 }

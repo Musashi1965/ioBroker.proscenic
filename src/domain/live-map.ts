@@ -41,6 +41,7 @@ const COLOR_WALL: Color = [56, 130, 188];
 const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
 const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
+const FORBIDDEN_AREA_ALPHA = 0.45;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
 const COLOR_PATH: Color = [255, 255, 255];
@@ -148,7 +149,7 @@ function drawCoordinateMetadata(sample: MapSample, pixels: Buffer): void {
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);
 		if (projected.length >= 3) {
-			fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA);
+			fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA, FORBIDDEN_AREA_ALPHA);
 			drawPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_OUTLINE);
 		}
 	}
@@ -317,6 +318,7 @@ function fillPolygon(
 	height: number,
 	polygon: Array<[number, number]>,
 	color: Color,
+	alpha = 1,
 ): void {
 	const minY = Math.max(0, Math.min(...polygon.map(([, y]) => y)));
 	const maxY = Math.min(height - 1, Math.max(...polygon.map(([, y]) => y)));
@@ -337,7 +339,7 @@ function fillPolygon(
 			const start = Math.max(0, intersections[index]);
 			const end = Math.min(width - 1, intersections[index + 1]);
 			for (let x = start; x <= end; x++) {
-				setPixel(pixels, width, height, x, y, color);
+				blendPixel(pixels, width, height, x, y, color, alpha);
 			}
 		}
 	}
@@ -423,6 +425,29 @@ function setPixel(pixels: Buffer, width: number, height: number, x: number, y: n
 	pixels[offset] = color[0];
 	pixels[offset + 1] = color[1];
 	pixels[offset + 2] = color[2];
+}
+
+function blendPixel(
+	pixels: Buffer,
+	width: number,
+	height: number,
+	x: number,
+	y: number,
+	color: Color,
+	alpha: number,
+): void {
+	if (alpha >= 1) {
+		setPixel(pixels, width, height, x, y, color);
+		return;
+	}
+	if (x < 0 || x >= width || y < 0 || y >= height) {
+		return;
+	}
+
+	const offset = (y * width + x) * 3;
+	pixels[offset] = Math.round(pixels[offset] * (1 - alpha) + color[0] * alpha);
+	pixels[offset + 1] = Math.round(pixels[offset + 1] * (1 - alpha) + color[1] * alpha);
+	pixels[offset + 2] = Math.round(pixels[offset + 2] * (1 - alpha) + color[2] * alpha);
 }
 
 function distanceSquared(left: [number, number], right: [number, number]): number {
