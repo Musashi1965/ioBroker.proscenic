@@ -47,6 +47,7 @@ class Proscenic extends utils.Adapter {
 	private shuttingDown = false;
 	private recentRobotPoses: RobotPose[] = [];
 	private latestMapData: unknown;
+	private latestMapPathId: number | undefined;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -222,11 +223,21 @@ class Proscenic extends utils.Adapter {
 		}
 
 		if (infoType === 20002) {
-			this.latestMapData = data;
 			const map = normalizeMap20002(data);
 			if (map) {
+				if (
+					map.pathId !== undefined &&
+					this.latestMapPathId !== undefined &&
+					map.pathId !== this.latestMapPathId
+				) {
+					this.recentRobotPoses = [];
+				}
+				if (map.pathId !== undefined) {
+					this.latestMapPathId = map.pathId;
+				}
 				await projectMapMetadata(this, map);
 			}
+			this.latestMapData = data;
 			await this.projectLatestLiveMapImage();
 		}
 	}

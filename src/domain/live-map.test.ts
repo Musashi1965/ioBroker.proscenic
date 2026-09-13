@@ -29,6 +29,7 @@ describe("live map rendering", () => {
 		expect(image?.height).to.equal(2);
 		expect(image?.decompressedBytes).to.equal(grid.length);
 		expect(image?.dataUrl.startsWith("data:image/png;base64,")).to.equal(true);
+		expect(decodePngDataUrl(image?.dataUrl)[25]).to.equal(2);
 	});
 
 	it("extracts private robot positions only for in-memory rendering", () => {
@@ -56,4 +57,10 @@ function encodeLiteralOnlyLz4(payload: Buffer): Buffer {
 	}
 	chunks.push(payload);
 	return Buffer.concat(chunks);
+}
+
+function decodePngDataUrl(dataUrl: string | undefined): Buffer {
+	expect(dataUrl).to.be.a("string");
+	const encoded = dataUrl?.slice("data:image/png;base64,".length) ?? "";
+	return Buffer.from(encoded, "base64");
 }

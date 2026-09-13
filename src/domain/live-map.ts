@@ -29,10 +29,22 @@ interface MapArea {
 	vertices: Array<[number, number]>;
 }
 
+type Color = readonly [number, number, number];
+
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const CRC_TABLE = createCrcTable();
 const MAX_LIVE_MAP_PIXELS = 512 * 512;
 const MAX_LIVE_MAP_DATA_URL_BYTES = 256 * 1024;
+const COLOR_UNKNOWN: Color = [255, 255, 255];
+const COLOR_FLOOR: Color = [169, 200, 235];
+const COLOR_WALL: Color = [56, 130, 188];
+const COLOR_OBSTACLE: Color = [82, 82, 82];
+const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
+const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
+const COLOR_DOCK: Color = [92, 92, 92];
+const COLOR_ROBOT: Color = [39, 139, 61];
+const COLOR_PATH: Color = [255, 255, 255];
+const COLOR_HEADING: Color = [20, 20, 20];
 
 export function extractRobotPose20001(data: unknown): RobotPose | undefined {
 	const record = getRecord(data);
@@ -63,7 +75,7 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 	drawCoordinateMetadata(sample, pixels);
 	const poseCount = drawRobotRuntime(sample, pixels, poses);
 
-	const png = encodeGrayscalePng(sample.width, sample.height, pixels);
+	const png = encodeRgbPng(sample.width, sample.height, pixels);
 	const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
 	if (Buffer.byteLength(dataUrl, "utf8") > MAX_LIVE_MAP_DATA_URL_BYTES) {
 		return undefined;
@@ -111,21 +123,20 @@ function parseMapSample(data: unknown): MapSample | undefined {
 }
 
 function renderOccupancy(width: number, height: number, occupancy: Buffer): Buffer {
-	const pixels = Buffer.alloc(width * height, 0xff);
+	const pixels = Buffer.alloc(width * height * 3);
 	for (let index = 0; index < occupancy.length; index++) {
 		const sourceX = index % width;
 		const sourceY = Math.floor(index / width);
 		const targetY = height - 1 - sourceY;
-		const targetIndex = targetY * width + sourceX;
 		const value = occupancy[index];
 		if (value === 0) {
-			pixels[targetIndex] = 0x28;
+			setPixel(pixels, width, height, sourceX, targetY, COLOR_WALL);
 		} else if (value === 127) {
-			pixels[targetIndex] = 0xb8;
+			setPixel(pixels, width, height, sourceX, targetY, COLOR_FLOOR);
 		} else if (value === 255) {
-			pixels[targetIndex] = 0xff;
+			setPixel(pixels, width, height, sourceX, targetY, COLOR_UNKNOWN);
 		} else {
-			pixels[targetIndex] = Math.max(0, Math.min(255, value));
+			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : COLOR_FLOOR);
 		}
 	}
 	return pixels;
@@ -137,15 +148,15 @@ function drawCoordinateMetadata(sample: MapSample, pixels: Buffer): void {
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);
 		if (projected.length >= 3) {
-			fillPolygon(pixels, sample.width, sample.height, projected, 0xa8);
-			drawPolygon(pixels, sample.width, sample.height, projected, 0x48);
+			fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA);
+			drawPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_OUTLINE);
 		}
 	}
 
 	if (sample.chargeHandlePos) {
 		const charge = projectRobotCoordinate(sample, sample.chargeHandlePos);
 		if (charge) {
-			plotMarker(pixels, sample.width, sample.height, charge[0], charge[1], 4, 0x10);
+			plotMarker(pixels, sample.width, sample.height, charge[0], charge[1], 5, COLOR_DOCK);
 		}
 	}
 }
@@ -162,7 +173,7 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 		const previous = projected[index - 1].point;
 		const current = projected[index].point;
 		if (distanceSquared(previous, current) <= 30 * 30) {
-			drawLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1], 0x70);
+			drawLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1], COLOR_PATH);
 		}
 	}
 
@@ -171,13 +182,13 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 		return 0;
 	}
 
-	plotMarker(pixels, sample.width, sample.height, latest.point[0], latest.point[1], 5, 0x00);
+	plotMarker(pixels, sample.width, sample.height, latest.point[0], latest.point[1], 5, COLOR_ROBOT);
 	if (latest.phi !== undefined) {
 		const angle = latest.phi / 1000;
 		const headingLength = 10;
 		const endX = Math.round(latest.point[0] + Math.cos(angle) * headingLength);
 		const endY = Math.round(latest.point[1] - Math.sin(angle) * headingLength);
-		drawLine(pixels, sample.width, sample.height, latest.point[0], latest.point[1], endX, endY, 0x00);
+		drawLine(pixels, sample.width, sample.height, latest.point[0], latest.point[1], endX, endY, COLOR_HEADING);
 	}
 
 	return projected.length;
@@ -305,7 +316,7 @@ function fillPolygon(
 	width: number,
 	height: number,
 	polygon: Array<[number, number]>,
-	color: number,
+	color: Color,
 ): void {
 	const minY = Math.max(0, Math.min(...polygon.map(([, y]) => y)));
 	const maxY = Math.min(height - 1, Math.max(...polygon.map(([, y]) => y)));
@@ -326,7 +337,7 @@ function fillPolygon(
 			const start = Math.max(0, intersections[index]);
 			const end = Math.min(width - 1, intersections[index + 1]);
 			for (let x = start; x <= end; x++) {
-				pixels[y * width + x] = Math.min(pixels[y * width + x], color);
+				setPixel(pixels, width, height, x, y, color);
 			}
 		}
 	}
@@ -337,7 +348,7 @@ function drawPolygon(
 	width: number,
 	height: number,
 	polygon: Array<[number, number]>,
-	color: number,
+	color: Color,
 ): void {
 	for (let index = 0; index < polygon.length; index++) {
 		const [x1, y1] = polygon[index];
@@ -354,7 +365,7 @@ function drawLine(
 	y1: number,
 	x2: number,
 	y2: number,
-	color: number,
+	color: Color,
 ): void {
 	const dx = Math.abs(x2 - x1);
 	const sx = x1 < x2 ? 1 : -1;
@@ -366,7 +377,7 @@ function drawLine(
 
 	while (true) {
 		if (x >= 0 && x < width && y >= 0 && y < height) {
-			pixels[y * width + x] = Math.min(pixels[y * width + x], color);
+			setPixel(pixels, width, height, x, y, color);
 		}
 		if (x === x2 && y === y2) {
 			break;
@@ -390,38 +401,50 @@ function plotMarker(
 	x: number,
 	y: number,
 	radius: number,
-	color: number,
+	color: Color,
 ): void {
 	for (let dy = -radius; dy <= radius; dy++) {
 		for (let dx = -radius; dx <= radius; dx++) {
 			const px = x + dx;
 			const py = y + dy;
 			if (px >= 0 && px < width && py >= 0 && py < height && dx * dx + dy * dy <= radius * radius) {
-				pixels[py * width + px] = Math.min(pixels[py * width + px], color);
+				setPixel(pixels, width, height, px, py, color);
 			}
 		}
 	}
+}
+
+function setPixel(pixels: Buffer, width: number, height: number, x: number, y: number, color: Color): void {
+	if (x < 0 || x >= width || y < 0 || y >= height) {
+		return;
+	}
+
+	const offset = (y * width + x) * 3;
+	pixels[offset] = color[0];
+	pixels[offset + 1] = color[1];
+	pixels[offset + 2] = color[2];
 }
 
 function distanceSquared(left: [number, number], right: [number, number]): number {
 	return (left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2;
 }
 
-function encodeGrayscalePng(width: number, height: number, pixels: Buffer): Buffer {
-	if (pixels.length !== width * height) {
-		throw new Error(`Expected ${width * height} grayscale pixels but received ${pixels.length}`);
+function encodeRgbPng(width: number, height: number, pixels: Buffer): Buffer {
+	if (pixels.length !== width * height * 3) {
+		throw new Error(`Expected ${width * height * 3} RGB pixels but received ${pixels.length}`);
 	}
 
 	const header = Buffer.alloc(13);
 	header.writeUInt32BE(width, 0);
 	header.writeUInt32BE(height, 4);
 	header[8] = 8;
-	header[9] = 0;
+	header[9] = 2;
 
-	const scanlines = Buffer.alloc((width + 1) * height);
+	const rowBytes = width * 3;
+	const scanlines = Buffer.alloc((rowBytes + 1) * height);
 	for (let y = 0; y < height; y++) {
-		scanlines[y * (width + 1)] = 0;
-		pixels.copy(scanlines, y * (width + 1) + 1, y * width, (y + 1) * width);
+		scanlines[y * (rowBytes + 1)] = 0;
+		pixels.copy(scanlines, y * (rowBytes + 1) + 1, y * rowBytes, (y + 1) * rowBytes);
 	}
 
 	return Buffer.concat([

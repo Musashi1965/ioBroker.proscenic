@@ -23,10 +23,16 @@ Expose an explicit experimental live-map image under:
 - `map.live.poseCount`;
 - `map.live.decompressedBytes`.
 
-`map.live.image` contains a bounded PNG data URL rendered from the latest
+`map.live.image` contains a bounded RGB PNG data URL rendered from the latest
 20002 occupancy grid. The adapter uses the currently verified `flip-y`
-orientation and overlays available coordinate metadata plus in-memory robot
-poses from 20001 events when present.
+orientation, an app-oriented color palette, and overlays available coordinate
+metadata plus in-memory robot poses from 20001 events when present.
+
+The in-memory pose trail is scoped to the active map path. When a later 20002
+event reports a different `pathId`, the adapter clears its own collected pose
+trail before rendering the new path. Any old route still visible after that
+comes from the robot-provided 20002 occupancy/map snapshot or from the app, not
+from the adapter's 20001 pose overlay.
 
 The adapter must not log or commit raw 20002 payloads, decompressed map bytes,
 serials, coordinates, captures, generated private map files, or VIS screenshots.
