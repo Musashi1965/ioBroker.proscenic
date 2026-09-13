@@ -3,6 +3,13 @@ import type { LiveMapImage } from "../domain/live-map";
 import type { RobotStatus } from "../domain/status";
 import type { DeviceRecord } from "../protocol/types";
 
+export interface LiveMapProjectionDiagnostics {
+	renderReason: "map" | "pose";
+	lastPathId?: number;
+	pathResetCount: number;
+	lastPoseUpdated?: string;
+}
+
 export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Promise<void> {
 	await adapter.setStateAsync("capabilities.statusRead", { val: true, ack: true });
 	await adapter.setStateAsync("capabilities.commands", { val: false, ack: true });
@@ -51,11 +58,22 @@ export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMeta
 	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
 }
 
-export async function projectLiveMapImage(adapter: ioBroker.Adapter, image: LiveMapImage): Promise<void> {
+export async function projectLiveMapImage(
+	adapter: ioBroker.Adapter,
+	image: LiveMapImage,
+	diagnostics: LiveMapProjectionDiagnostics,
+): Promise<void> {
 	await adapter.setStateAsync("map.live.image", { val: image.dataUrl, ack: true });
 	await adapter.setStateAsync("map.live.updated", { val: new Date().toISOString(), ack: true });
 	await adapter.setStateAsync("map.live.orientation", { val: image.orientation, ack: true });
 	await adapter.setStateAsync("map.live.poseCount", { val: image.poseCount, ack: true });
+	await adapter.setStateAsync("map.live.rawPoseCount", { val: image.rawPoseCount, ack: true });
+	await adapter.setStateAsync("map.live.pathLineSegments", { val: image.pathLineSegments, ack: true });
+	await adapter.setStateAsync("map.live.skippedPathSegments", { val: image.skippedPathSegments, ack: true });
+	await adapter.setStateAsync("map.live.renderReason", { val: diagnostics.renderReason, ack: true });
+	await setIfDefined(adapter, "map.live.lastPathId", diagnostics.lastPathId);
+	await adapter.setStateAsync("map.live.pathResetCount", { val: diagnostics.pathResetCount, ack: true });
+	await adapter.setStateAsync("map.live.lastPoseUpdated", { val: diagnostics.lastPoseUpdated ?? "", ack: true });
 	await adapter.setStateAsync("map.live.decompressedBytes", { val: image.decompressedBytes, ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
 }

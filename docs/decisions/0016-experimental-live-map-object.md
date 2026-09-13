@@ -21,6 +21,13 @@ Expose an explicit experimental live-map image under:
 - `map.live.updated`;
 - `map.live.orientation`;
 - `map.live.poseCount`;
+- `map.live.rawPoseCount`;
+- `map.live.pathLineSegments`;
+- `map.live.skippedPathSegments`;
+- `map.live.renderReason`;
+- `map.live.lastPathId`;
+- `map.live.pathResetCount`;
+- `map.live.lastPoseUpdated`;
 - `map.live.decompressedBytes`.
 
 `map.live.image` contains a bounded RGB PNG data URL rendered from the latest
@@ -30,13 +37,33 @@ metadata plus in-memory robot poses from 20001 events when present. For the
 observed M7 Pro, occupancy value `255` is rendered as the medium-blue unknown
 background, `127` as the white room area, and `0` as the darker blue map line.
 The adapter-owned pose trail uses adaptive contrast: blue on white room pixels
-and white on non-white background pixels.
+and white on non-white background pixels. The pose trail is rendered wider than
+one pixel for VIS readability.
 
 The in-memory pose trail is scoped to the active map path. When a later 20002
 event reports a different `pathId`, the adapter clears its own collected pose
 trail before rendering the new path. Any old route still visible after that
 comes from the robot-provided 20002 occupancy/map snapshot or from the app, not
-from the adapter's 20001 pose overlay.
+from the adapter's 20001 pose overlay. The renderer skips duplicate or tiny
+pose movements and implausibly long jumps between two gateway samples instead
+of drawing misleading straight lines across the map.
+
+The diagnostic states explain why the current image changed and how much of
+the in-memory pose trail was rendered:
+
+- `rawPoseCount` is the number of in-memory 20001 poses available for the
+  current render.
+- `poseCount` is the number of those poses that could be projected into the
+  current 20002 map coordinate space.
+- `pathLineSegments` is the number of accepted pose-to-pose line segments.
+- `skippedPathSegments` is the number of rejected duplicate, too-small, or
+  implausibly large pose jumps.
+- `renderReason` is `map` for a new 20002 map snapshot and `pose` for a 20001
+  pose-triggered refresh.
+- `lastPathId` is the latest observed map path identifier.
+- `pathResetCount` counts adapter-side pose trail resets caused by `pathId`
+  changes.
+- `lastPoseUpdated` records the latest accepted 20001 pose event timestamp.
 
 The adapter must not log or commit raw 20002 payloads, decompressed map bytes,
 serials, coordinates, captures, generated private map files, or VIS screenshots.

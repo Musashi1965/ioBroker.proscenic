@@ -77,21 +77,71 @@ describe("projectLiveMapImage", () => {
 			},
 		} as unknown as ioBroker.Adapter;
 
-		await projectLiveMapImage(adapter, {
-			dataUrl: "data:image/png;base64,fixture",
-			width: 2,
-			height: 2,
-			poseCount: 3,
-			orientation: "flip-y",
-			decompressedBytes: 4,
-		});
+		await projectLiveMapImage(
+			adapter,
+			{
+				dataUrl: "data:image/png;base64,fixture",
+				width: 2,
+				height: 2,
+				poseCount: 3,
+				rawPoseCount: 4,
+				pathLineSegments: 2,
+				skippedPathSegments: 1,
+				orientation: "flip-y",
+				decompressedBytes: 4,
+			},
+			{
+				renderReason: "pose",
+				lastPathId: 456,
+				pathResetCount: 1,
+				lastPoseUpdated: "2026-09-13T15:00:00.000Z",
+			},
+		);
 
 		expect(states.get("map.live.image")).to.deep.equal({ val: "data:image/png;base64,fixture", ack: true });
 		expect(states.get("map.live.updated")?.ack).to.equal(true);
 		expect(states.get("map.live.updated")?.val).to.be.a("string");
 		expect(states.get("map.live.orientation")).to.deep.equal({ val: "flip-y", ack: true });
 		expect(states.get("map.live.poseCount")).to.deep.equal({ val: 3, ack: true });
+		expect(states.get("map.live.rawPoseCount")).to.deep.equal({ val: 4, ack: true });
+		expect(states.get("map.live.pathLineSegments")).to.deep.equal({ val: 2, ack: true });
+		expect(states.get("map.live.skippedPathSegments")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.renderReason")).to.deep.equal({ val: "pose", ack: true });
+		expect(states.get("map.live.lastPathId")).to.deep.equal({ val: 456, ack: true });
+		expect(states.get("map.live.pathResetCount")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.lastPoseUpdated")).to.deep.equal({ val: "2026-09-13T15:00:00.000Z", ack: true });
 		expect(states.get("map.live.decompressedBytes")).to.deep.equal({ val: 4, ack: true });
 		expect(states.get("capabilities.maps")).to.deep.equal({ val: true, ack: true });
+	});
+
+	it("clears stale live pose timestamps after a path reset", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectLiveMapImage(
+			adapter,
+			{
+				dataUrl: "data:image/png;base64,fixture",
+				width: 2,
+				height: 2,
+				poseCount: 0,
+				rawPoseCount: 0,
+				pathLineSegments: 0,
+				skippedPathSegments: 0,
+				orientation: "flip-y",
+				decompressedBytes: 4,
+			},
+			{
+				renderReason: "map",
+				pathResetCount: 2,
+			},
+		);
+
+		expect(states.get("map.live.lastPoseUpdated")).to.deep.equal({ val: "", ack: true });
 	});
 });

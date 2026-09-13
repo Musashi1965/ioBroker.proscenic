@@ -29,6 +29,10 @@ describe("live map rendering", () => {
 		expect(image?.width).to.equal(3);
 		expect(image?.height).to.equal(2);
 		expect(image?.decompressedBytes).to.equal(grid.length);
+		expect(image?.rawPoseCount).to.equal(0);
+		expect(image?.poseCount).to.equal(0);
+		expect(image?.pathLineSegments).to.equal(0);
+		expect(image?.skippedPathSegments).to.equal(0);
 		expect(image?.dataUrl.startsWith("data:image/png;base64,")).to.equal(true);
 		expect(decodePngDataUrl(image?.dataUrl)[25]).to.equal(2);
 	});
@@ -95,6 +99,32 @@ describe("live map rendering", () => {
 
 		expect(pixelAt(pixels, width, 0, 10)).to.deep.equal([184, 204, 216]);
 		expect(pixelAt(pixels, width, 10, 10)).to.deep.equal([56, 130, 188]);
+		expect(image?.rawPoseCount).to.equal(2);
+		expect(image?.poseCount).to.equal(2);
+		expect(image?.pathLineSegments).to.equal(1);
+		expect(image?.skippedPathSegments).to.equal(0);
+	});
+
+	it("skips implausible path jumps without dropping later plausible segments", () => {
+		const width = 100;
+		const height = 100;
+		const grid = Buffer.alloc(width * height, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [500, 500] }, { pos: [4_000, 4_000] }, { pos: [3_000, 4_000] }],
+		);
+
+		expect(image?.rawPoseCount).to.equal(3);
+		expect(image?.poseCount).to.equal(3);
+		expect(image?.pathLineSegments).to.equal(1);
+		expect(image?.skippedPathSegments).to.equal(1);
 	});
 });
 

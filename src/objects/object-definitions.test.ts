@@ -56,6 +56,13 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.updated");
 		expect(ids).to.include("map.live.orientation");
 		expect(ids).to.include("map.live.poseCount");
+		expect(ids).to.include("map.live.rawPoseCount");
+		expect(ids).to.include("map.live.pathLineSegments");
+		expect(ids).to.include("map.live.skippedPathSegments");
+		expect(ids).to.include("map.live.renderReason");
+		expect(ids).to.include("map.live.lastPathId");
+		expect(ids).to.include("map.live.pathResetCount");
+		expect(ids).to.include("map.live.lastPoseUpdated");
 		expect(ids).to.include("map.live.decompressedBytes");
 		expect(ids).to.not.include("map.raw");
 		expect(ids).to.not.include("map.image");

@@ -48,6 +48,8 @@ class Proscenic extends utils.Adapter {
 	private recentRobotPoses: RobotPose[] = [];
 	private latestMapData: unknown;
 	private latestMapPathId: number | undefined;
+	private liveMapPathResetCount = 0;
+	private lastPoseUpdated: string | undefined;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -208,11 +210,12 @@ class Proscenic extends utils.Adapter {
 		if (infoType === 20001) {
 			const pose = extractRobotPose20001(data);
 			if (pose) {
+				this.lastPoseUpdated = new Date().toISOString();
 				this.recentRobotPoses.push(pose);
 				if (this.recentRobotPoses.length > MAX_LIVE_MAP_POSES) {
 					this.recentRobotPoses = this.recentRobotPoses.slice(-MAX_LIVE_MAP_POSES);
 				}
-				await this.projectLatestLiveMapImage();
+				await this.projectLatestLiveMapImage("pose");
 			}
 
 			const status = normalizeStatus20001(data);
@@ -231,6 +234,8 @@ class Proscenic extends utils.Adapter {
 					map.pathId !== this.latestMapPathId
 				) {
 					this.recentRobotPoses = [];
+					this.liveMapPathResetCount += 1;
+					this.lastPoseUpdated = undefined;
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
@@ -238,11 +243,11 @@ class Proscenic extends utils.Adapter {
 				await projectMapMetadata(this, map);
 			}
 			this.latestMapData = data;
-			await this.projectLatestLiveMapImage();
+			await this.projectLatestLiveMapImage("map");
 		}
 	}
 
-	private async projectLatestLiveMapImage(): Promise<void> {
+	private async projectLatestLiveMapImage(renderReason: "map" | "pose"): Promise<void> {
 		if (!this.latestMapData) {
 			return;
 		}
@@ -250,7 +255,12 @@ class Proscenic extends utils.Adapter {
 		try {
 			const image = renderLiveMapImage20002(this.latestMapData, this.recentRobotPoses);
 			if (image) {
-				await projectLiveMapImage(this, image);
+				await projectLiveMapImage(this, image, {
+					renderReason,
+					lastPathId: this.latestMapPathId,
+					pathResetCount: this.liveMapPathResetCount,
+					lastPoseUpdated: this.lastPoseUpdated,
+				});
 			}
 		} catch (error) {
 			this.log.debug(`Could not render experimental live map image: ${redactedErrorMessage(error)}`);

@@ -10,6 +10,9 @@ export interface LiveMapImage {
 	width: number;
 	height: number;
 	poseCount: number;
+	rawPoseCount: number;
+	pathLineSegments: number;
+	skippedPathSegments: number;
 	orientation: "flip-y";
 	decompressedBytes: number;
 }
@@ -47,6 +50,9 @@ const COLOR_ROBOT: Color = [39, 139, 61];
 const COLOR_PATH_ON_ROOM: Color = [56, 130, 188];
 const COLOR_PATH_ON_BACKGROUND: Color = [255, 255, 255];
 const COLOR_HEADING: Color = [20, 20, 20];
+const MIN_PATH_SEGMENT_DISTANCE_SQUARED = 1.5 ** 2;
+const MAX_PATH_SEGMENT_DISTANCE_SQUARED = 30 ** 2;
+const PATH_LINE_RADIUS = 1;
 
 export function extractRobotPose20001(data: unknown): RobotPose | undefined {
 	const record = getRecord(data);
@@ -75,7 +81,7 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 
 	const pixels = renderOccupancy(sample.width, sample.height, occupancy);
 	drawCoordinateMetadata(sample, pixels);
-	const poseCount = drawRobotRuntime(sample, pixels, poses);
+	const runtime = drawRobotRuntime(sample, pixels, poses);
 
 	const png = encodeRgbPng(sample.width, sample.height, pixels);
 	const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
@@ -87,7 +93,10 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 		dataUrl,
 		width: sample.width,
 		height: sample.height,
-		poseCount,
+		poseCount: runtime.projectedPoseCount,
+		rawPoseCount: poses.length,
+		pathLineSegments: runtime.pathLineSegments,
+		skippedPathSegments: runtime.skippedPathSegments,
 		orientation: "flip-y",
 		decompressedBytes: occupancy.length,
 	};
@@ -163,7 +172,11 @@ function drawCoordinateMetadata(sample: MapSample, pixels: Buffer): void {
 	}
 }
 
-function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly RobotPose[]): number {
+function drawRobotRuntime(
+	sample: MapSample,
+	pixels: Buffer,
+	poses: readonly RobotPose[],
+): { projectedPoseCount: number; pathLineSegments: number; skippedPathSegments: number } {
 	const projected = poses
 		.map(pose => ({
 			point: projectRobotCoordinate(sample, pose.pos),
@@ -171,17 +184,41 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 		}))
 		.filter((pose): pose is { point: [number, number]; phi: number | undefined } => pose.point !== undefined);
 
+	const basePixels = Buffer.from(pixels);
+	let pathLineSegments = 0;
+	let skippedPathSegments = 0;
+
 	for (let index = 1; index < projected.length; index++) {
 		const previous = projected[index - 1].point;
 		const current = projected[index].point;
-		if (distanceSquared(previous, current) <= 30 * 30) {
-			drawAdaptivePathLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1]);
+		const segmentDistanceSquared = distanceSquared(previous, current);
+		if (
+			segmentDistanceSquared >= MIN_PATH_SEGMENT_DISTANCE_SQUARED &&
+			segmentDistanceSquared <= MAX_PATH_SEGMENT_DISTANCE_SQUARED
+		) {
+			drawAdaptivePathLine(
+				pixels,
+				basePixels,
+				sample.width,
+				sample.height,
+				previous[0],
+				previous[1],
+				current[0],
+				current[1],
+			);
+			pathLineSegments += 1;
+		} else {
+			skippedPathSegments += 1;
 		}
 	}
 
 	const latest = projected.at(-1);
 	if (!latest) {
-		return 0;
+		return {
+			projectedPoseCount: 0,
+			pathLineSegments,
+			skippedPathSegments,
+		};
 	}
 
 	plotMarker(pixels, sample.width, sample.height, latest.point[0], latest.point[1], 5, COLOR_ROBOT);
@@ -193,11 +230,16 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 		drawLine(pixels, sample.width, sample.height, latest.point[0], latest.point[1], endX, endY, COLOR_HEADING);
 	}
 
-	return projected.length;
+	return {
+		projectedPoseCount: projected.length,
+		pathLineSegments,
+		skippedPathSegments,
+	};
 }
 
 function drawAdaptivePathLine(
 	pixels: Buffer,
+	basePixels: Buffer,
 	width: number,
 	height: number,
 	x1: number,
@@ -206,8 +248,31 @@ function drawAdaptivePathLine(
 	y2: number,
 ): void {
 	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, (x, y) =>
-		isRoomPixel(pixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
+		isRoomPixel(basePixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
 	);
+	drawLineNeighbors(pixels, basePixels, width, height, x1, y1, x2, y2);
+}
+
+function drawLineNeighbors(
+	pixels: Buffer,
+	basePixels: Buffer,
+	width: number,
+	height: number,
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+): void {
+	for (let dy = -PATH_LINE_RADIUS; dy <= PATH_LINE_RADIUS; dy++) {
+		for (let dx = -PATH_LINE_RADIUS; dx <= PATH_LINE_RADIUS; dx++) {
+			if ((dx === 0 && dy === 0) || dx * dx + dy * dy > PATH_LINE_RADIUS * PATH_LINE_RADIUS) {
+				continue;
+			}
+			drawLineWithPixelColor(pixels, width, height, x1 + dx, y1 + dy, x2 + dx, y2 + dy, (x, y) =>
+				isRoomPixel(basePixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
+			);
+		}
+	}
 }
 
 function projectRobotCoordinate(sample: MapSample, point: [number, number]): [number, number] | undefined {
