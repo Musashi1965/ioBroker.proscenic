@@ -35,8 +35,8 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 const CRC_TABLE = createCrcTable();
 const MAX_LIVE_MAP_PIXELS = 512 * 512;
 const MAX_LIVE_MAP_DATA_URL_BYTES = 256 * 1024;
-const COLOR_UNKNOWN: Color = [255, 255, 255];
-const COLOR_FLOOR: Color = [169, 200, 235];
+const COLOR_UNKNOWN: Color = [184, 204, 216];
+const COLOR_ROOM: Color = [255, 255, 255];
 const COLOR_WALL: Color = [56, 130, 188];
 const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
@@ -44,7 +44,8 @@ const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
-const COLOR_PATH: Color = [255, 255, 255];
+const COLOR_PATH_ON_ROOM: Color = [56, 130, 188];
+const COLOR_PATH_ON_BACKGROUND: Color = [255, 255, 255];
 const COLOR_HEADING: Color = [20, 20, 20];
 
 export function extractRobotPose20001(data: unknown): RobotPose | undefined {
@@ -133,11 +134,11 @@ function renderOccupancy(width: number, height: number, occupancy: Buffer): Buff
 		if (value === 0) {
 			setPixel(pixels, width, height, sourceX, targetY, COLOR_WALL);
 		} else if (value === 127) {
-			setPixel(pixels, width, height, sourceX, targetY, COLOR_FLOOR);
+			setPixel(pixels, width, height, sourceX, targetY, COLOR_ROOM);
 		} else if (value === 255) {
 			setPixel(pixels, width, height, sourceX, targetY, COLOR_UNKNOWN);
 		} else {
-			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : COLOR_FLOOR);
+			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : COLOR_ROOM);
 		}
 	}
 	return pixels;
@@ -174,7 +175,7 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 		const previous = projected[index - 1].point;
 		const current = projected[index].point;
 		if (distanceSquared(previous, current) <= 30 * 30) {
-			drawLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1], COLOR_PATH);
+			drawAdaptivePathLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1]);
 		}
 	}
 
@@ -193,6 +194,20 @@ function drawRobotRuntime(sample: MapSample, pixels: Buffer, poses: readonly Rob
 	}
 
 	return projected.length;
+}
+
+function drawAdaptivePathLine(
+	pixels: Buffer,
+	width: number,
+	height: number,
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+): void {
+	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, (x, y) =>
+		isRoomPixel(pixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
+	);
 }
 
 function projectRobotCoordinate(sample: MapSample, point: [number, number]): [number, number] | undefined {
@@ -369,6 +384,19 @@ function drawLine(
 	y2: number,
 	color: Color,
 ): void {
+	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, () => color);
+}
+
+function drawLineWithPixelColor(
+	pixels: Buffer,
+	width: number,
+	height: number,
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	pickColor: (x: number, y: number) => Color,
+): void {
 	const dx = Math.abs(x2 - x1);
 	const sx = x1 < x2 ? 1 : -1;
 	const dy = -Math.abs(y2 - y1);
@@ -379,7 +407,7 @@ function drawLine(
 
 	while (true) {
 		if (x >= 0 && x < width && y >= 0 && y < height) {
-			setPixel(pixels, width, height, x, y, color);
+			setPixel(pixels, width, height, x, y, pickColor(x, y));
 		}
 		if (x === x2 && y === y2) {
 			break;
@@ -425,6 +453,20 @@ function setPixel(pixels: Buffer, width: number, height: number, x: number, y: n
 	pixels[offset] = color[0];
 	pixels[offset + 1] = color[1];
 	pixels[offset + 2] = color[2];
+}
+
+function getPixel(pixels: Buffer, width: number, height: number, x: number, y: number): Color | undefined {
+	if (x < 0 || x >= width || y < 0 || y >= height) {
+		return undefined;
+	}
+
+	const offset = (y * width + x) * 3;
+	return [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
+}
+
+function isRoomPixel(pixels: Buffer, width: number, height: number, x: number, y: number): boolean {
+	const pixel = getPixel(pixels, width, height, x, y);
+	return pixel !== undefined && pixel[0] >= 245 && pixel[1] >= 245 && pixel[2] >= 245;
 }
 
 function blendPixel(

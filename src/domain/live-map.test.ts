@@ -65,11 +65,36 @@ describe("live map rendering", () => {
 		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
 		const center = pixelAt(pixels, 5, 2, 2);
 
-		expect(center).to.not.deep.equal([169, 200, 235]);
+		expect(center).to.not.deep.equal([255, 255, 255]);
 		expect(center).to.not.deep.equal([209, 106, 133]);
-		expect(center[0]).to.be.greaterThan(169);
-		expect(center[1]).to.be.lessThan(200);
-		expect(center[2]).to.be.lessThan(235);
+		expect(center[0]).to.be.lessThan(255);
+		expect(center[1]).to.be.lessThan(255);
+		expect(center[2]).to.be.lessThan(255);
+	});
+
+	it("renders the room white, the unknown background blue, and path lines with adaptive contrast", () => {
+		const width = 20;
+		const height = 20;
+		const grid = Buffer.alloc(width * height, 255);
+		for (let y = 0; y < height; y++) {
+			grid[y * width + 10] = 127;
+		}
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [500, 0] }, { pos: [500, 950] }],
+		);
+
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+
+		expect(pixelAt(pixels, width, 0, 10)).to.deep.equal([184, 204, 216]);
+		expect(pixelAt(pixels, width, 10, 10)).to.deep.equal([56, 130, 188]);
 	});
 });
 

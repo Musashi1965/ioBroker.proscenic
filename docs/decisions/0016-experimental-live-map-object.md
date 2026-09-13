@@ -26,7 +26,11 @@ Expose an explicit experimental live-map image under:
 `map.live.image` contains a bounded RGB PNG data URL rendered from the latest
 20002 occupancy grid. The adapter uses the currently verified `flip-y`
 orientation, an app-oriented color palette, and overlays available coordinate
-metadata plus in-memory robot poses from 20001 events when present.
+metadata plus in-memory robot poses from 20001 events when present. For the
+observed M7 Pro, occupancy value `255` is rendered as the medium-blue unknown
+background, `127` as the white room area, and `0` as the darker blue map line.
+The adapter-owned pose trail uses adaptive contrast: blue on white room pixels
+and white on non-white background pixels.
 
 The in-memory pose trail is scoped to the active map path. When a later 20002
 event reports a different `pathId`, the adapter clears its own collected pose
