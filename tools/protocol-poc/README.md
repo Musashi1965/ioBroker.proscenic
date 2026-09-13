@@ -38,7 +38,8 @@ Optional settings:
 - `PROSCENIC_DEVICE_INDEX`: zero-based device index, default `0`.
 - `PROSCENIC_LISTEN_SECONDS`: gateway listen duration, default `30`.
 - `PROSCENIC_MAX_EVENTS`: maximum encrypted gateway events to summarize,
-  default `3`.
+  default `3`; set to `0` to disable the event limit and rely on the listen or
+  capture window.
 - `PROSCENIC_CAPTURE_SECONDS`: optional total capture window across reconnect
   cycles. When unset, the PoC keeps the previous single-window behavior.
 - `PROSCENIC_RECONNECT_DELAY_MS`: delay between capture reconnect cycles,

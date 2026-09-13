@@ -183,4 +183,45 @@ describe("gateway reader", () => {
       });
     }
   });
+
+  it("treats an infinite max event limit as listen-window bounded", async () => {
+    const frame = JSON.stringify({
+      infoType: 30000,
+      data: {
+        cmds: [],
+      },
+    });
+    const server = createServer((socket) => {
+      socket.on("data", () => {
+        socket.write(`${frame}#\t#${frame}#\t#`);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    try {
+      const address = server.address();
+      assert.equal(typeof address, "object");
+      assert.ok(address);
+      const { port } = address as AddressInfo;
+      const result = await readGatewayEvents({
+        endpoint: {
+          host: "127.0.0.1",
+          port,
+        },
+        token: "0123456789abcdef",
+        serial: "serial",
+        listenSeconds: 1,
+        maxEvents: Number.POSITIVE_INFINITY,
+        timeoutMs: 100,
+        maxBufferBytes: 1024,
+      });
+
+      assert.equal(result.completionReason, "listen-window-elapsed");
+      assert.equal(result.events.length, 2);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
 });

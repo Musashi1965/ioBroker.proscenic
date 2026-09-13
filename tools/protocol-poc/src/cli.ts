@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const region = parseRegion(process.env.PROSCENIC_REGION ?? "eu");
   const timeoutMs = parsePositiveInt(process.env.PROSCENIC_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const listenSeconds = parsePositiveInt(process.env.PROSCENIC_LISTEN_SECONDS, DEFAULT_LISTEN_SECONDS);
-  const maxEvents = parsePositiveInt(process.env.PROSCENIC_MAX_EVENTS, DEFAULT_MAX_EVENTS);
+  const maxEvents = parseMaxEvents(process.env.PROSCENIC_MAX_EVENTS, DEFAULT_MAX_EVENTS);
   const captureSeconds = parseOptionalPositiveInt(process.env.PROSCENIC_CAPTURE_SECONDS);
   const reconnectDelayMs = parseNonNegativeInt(
     process.env.PROSCENIC_RECONNECT_DELAY_MS,
@@ -136,6 +136,22 @@ function parseOptionalPositiveInt(value: string | undefined): number | undefined
   const parsed = Number.parseInt(value, 10);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`Expected positive integer, got ${value}`);
+  }
+
+  return parsed;
+}
+
+function parseMaxEvents(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`Expected non-negative integer, got ${value}`);
+  }
+  if (parsed === 0) {
+    return Number.POSITIVE_INFINITY;
   }
 
   return parsed;
