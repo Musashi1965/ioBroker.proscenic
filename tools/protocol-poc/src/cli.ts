@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { ProscenicClient, type Region } from "./client.js";
+import { parseMaxEvents, shouldContinueCaptureAfterCycle } from "./capture-policy.js";
 import { readGatewayEvents, type GatewayEndpoint, type GatewayEvent } from "./gateway.js";
 import { promptHidden, promptLine } from "./input.js";
 import { createPrivateCaptureWriter } from "./private-capture.js";
@@ -136,22 +137,6 @@ function parseOptionalPositiveInt(value: string | undefined): number | undefined
   const parsed = Number.parseInt(value, 10);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`Expected positive integer, got ${value}`);
-  }
-
-  return parsed;
-}
-
-function parseMaxEvents(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isSafeInteger(parsed) || parsed < 0) {
-    throw new Error(`Expected non-negative integer, got ${value}`);
-  }
-  if (parsed === 0) {
-    return Number.POSITIVE_INFINITY;
   }
 
   return parsed;
@@ -330,7 +315,14 @@ async function readGatewayCapture(options: {
       };
     }
 
-    if (options.captureSeconds === undefined || result.completionReason === "listen-window-elapsed") {
+    if (!shouldContinueCaptureAfterCycle({
+      captureSeconds: options.captureSeconds,
+      completionReason: result.completionReason,
+      nowMs: Date.now(),
+      deadlineMs,
+      eventCount: events.length,
+      maxEvents: options.maxEvents,
+    })) {
       break;
     }
 

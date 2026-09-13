@@ -63,10 +63,12 @@ address.
 
 For longer owner-local research sessions, set `PROSCENIC_CAPTURE_SECONDS`
 together with `PROSCENIC_PRIVATE_CAPTURE=1`. The PoC then keeps capturing until
-the total capture window or the maximum event count is reached. If the gateway
-closes early, the tool waits for `PROSCENIC_RECONNECT_DELAY_MS`, refreshes the
-login token, discovers the gateway again, and starts another redacted capture
-cycle. The private JSONL file is kept open across cycles.
+the total capture window or the maximum event count is reached. Each
+`PROSCENIC_LISTEN_SECONDS` window is one socket cycle; when the overall capture
+window is still open, the PoC reconnects and starts the next cycle. If the
+gateway closes early, the tool waits for `PROSCENIC_RECONNECT_DELAY_MS`,
+refreshes the login token, discovers the gateway again, and starts another
+redacted capture cycle. The private JSONL file is kept open across cycles.
 
 Malformed frames, bad decrypts, and invalid JSON are counted as frame errors so
 one bad gateway message cannot abort a long capture. The PoC records only a
