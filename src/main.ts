@@ -5,6 +5,7 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
+import { normalizeConsumables21015, type ConsumableStates } from "./domain/consumables";
 import {
 	buildCommandRequest,
 	commandForStateId,
@@ -21,29 +22,40 @@ import {
 	type LiveMapCoordinateMetadata,
 	type RobotPose,
 } from "./domain/live-map";
-import { normalizeMaintenanceMessage20003 } from "./domain/maintenance-message";
+import { normalizeMaintenanceHistory20003, normalizeMaintenanceMessage20003 } from "./domain/maintenance-message";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
+	projectConsumables,
 	projectLiveMapImage,
 	projectMapMetadata,
+	projectMaintenanceHistory,
 	projectMaintenanceMessage,
 	projectStatus,
 	redactedErrorMessage,
+	setConsumablesReadFailure,
 	setConnectionState,
 	setInitialCapabilityStates,
 	setLastError,
+	setMaintenanceHistoryReadFailure,
 } from "./objects/projector";
 import { ProscenicGatewayClient } from "./protocol/gateway-client";
 import { ProscenicRestClient } from "./protocol/rest-client";
 import type { DeviceRecord, GatewayData, GatewayEndpoint } from "./protocol/types";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const CONSUMABLE_GATEWAY_TIMEOUT_MS = 35_000;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
+
+interface PendingConsumableRead {
+	timer: ReturnType<typeof setTimeout>;
+	resolve: (consumables: ConsumableStates) => void;
+	reject: (error: Error) => void;
+}
 
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
@@ -64,6 +76,8 @@ class Proscenic extends utils.Adapter {
 	private liveMapPathResetCount = 0;
 	private lastPoseUpdated: string | undefined;
 	private maintenanceEventCount = 0;
+	private auxiliaryReadInProgress = false;
+	private pendingConsumableRead: PendingConsumableRead | undefined;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -105,6 +119,7 @@ class Proscenic extends utils.Adapter {
 		try {
 			this.shuttingDown = true;
 			this.clearReconnectTimer();
+			this.rejectPendingConsumableRead(new Error("Adapter unload interrupted consumable read"));
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
 			this.clearCommandSession();
@@ -176,12 +191,14 @@ class Proscenic extends utils.Adapter {
 				this.reconnectAttempt = 0;
 				void setConnectionState(this, "gateway", true);
 				this.log.info("Connected to the Proscenic gateway.");
+				void this.refreshVerifiedReadPaths();
 			},
 			onEvent: event => {
 				void this.handleGatewayEvent(event.infoType, event.data);
 			},
 			onClose: () => {
 				void setConnectionState(this, "gateway", false);
+				this.rejectPendingConsumableRead(new Error("Gateway closed before consumable data was received"));
 				if (!this.shuttingDown) {
 					this.log.warn("Proscenic gateway connection closed.");
 					this.scheduleReconnect("gateway close");
@@ -221,6 +238,15 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {
+		if (infoType === 21015) {
+			const consumables = normalizeConsumables21015(data);
+			if (consumables) {
+				await projectConsumables(this, consumables);
+				this.resolvePendingConsumableRead(consumables);
+			}
+			return;
+		}
+
 		if (infoType === 20001) {
 			const pose = extractRobotPose20001(data);
 			if (pose) {
@@ -281,6 +307,91 @@ class Proscenic extends utils.Adapter {
 				await projectMaintenanceMessage(this, message, this.maintenanceEventCount);
 			}
 		}
+	}
+
+	private async refreshVerifiedReadPaths(): Promise<void> {
+		if (this.auxiliaryReadInProgress || this.shuttingDown) {
+			return;
+		}
+		if (!this.commandEnabled) {
+			return;
+		}
+		if (!this.commandClient || !this.commandToken || !this.commandSerial) {
+			return;
+		}
+
+		this.auxiliaryReadInProgress = true;
+		try {
+			await Promise.all([this.refreshMaintenanceHistory(), this.refreshConsumables()]);
+		} finally {
+			this.auxiliaryReadInProgress = false;
+		}
+	}
+
+	private async refreshMaintenanceHistory(): Promise<void> {
+		if (!this.commandClient || !this.commandToken || !this.commandSerial) {
+			return;
+		}
+
+		try {
+			const data = await this.commandClient.getMaintenanceHistory(this.commandToken, this.commandSerial);
+			const history = normalizeMaintenanceHistory20003(data);
+			if (!history) {
+				throw new Error("Maintenance history response did not contain usable events");
+			}
+			await projectMaintenanceHistory(this, history, this.maintenanceEventCount);
+		} catch (error) {
+			await setMaintenanceHistoryReadFailure(this, error);
+			this.log.debug(`Could not refresh Proscenic maintenance history: ${redactedErrorMessage(error)}`);
+		}
+	}
+
+	private async refreshConsumables(): Promise<void> {
+		if (!this.commandClient || !this.commandToken || !this.commandSerial) {
+			return;
+		}
+
+		let consumableRead: Promise<ConsumableStates> | undefined;
+		try {
+			consumableRead = this.awaitNextConsumables();
+			await this.commandClient.requestConsumables(this.commandToken, this.commandSerial);
+			await consumableRead;
+		} catch (error) {
+			void consumableRead?.catch(() => undefined);
+			this.rejectPendingConsumableRead(error instanceof Error ? error : new Error(String(error)));
+			await setConsumablesReadFailure(this, error);
+			this.log.debug(`Could not refresh Proscenic consumables: ${redactedErrorMessage(error)}`);
+		}
+	}
+
+	private awaitNextConsumables(): Promise<ConsumableStates> {
+		this.rejectPendingConsumableRead(new Error("Superseded by a newer consumable read"));
+
+		return new Promise<ConsumableStates>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.pendingConsumableRead = undefined;
+				reject(new Error(`No consumable gateway event received within ${CONSUMABLE_GATEWAY_TIMEOUT_MS} ms`));
+			}, CONSUMABLE_GATEWAY_TIMEOUT_MS);
+			this.pendingConsumableRead = { timer, resolve, reject };
+		});
+	}
+
+	private resolvePendingConsumableRead(consumables: ConsumableStates): void {
+		if (!this.pendingConsumableRead) {
+			return;
+		}
+		clearTimeout(this.pendingConsumableRead.timer);
+		this.pendingConsumableRead.resolve(consumables);
+		this.pendingConsumableRead = undefined;
+	}
+
+	private rejectPendingConsumableRead(error: Error): void {
+		if (!this.pendingConsumableRead) {
+			return;
+		}
+		clearTimeout(this.pendingConsumableRead.timer);
+		this.pendingConsumableRead.reject(error);
+		this.pendingConsumableRead = undefined;
 	}
 
 	private async projectLatestLiveMapImage(renderReason: "map" | "pose"): Promise<void> {

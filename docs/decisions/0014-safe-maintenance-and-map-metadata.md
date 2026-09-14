@@ -43,6 +43,10 @@ Expose only safe, derived maintenance and map information in the adapter:
   filter, side-brush, main-brush, sensor, or dust-bag values with this event or
   another payload. The subsequently verified consumable source is `21015`;
   see the maintenance findings for its separate read request.
+- ADR 0017 adds the verified `consumables.*` object tree and the bounded
+  `status.maintenance.history.*` REST message-history tree. That decision keeps
+  the unverified `21015.battery` field out of the public object contract and
+  continues to separate historical messages from active-warning state.
 - `map.*` stores metadata from `infoType` 20002 only:
   - `map.available`;
   - `map.id`;

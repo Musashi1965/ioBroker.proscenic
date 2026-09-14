@@ -86,9 +86,11 @@ which were independently verified against the real M7 Pro:
 - Old Android code translations conflict with live cloud messages for `6132`.
   Neither the old dictionary nor `level=1` is a universal severity contract.
 
-See [maintenance findings](MAINTENANCE_PROTOCOL_FINDINGS.md) for request fields,
-units, provenance, limitations, and adapter integration requirements. These
-results supersede the earlier lack of consumable/message endpoint evidence.
+See [maintenance findings](MAINTENANCE_PROTOCOL_FINDINGS.md) and
+[ADR 0017](decisions/0017-consumables-and-message-history-objects.md) for
+request fields, units, provenance, limitations, and the first adapter object
+integration. These results supersede the earlier lack of consumable/message
+endpoint evidence.
 
 ## ioBroker baseline
 

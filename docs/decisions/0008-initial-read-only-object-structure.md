@@ -46,6 +46,15 @@ Initial states:
 | `capabilities.statusRead` | boolean | `indicator` |  | implementation capability |
 | `capabilities.commands` | boolean | `indicator` |  | implementation capability |
 | `capabilities.maps` | boolean | `indicator` |  | implementation capability |
+| `capabilities.consumables` | boolean | `indicator` |  | verified `21015` read capability |
+| `capabilities.maintenanceMessages` | boolean | `indicator` |  | verified REST `20003` history capability |
+| `consumables.<component>.usedSeconds` | number | `value` | `s` | `infoType` 21015 |
+| `consumables.<component>.intervalHours` | number | `value` | `h` | verified app interval |
+| `consumables.<component>.remainingPercent` | number | `value` | `%` | derived from used seconds |
+| `consumables.<component>.overdueHours` | number | `value` | `h` | derived from used seconds |
+| `consumables.updated` | string | `date` |  | latest accepted `infoType` 21015 event |
+| `consumables.lastReadResult` | string | `text` |  | `21015` refresh result |
+| `consumables.lastError` | string | `text` |  | redacted `21015` refresh error |
 | `status.mode` | string | `state` |  | `infoType` 20001 |
 | `status.subMode` | string | `state` |  | `infoType` 20001 |
 | `status.clean.area` | number | `value` | `m²` | `infoType` 20001 |
@@ -68,6 +77,16 @@ Initial states:
 | `status.maintenance.details` | string | `text` |  | redacted diagnostic summary |
 | `status.maintenance.eventCount` | number | `value` |  | accepted `infoType` 20003 event count since adapter start |
 | `status.maintenance.updated` | string | `date` |  | latest accepted `infoType` 20003 event |
+| `status.maintenance.history.items` | string | `json` |  | bounded REST `20003` history |
+| `status.maintenance.history.count` | number | `value` |  | safe history entries stored |
+| `status.maintenance.history.totalCount` | number | `value` |  | backend-reported total when present |
+| `status.maintenance.history.latestCode` | number | `value` |  | latest safe history entry code |
+| `status.maintenance.history.latestLevel` | number | `value` |  | latest safe history entry level |
+| `status.maintenance.history.latestMessage` | string | `text` |  | latest safe history entry message |
+| `status.maintenance.history.latestEventTime` | string | `date` |  | latest safe history entry time |
+| `status.maintenance.history.updated` | string | `date` |  | latest history read |
+| `status.maintenance.history.lastReadResult` | string | `text` |  | history read result |
+| `status.maintenance.history.lastError` | string | `text` |  | redacted history read error |
 | `map.available` | boolean | `indicator` |  | derived from `infoType` 20002 |
 | `map.id` | number | `value` |  | `infoType` 20002 metadata |
 | `map.pathId` | number | `value` |  | `infoType` 20002 metadata |

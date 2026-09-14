@@ -28,6 +28,10 @@ Current decisions:
   diagnostics and map metadata
 - [ADR 0015](0015-private-captures-for-reverse-engineering.md): private
   captures for owner-local reverse engineering
+- [ADR 0016](0016-experimental-live-map-object.md): experimental live map
+  object for local visual debugging
+- [ADR 0017](0017-consumables-and-message-history-objects.md): consumables and
+  message history objects
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, command confirmation behavior, public

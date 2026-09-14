@@ -1,7 +1,9 @@
 import { expect } from "chai";
 import {
+	projectConsumables,
 	projectDevice,
 	projectLiveMapImage,
+	projectMaintenanceHistory,
 	projectMapMetadata,
 	projectMaintenanceMessage,
 	redactedErrorMessage,
@@ -151,6 +153,115 @@ describe("projectMaintenanceMessage", () => {
 		expect(states.get("status.maintenance.eventCount")).to.deep.equal({ val: 3, ack: true });
 		expect(states.get("status.maintenance.updated")?.ack).to.equal(true);
 		expect(states.get("status.maintenance.updated")?.val).to.be.a("string");
+	});
+});
+
+describe("projectMaintenanceHistory", () => {
+	it("publishes a bounded safe REST history and the latest event summary", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectMaintenanceHistory(
+			adapter,
+			{
+				messages: [
+					{
+						code: 6132,
+						level: 1,
+						title: "unkonw",
+						message: "The dust bag seems to be full",
+						eventTime: "2026-09-14T08:49:23.000Z",
+						details: '{"infoType":20003,"code":6132}',
+					},
+				],
+				totalElements: 12,
+				totalPages: 2,
+				page: 0,
+				size: 10,
+			},
+			12,
+		);
+
+		expect(states.get("status.maintenance.code")).to.deep.equal({ val: 6132, ack: true });
+		expect(states.get("status.maintenance.history.latestCode")).to.deep.equal({ val: 6132, ack: true });
+		expect(states.get("status.maintenance.history.latestLevel")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("status.maintenance.history.latestMessage")).to.deep.equal({
+			val: "The dust bag seems to be full",
+			ack: true,
+		});
+		expect(states.get("status.maintenance.history.latestEventTime")).to.deep.equal({
+			val: "2026-09-14T08:49:23.000Z",
+			ack: true,
+		});
+		expect(states.get("status.maintenance.history.count")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("status.maintenance.history.totalCount")).to.deep.equal({ val: 12, ack: true });
+		expect(JSON.parse(states.get("status.maintenance.history.items")?.val as string)).to.deep.equal([
+			{
+				code: 6132,
+				level: 1,
+				title: "unkonw",
+				message: "The dust bag seems to be full",
+				eventTime: "2026-09-14T08:49:23.000Z",
+			},
+		]);
+		expect(states.get("status.maintenance.history.lastReadResult")).to.deep.equal({ val: "ok", ack: true });
+		expect(states.get("status.maintenance.history.lastError")).to.deep.equal({ val: "", ack: true });
+		expect(states.get("capabilities.maintenanceMessages")).to.deep.equal({ val: true, ack: true });
+	});
+});
+
+describe("projectConsumables", () => {
+	it("publishes verified consumable counters and derived maintenance values", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectConsumables(adapter, {
+			filter: {
+				usedSeconds: 458_996,
+				intervalHours: 150,
+				remainingPercent: 15.00074074074074,
+				overdueHours: 0,
+			},
+			sideBrush: {
+				usedSeconds: 458_996,
+				intervalHours: 200,
+				remainingPercent: 36.25055555555556,
+				overdueHours: 0,
+			},
+			mainBrush: {
+				usedSeconds: 458_996,
+				intervalHours: 300,
+				remainingPercent: 57.50037037037037,
+				overdueHours: 0,
+			},
+			sensors: {
+				usedSeconds: 458_996,
+				intervalHours: 30,
+				remainingPercent: -324.9962962962963,
+				overdueHours: 97.49888888888889,
+			},
+		});
+
+		expect(states.get("consumables.filter.usedSeconds")).to.deep.equal({ val: 458_996, ack: true });
+		expect(states.get("consumables.filter.intervalHours")).to.deep.equal({ val: 150, ack: true });
+		expect(states.get("consumables.sensors.remainingPercent")).to.deep.equal({
+			val: -324.9962962962963,
+			ack: true,
+		});
+		expect(states.get("consumables.sensors.overdueHours")).to.deep.equal({ val: 97.49888888888889, ack: true });
+		expect(states.get("consumables.lastReadResult")).to.deep.equal({ val: "ok", ack: true });
+		expect(states.get("consumables.lastError")).to.deep.equal({ val: "", ack: true });
+		expect(states.get("capabilities.consumables")).to.deep.equal({ val: true, ack: true });
 	});
 });
 

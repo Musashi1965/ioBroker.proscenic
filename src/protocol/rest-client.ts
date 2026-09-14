@@ -1,7 +1,14 @@
 import { request as httpsRequest } from "node:https";
 import type { CommandRequest } from "../domain/commands";
 import { md5Hex } from "./crypto";
-import type { DeviceListData, DeviceRecord, GatewayData, LoginData, ProscenicEnvelope } from "./types";
+import type {
+	DeviceListData,
+	DeviceRecord,
+	GatewayData,
+	LoginData,
+	MaintenanceHistoryData,
+	ProscenicEnvelope,
+} from "./types";
 
 const REGION_BASE_URLS = {
 	eu: "https://mobile.proscenic.com.de",
@@ -73,6 +80,28 @@ export class ProscenicRestClient {
 			{
 				token,
 			},
+		);
+
+		return response.data ?? {};
+	}
+
+	public async requestConsumables(token: string, serial: string): Promise<ProscenicEnvelope> {
+		const path = `/instructions/cmd21015/${encodeURIComponent(serial)}`;
+		return this.postForm(path, { username: this.options.username }, { token });
+	}
+
+	public async getMaintenanceHistory(token: string, serial: string): Promise<MaintenanceHistoryData> {
+		const path = `/app/cleanRobot/20003/${encodeURIComponent(serial)}`;
+		const response = await this.postForm<MaintenanceHistoryData>(
+			path,
+			{
+				username: this.options.username,
+				language: "EN",
+				model: "M7",
+				page: "0",
+				size: "10",
+			},
+			{ token },
 		);
 
 		return response.data ?? {};

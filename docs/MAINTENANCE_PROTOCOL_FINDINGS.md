@@ -93,18 +93,23 @@ stay active forever merely because it remains in the history. Gateway events,
 `20001.errorState`, latest message, and active maintenance warnings need distinct
 freshness and clearing semantics before adapter integration.
 
-## Next adapter implementation
+## Adapter implementation status
 
-1. Add a typed consumable-read operation after gateway readiness. Await `21015`
-   with a bounded timeout; retain the last successful counters and timestamp on
-   failure. Coalesce refreshes and avoid repeated requests on every status event.
-2. Normalize the four verified counters. Keep used seconds, interval and overdue
-   calculation separate from display rounding. Do not expose reset controls yet.
-3. Add bounded message-history reads, explicitly separating historical messages
-   from active warnings. Match code and event time when enriching gateway events;
-   determine timestamp units and chronology before treating them as dates.
-4. Define public state IDs and warning-clearing semantics in an ADR, test with
-   synthetic inputs, and verify updates/reconnect behavior before deployment.
+ADR 0017 defines the first adapter object contract for these read paths. The
+adapter now:
 
-This research verifies read protocols; it does not deploy their full adapter
-integration or establish support for other models.
+1. triggers the verified `cmd21015` consumable request after gateway readiness
+   and waits for a bounded `21015` gateway event;
+2. normalizes the four verified used-second counters into `consumables.*`
+   states with interval, remaining percentage, and overdue-hour diagnostics;
+3. keeps the unverified `21015.battery` field out of the public object tree;
+4. reads the first REST `20003` message-history page and projects only redacted
+   safe fields under `status.maintenance.history.*`;
+5. keeps historical messages separate from `status.maintenance.hasWarning`.
+
+Open follow-up work remains: active-warning clearing semantics, additional
+history pagination, reset-command proof for `21016`, and real-device verification
+of the adapter-side refresh after deployment.
+
+This research verifies read protocols and records the first adapter integration
+for the verified M7 Pro backend. It does not establish support for other models.

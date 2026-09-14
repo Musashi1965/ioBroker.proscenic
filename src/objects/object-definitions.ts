@@ -15,6 +15,11 @@ export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [
 	channel("device", "Selected device"),
 	channel("connection", "Connection"),
 	channel("capabilities", "Capabilities"),
+	channel("consumables", "Consumables"),
+	channel("consumables.filter", "Filter"),
+	channel("consumables.sideBrush", "Side brush"),
+	channel("consumables.mainBrush", "Main brush"),
+	channel("consumables.sensors", "Sensors"),
 	channel("status", "Status"),
 	channel("status.clean", "Cleaning"),
 	channel("status.battery", "Battery"),
@@ -24,6 +29,7 @@ export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [
 	channel("status.error", "Error"),
 	channel("status.features", "Features"),
 	channel("status.maintenance", "Maintenance"),
+	channel("status.maintenance.history", "Maintenance message history"),
 	channel("map", "Map metadata"),
 	channel("map.live", "Experimental live map"),
 	channel("commands", "Commands"),
@@ -42,6 +48,15 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("capabilities.statusRead", "Read status", "boolean", "indicator"),
 	state("capabilities.commands", "Commands exposed", "boolean", "indicator"),
 	state("capabilities.maps", "Maps exposed", "boolean", "indicator"),
+	state("capabilities.consumables", "Consumables exposed", "boolean", "indicator"),
+	state("capabilities.maintenanceMessages", "Maintenance messages exposed", "boolean", "indicator"),
+	...consumableStates("consumables.filter", "Filter"),
+	...consumableStates("consumables.sideBrush", "Side brush"),
+	...consumableStates("consumables.mainBrush", "Main brush"),
+	...consumableStates("consumables.sensors", "Sensors"),
+	state("consumables.updated", "Last consumables update", "string", "date"),
+	state("consumables.lastReadResult", "Last consumables read result", "string", "text"),
+	state("consumables.lastError", "Last consumables read error", "string", "text"),
 	state("status.mode", "Mode", "string", "state"),
 	state("status.subMode", "Sub mode", "string", "state"),
 	state("status.clean.area", "Cleaning area", "number", "value", { unit: "m²", min: 0 }),
@@ -62,6 +77,21 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("status.maintenance.details", "Maintenance details", "string", "text"),
 	state("status.maintenance.eventCount", "Maintenance event count", "number", "value", { min: 0 }),
 	state("status.maintenance.updated", "Last maintenance event update", "string", "date"),
+	state("status.maintenance.history.items", "Maintenance message history", "string", "json"),
+	state("status.maintenance.history.count", "Maintenance message history count", "number", "value", { min: 0 }),
+	state("status.maintenance.history.totalCount", "Total maintenance message count", "number", "value", { min: 0 }),
+	state("status.maintenance.history.latestCode", "Latest maintenance history code", "number", "value"),
+	state("status.maintenance.history.latestLevel", "Latest maintenance history level", "number", "value", { min: 0 }),
+	state("status.maintenance.history.latestMessage", "Latest maintenance history message", "string", "text"),
+	state("status.maintenance.history.latestEventTime", "Latest maintenance history event time", "string", "date"),
+	state("status.maintenance.history.updated", "Last maintenance message history update", "string", "date"),
+	state(
+		"status.maintenance.history.lastReadResult",
+		"Last maintenance message history read result",
+		"string",
+		"text",
+	),
+	state("status.maintenance.history.lastError", "Last maintenance message history read error", "string", "text"),
 	state("status.features.autoBoost", "Auto boost", "boolean", "indicator"),
 	state("status.features.cleanComponents", "Clean components", "boolean", "indicator"),
 	state("map.available", "Map data available", "boolean", "indicator"),
@@ -146,6 +176,15 @@ function state(
 			native: {},
 		},
 	};
+}
+
+function consumableStates(prefix: string, name: string): StateDefinition[] {
+	return [
+		state(`${prefix}.usedSeconds`, `${name} used seconds`, "number", "value", { unit: "s", min: 0 }),
+		state(`${prefix}.intervalHours`, `${name} interval`, "number", "value", { unit: "h", min: 0 }),
+		state(`${prefix}.remainingPercent`, `${name} remaining`, "number", "value", { unit: "%" }),
+		state(`${prefix}.overdueHours`, `${name} overdue`, "number", "value", { unit: "h", min: 0 }),
+	];
 }
 
 function commandButton(definition: CommandDefinition): StateDefinition {

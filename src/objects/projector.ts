@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { MaintenanceMessage } from "../domain/maintenance-message";
+import type { ConsumableStates } from "../domain/consumables";
+import type { MaintenanceHistory, MaintenanceMessage } from "../domain/maintenance-message";
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
 import type { RobotStatus } from "../domain/status";
@@ -20,6 +21,8 @@ export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Pro
 	await adapter.setStateAsync("capabilities.statusRead", { val: true, ack: true });
 	await adapter.setStateAsync("capabilities.commands", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: false, ack: true });
+	await adapter.setStateAsync("capabilities.consumables", { val: false, ack: true });
+	await adapter.setStateAsync("capabilities.maintenanceMessages", { val: false, ack: true });
 }
 
 export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRecord): Promise<void> {
@@ -66,6 +69,58 @@ export async function projectMaintenanceMessage(
 	await adapter.setStateAsync("status.maintenance.updated", { val: new Date().toISOString(), ack: true });
 }
 
+export async function projectMaintenanceHistory(
+	adapter: ioBroker.Adapter,
+	history: MaintenanceHistory,
+	eventCount: number,
+): Promise<void> {
+	const latest = history.messages[0];
+	if (latest) {
+		await projectMaintenanceMessage(adapter, latest, eventCount);
+		await setIfDefined(adapter, "status.maintenance.history.latestCode", latest.code);
+		await setIfDefined(adapter, "status.maintenance.history.latestLevel", latest.level);
+		await setIfDefined(adapter, "status.maintenance.history.latestMessage", latest.message ?? latest.title ?? "");
+		await setIfDefined(adapter, "status.maintenance.history.latestEventTime", latest.eventTime);
+	}
+	await adapter.setStateAsync("status.maintenance.history.items", {
+		val: JSON.stringify(history.messages.map(historyMessageItem)),
+		ack: true,
+	});
+	await adapter.setStateAsync("status.maintenance.history.count", { val: history.messages.length, ack: true });
+	await setIfDefined(adapter, "status.maintenance.history.totalCount", history.totalElements);
+	await adapter.setStateAsync("status.maintenance.history.updated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("status.maintenance.history.lastReadResult", { val: "ok", ack: true });
+	await adapter.setStateAsync("status.maintenance.history.lastError", { val: "", ack: true });
+	await adapter.setStateAsync("capabilities.maintenanceMessages", { val: true, ack: true });
+}
+
+export async function projectConsumables(adapter: ioBroker.Adapter, consumables: ConsumableStates): Promise<void> {
+	for (const [component, state] of Object.entries(consumables)) {
+		const prefix = `consumables.${component}`;
+		await adapter.setStateAsync(`${prefix}.usedSeconds`, { val: state.usedSeconds, ack: true });
+		await adapter.setStateAsync(`${prefix}.intervalHours`, { val: state.intervalHours, ack: true });
+		await adapter.setStateAsync(`${prefix}.remainingPercent`, { val: state.remainingPercent, ack: true });
+		await adapter.setStateAsync(`${prefix}.overdueHours`, { val: state.overdueHours, ack: true });
+	}
+	await adapter.setStateAsync("consumables.updated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("consumables.lastReadResult", { val: "ok", ack: true });
+	await adapter.setStateAsync("consumables.lastError", { val: "", ack: true });
+	await adapter.setStateAsync("capabilities.consumables", { val: true, ack: true });
+}
+
+export async function setConsumablesReadFailure(adapter: ioBroker.Adapter, error: unknown): Promise<void> {
+	await adapter.setStateAsync("consumables.lastReadResult", { val: "failed", ack: true });
+	await adapter.setStateAsync("consumables.lastError", { val: redactedErrorMessage(error), ack: true });
+}
+
+export async function setMaintenanceHistoryReadFailure(adapter: ioBroker.Adapter, error: unknown): Promise<void> {
+	await adapter.setStateAsync("status.maintenance.history.lastReadResult", { val: "failed", ack: true });
+	await adapter.setStateAsync("status.maintenance.history.lastError", {
+		val: redactedErrorMessage(error),
+		ack: true,
+	});
+}
+
 export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMetadata): Promise<void> {
 	await setIfDefined(adapter, "map.available", map.available);
 	await setIfDefined(adapter, "map.id", map.mapId);
@@ -78,6 +133,16 @@ export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMeta
 	await setIfDefined(adapter, "map.encodedBytes", map.encodedBytes);
 	await adapter.setStateAsync("map.updated", { val: new Date().toISOString(), ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: true, ack: true });
+}
+
+function historyMessageItem(message: MaintenanceMessage): Record<string, string | number> {
+	return {
+		...(message.code !== undefined ? { code: message.code } : {}),
+		...(message.level !== undefined ? { level: message.level } : {}),
+		...(message.title !== undefined ? { title: message.title } : {}),
+		...(message.message !== undefined ? { message: message.message } : {}),
+		...(message.eventTime !== undefined ? { eventTime: message.eventTime } : {}),
+	};
 }
 
 export async function projectLiveMapImage(

@@ -30,6 +30,14 @@ export interface GatewayData {
 	addr_list?: GatewayAddress[];
 }
 
+export interface MaintenanceHistoryData {
+	content?: unknown[];
+	totalElements?: number;
+	totalPages?: number;
+	number?: number;
+	size?: number;
+}
+
 export interface GatewayEndpoint {
 	host: string;
 	port: number;
