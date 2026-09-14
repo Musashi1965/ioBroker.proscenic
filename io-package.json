@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.0.1",
+		"version": "0.1.0",
 		"news": {
+			"0.1.0": {
+				"en": "Added M7 Pro commands, status projection, consumables, maintenance history, and experimental live map rendering",
+				"de": "M7-Pro-Kommandos, Statusprojektion, Verbrauchswerte, Wartungshistorie und experimentelles Live-Karten-Rendering hinzugefügt",
+				"ru": "Добавлены команды M7 Pro, проекция состояния, расходные материалы, история обслуживания и экспериментальная отрисовка карты",
+				"pt": "Adicionados comandos do M7 Pro, estados, consumíveis, histórico de manutenção e renderização experimental do mapa",
+				"nl": "M7 Pro-opdrachten, statusprojectie, verbruiksgegevens, onderhoudsgeschiedenis en experimentele livekaart toegevoegd",
+				"fr": "Ajout des commandes M7 Pro, des états, des consommables, de l'historique de maintenance et du rendu expérimental de carte",
+				"it": "Aggiunti comandi M7 Pro, stati, consumabili, cronologia manutenzione e rendering sperimentale della mappa",
+				"es": "Añadidos comandos M7 Pro, estados, consumibles, historial de mantenimiento y renderizado experimental del mapa",
+				"pl": "Dodano polecenia M7 Pro, stany, materiały eksploatacyjne, historię konserwacji i eksperymentalne renderowanie mapy",
+				"uk": "Додано команди M7 Pro, стани, витратні матеріали, історію обслуговування та експериментальне відображення карти",
+				"zh-cn": "添加 M7 Pro 命令、状态投影、耗材、维护历史和实验性实时地图渲染"
+			},
 			"0.0.1": {
 				"en": "initial release",
 				"de": "Erstveröffentlichung",

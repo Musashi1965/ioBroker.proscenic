@@ -1,6 +1,6 @@
 # General Project Definition
 
-Status: first read-only adapter implementation after gateway PoC, 2026-09-10
+Status: first local-development adapter milestone, 2026-09-14
 
 ## Identity
 
@@ -31,22 +31,24 @@ endpoint and gateway:
 - receipt and decryption of three gateway events, including `infoType` 20001,
   `20002`, and `30000`, with only redacted shape summaries printed.
 
-This proves authentication, device enumeration, gateway discovery, socket
-handshake, framing, and AES decryption on one real M7 Pro. Exact status field
-semantics, command endpoints, map handling, reconnect, and cleanup behavior
-remain pending.
+This proved authentication, device enumeration, gateway discovery, socket
+handshake, framing, and AES decryption on one real M7 Pro. Later owner-local
+adapter validation added bounded reconnect/unload behavior, the first
+real-device-tested command buttons, safe status projection, consumable counters,
+maintenance/message history, and experimental live-map rendering for VIS
+debugging. The exact public release contract remains under development.
 
 ## Initial goals
 
-1. Prove a read-only client for login, device enumeration, gateway discovery,
-   framed socket reception, decryption, status normalization, timeout,
-   reconnect, and clean shutdown.
+1. Prove a client for login, device enumeration, gateway discovery, framed
+   socket reception, decryption, status normalization, timeout, reconnect, and
+   clean shutdown.
 2. Keep the official ioBroker TypeScript adapter foundation buildable and
    record its tool/runtime baseline.
 3. Define and test a minimal public object contract before projecting device
    data.
-4. Add writable commands one at a time only after real-device confirmation and
-   safe acknowledgement semantics.
+4. Add writable commands only after real-device confirmation and safe
+   acknowledgement semantics.
 5. Prepare the project for GitHub, npm, ioBroker `latest`, and later `stable`
    publication without exposing private installation data.
 
@@ -66,10 +68,10 @@ remain pending.
 
 ## Public contract direction
 
-The first accepted contract will use stable, non-secret technical identity and
-separate information, connection, status, capabilities, commands, consumables,
-and optional map metadata. The exact paths are not frozen yet and require an
-ADR after the status PoC.
+The first accepted local-development contract uses stable, non-secret technical
+identity and separate information, connection, status, capabilities, commands,
+consumables, maintenance history, safe map metadata, and an explicit
+experimental live-map object. The public release contract is not frozen yet.
 
 All external writes use `ack=false`; adapter-confirmed results use `ack=true`.
 Raw upstream payloads and exceptions are never the public contract.

@@ -1,26 +1,42 @@
 # ioBroker.proscenic
 
-Planned ioBroker adapter for supported Proscenic vacuum robots, initially the
-Proscenic M7 Pro (`M7_PRO`, model `811_LDS`).
+Development-stage ioBroker adapter for supported Proscenic vacuum robots,
+initially the Proscenic M7 Pro (`M7_PRO`, model `811_LDS`) through the legacy
+Proscenic cloud/gateway path.
 
 ## Project status
 
-This repository is in the first read-only adapter implementation phase. It
-contains an ioBroker TypeScript adapter that can create the initial object
-structure and connect to the verified legacy Proscenic cloud/gateway path when
-credentials are configured.
+This repository contains a TypeScript ioBroker adapter that can authenticate
+against the verified legacy European Proscenic cloud, enumerate one real M7 Pro,
+connect to the cloud gateway, project normalized runtime states, and expose the
+first real-device-validated control and maintenance objects.
 
-A private real-device probe has verified the legacy European Proscenic cloud
-login, token acquisition, and device enumeration for one M7 Pro. Gateway status
-events, reconnect behavior, commands, map handling, and other models are not yet
-accepted as working.
+Verified on one owner-local Proscenic M7 Pro so far:
 
-The first public object structure is read-only and intentionally excludes
-commands, maps, positions, serial numbers, gateway endpoints, raw payloads, and
-other private installation data. Writable controls will be added only with
-contract tests and real-device evidence.
+- cloud login, token acquisition, device discovery, gateway discovery, framed
+  socket reception, decryption, bounded reconnect, and adapter unload cleanup;
+- status projection for battery, cleaning mode, fan, mop/water candidates,
+  features, safe map metadata, and redacted maintenance diagnostics;
+- writable command buttons for start, pause, continue, return to station, fan
+  modes, deep cleaning, and dust collection;
+- consumable counters for filter, side brush, main brush, and sensors;
+- recent maintenance/message history, including dust-bag messages;
+- experimental local-development live-map rendering for VIS debugging, including
+  app-oriented map colors, no-go areas, room-zone candidates, charger marker,
+  and an interpolated pose trail.
 
-## Planned identity
+The adapter is not a public release yet. The supported hardware claim is limited
+to the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
+models, accounts, regions, firmware versions, Tuya-local control, room-cleaning
+commands, final map storage/retention policy, and production release readiness
+still require separate evidence.
+
+Raw payloads, serial numbers, gateway endpoints, device addresses, credentials,
+packet captures, private maps, and home-layout data are not committed or exposed
+as public fixtures. The current live-map object is explicitly experimental and
+intended for local VIS/debug use.
+
+## Project identity
 
 - GitHub repository: `ioBroker.proscenic`
 - npm package: `iobroker.proscenic`

@@ -1,6 +1,6 @@
 {
   "name": "iobroker.proscenic",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "ioBroker adapter for Proscenic vacuum robots using the legacy Proscenic cloud gateway",
   "author": {
     "name": "C@ptain Ch@os",
@@ -47,6 +47,8 @@
   },
   "main": "build/main.js",
   "files": [
+    "README.md",
+    "CHANGELOG.md",
     "admin{,/!(src)/**}/!(tsconfig|tsconfig.*|.eslintrc).{json,json5}",
     "admin{,/!(src)/**}/*.{html,css,png,svg,jpg,js}",
     "build/",

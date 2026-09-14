@@ -1,7 +1,7 @@
 # Technical Architecture
 
-Status: initial read-only adapter implementation; public objects remain subject
-to status-contract evidence before release.
+Status: first local-development adapter milestone; public objects remain subject
+to release-contract review.
 
 ## Core rule
 
@@ -107,7 +107,7 @@ through a bounded authentication path. See ADR 0004.
 
 - stable public device identifier and first object contract;
 - exact runtime and js-controller baseline after skeleton generation;
-- gateway heartbeat and reconnect policy after repeated read-only PoC runs;
+- final gateway heartbeat and reconnect policy after repeated adapter runs;
 - command confirmation semantics;
 - final map storage, serving, opt-in controls, size limits, and privacy policy
   before public release;

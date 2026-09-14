@@ -1,6 +1,6 @@
 # Upstream Research
 
-Status: initial review, 2026-09-10
+Status: active reverse-engineering notes, 2026-09-14
 
 ## Legacy Proscenic sources
 
@@ -29,20 +29,22 @@ Behavioral map/status findings from these sources and our own probes:
   behavioral hint for endpoint discovery on the verified M7 Pro legacy backend;
   it is not a source-compatible protocol contract.
 - Known map renderers treat the encoded map body as private robot map data and
-  combine it with coordinate fields and path/charger positions. The MIT adapter
-  therefore exposes only safe metadata until a separate local-only map rendering
-  decision is accepted.
+  combine it with coordinate fields and path/charger positions. ADR 0016 now
+  permits a local-development rendered `map.live.*` image for VIS debugging,
+  while raw map bytes and private coordinates remain excluded from tracked
+  fixtures and logs.
 - A separate, older Proscenic 790T Home Assistant integration reports that the
   cloud is used to generate the cleaning map. A Home Assistant community thread
   for that generation describes Proscenic map data as dot-like rather than as a
   ready-made picture. This is only a behavioral hint for our independently
   observed M7 Pro `infoType` 20002 data; it is not an implementation source.
-- Private M7 Pro captures from 2026-09-10 to 2026-09-12 repeatedly show stable
+- Private M7 Pro captures from 2026-09-10 to 2026-09-14 repeatedly show stable
   `mapId`, stable dimensions, stable resolution, and changing self-contained
   map blocks whose `pathId` can change between cleaning runs. The current
   evidence suggests repeated map snapshots with a base-map identity and
-  path/run overlay, not merely a single live position value. The exact binary
-  map format remains unresolved.
+  path/run overlay, not merely a single live position value. The adapter can
+  now render the observed M7 Pro occupancy grid in the app-conform `flip-y`
+  orientation with cached static overlays and an adapter-side pose trail.
 
 Independent implementation rule: derive project requirements from observable
 requests/responses, public documentation, independently written tests, and our
@@ -69,10 +71,13 @@ Proscenic Home account, so it does not establish a Tuya backend for this device.
 The private legacy API probes used independently written code and printed no
 password, token, serial number, gateway endpoint, or raw payload. They verified
 authentication, token issuance, one M7 Pro device record, gateway discovery,
-`infoType` 70001 socket handshake, and decryption of three gateway events:
-`infoType` 20001, `20002`, and `30000`. This result is sufficient to design a
-minimal read-only status contract. It is not sufficient to claim command, map,
-multi-device, reconnect, or release readiness.
+`infoType` 70001 socket handshake, and decryption of gateway events including
+`infoType` 20001, `20002`, `20003`, `21015`, and `30000`. Subsequent
+adapter-level validation confirmed the first M7 Pro command buttons, safe
+status projection, consumable reads, bounded message-history reads, and
+experimental live-map rendering on the local test installation. This still does
+not prove multi-device, other-model, other-region, Tuya-local, or public release
+readiness.
 
 ## Maintenance and message breakthrough (2026-09-14)
 
