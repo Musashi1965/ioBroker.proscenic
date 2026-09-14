@@ -90,6 +90,17 @@ For broad scans, use `PROSCENIC_REST_LOG_MODE=interesting` to suppress plain
 PROSCENIC_REST_GROUP=maintenance PROSCENIC_REST_START_INDEX=0 PROSCENIC_REST_MAX_CANDIDATES=1000 PROSCENIC_REST_LOG_MODE=interesting npm start
 ```
 
+For repeated private scans, prefer the wrapper. It loads
+`../../.poc-private/rest-poc/env.sh`, defaults to `LOG_MODE=interesting`, and
+keeps the terminal output focused on non-404 responses plus the completion
+summary:
+
+```sh
+./run-private-scan.sh maintenance 0 1000
+./run-private-scan.sh messages 1000 1000
+./run-private-scan.sh messages 0 50 tw
+```
+
 When running several probes in the same shell, read and export
 `PROSCENIC_PASSWORD` once, then run the filtered commands one after another.
 `read` alone creates a shell variable; without the explicit `export`, child
