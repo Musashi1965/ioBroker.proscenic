@@ -17,6 +17,7 @@ describe("initial object definitions", () => {
 			definition => definition.id,
 		);
 
+		expect(ids).to.include("device.image");
 		expect(ids).to.include("commands.start");
 		expect(ids).to.include("commands.pause");
 		expect(ids).to.include("commands.continue");

@@ -1,5 +1,11 @@
 import { expect } from "chai";
-import { projectLiveMapImage, projectMapMetadata, redactedErrorMessage, setConnectionState } from "./projector";
+import {
+	projectDevice,
+	projectLiveMapImage,
+	projectMapMetadata,
+	redactedErrorMessage,
+	setConnectionState,
+} from "./projector";
 
 describe("redactedErrorMessage", () => {
 	it("redacts account and endpoint material from public errors", () => {
@@ -27,6 +33,50 @@ describe("setConnectionState", () => {
 		expect(states.get("connection.cloud")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("connection.gateway")).to.deep.equal({ val: false, ack: true });
 		expect(states.get("info.connection")).to.deep.equal({ val: true, ack: true });
+	});
+});
+
+describe("projectDevice", () => {
+	it("publishes the M7 Pro product image for the verified device model", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectDevice(adapter, {
+			code: "M7_PRO",
+			model: "811_LDS",
+			status: true,
+		});
+
+		expect(states.get("device.code")).to.deep.equal({ val: "M7_PRO", ack: true });
+		expect(states.get("device.model")).to.deep.equal({ val: "811_LDS", ack: true });
+		expect(states.get("device.online")).to.deep.equal({ val: true, ack: true });
+		expect(states.get("device.image")?.ack).to.equal(true);
+		expect(states.get("device.image")?.val)
+			.to.be.a("string")
+			.and.match(/^data:image\/png;base64,/u);
+	});
+
+	it("clears the product image for other device models", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectDevice(adapter, {
+			code: "OTHER",
+			model: "UNKNOWN",
+			status: true,
+		});
+
+		expect(states.get("device.image")).to.deep.equal({ val: "", ack: true });
 	});
 });
 

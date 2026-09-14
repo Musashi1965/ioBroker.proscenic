@@ -41,6 +41,15 @@ issues, release artifacts, adapter logs, or chat excerpts.
 Command validation is intentionally separated into `tools/command-poc`. The
 protocol PoC remains read-only.
 
+REST endpoint discovery for maintenance, consumables, notifications, and
+message history is intentionally separated into `tools/rest-poc`. That tool may
+probe candidate read-oriented legacy REST endpoints after login and device
+selection, but it must keep raw responses below ignored owner-local
+`.poc-private/rest-poc/` and print only redacted shapes plus derived keyword
+hints. It must not reset consumables, send robot movement commands, create
+ioBroker objects, or claim endpoint support before a real-device probe proves
+the specific endpoint and field semantics.
+
 Command PoC runs have confirmed `start`, `pause`, `continue`, `return`,
 `fan-quiet`, `fan-standard`, `fan-strong`, `deep-cleaning`, and `collect-dust`
 on the first M7 Pro test device. `collect-dust` was also confirmed during an
@@ -80,6 +89,14 @@ source. The adapter now exposes a bounded and redacted
 `status.maintenance.details` diagnostic state to speed up this mapping. It must
 not publish guessed maintenance messages before the mapping is proven with
 redacted private evidence.
+
+Owner-provided screenshots from the main Proscenic app account on 2026-09-14
+showed a consumables screen with filter, side brush, main brush, and sensor
+remaining-life values, plus a message screen containing repeated dust-bag-full
+and dust-collection-station activity messages. These screenshots are visual
+evidence that the main account can see these values, but they do not by
+themselves prove whether the adapter should read them from gateway events or
+from a separate REST/app endpoint.
 
 `infoType` 20002 is also used for safe map metadata. The adapter may publish map
 availability, dimensions, resolution, IDs, area count, encoded size, compressed

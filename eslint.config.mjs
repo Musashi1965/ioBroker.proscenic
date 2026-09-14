@@ -11,6 +11,7 @@ export default [
 			'.vscode/',
 			'tools/command-poc/',
 			'tools/protocol-poc/',
+			'tools/rest-poc/',
 			'*.test.js',
 			'test/**/*.js',
 			'*.config.mjs',

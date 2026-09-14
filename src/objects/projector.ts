@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
 import type { RobotStatus } from "../domain/status";
@@ -23,6 +25,7 @@ export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRec
 	await setIfDefined(adapter, "device.code", device.code);
 	await setIfDefined(adapter, "device.model", device.model);
 	await setIfDefined(adapter, "device.online", device.status);
+	await adapter.setStateAsync("device.image", { val: deviceImageDataUrl(device), ack: true });
 }
 
 export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStatus): Promise<void> {
@@ -123,4 +126,27 @@ async function setIfDefined(
 	if (value !== undefined) {
 		await adapter.setStateAsync(id, { val: value, ack: true });
 	}
+}
+
+let cachedM7ProImageDataUrl: string | undefined;
+
+function deviceImageDataUrl(device: DeviceRecord): string {
+	if (device.code !== "M7_PRO" || device.model !== "811_LDS") {
+		return "";
+	}
+
+	cachedM7ProImageDataUrl ??= readAssetDataUrl("proscenic-m7-pro.png");
+	return cachedM7ProImageDataUrl;
+}
+
+function readAssetDataUrl(fileName: string): string {
+	for (const candidate of [
+		join(__dirname, "..", "admin", fileName),
+		join(__dirname, "..", "..", "admin", fileName),
+	]) {
+		if (existsSync(candidate)) {
+			return `data:image/png;base64,${readFileSync(candidate).toString("base64")}`;
+		}
+	}
+	return "";
 }

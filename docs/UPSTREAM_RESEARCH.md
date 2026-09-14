@@ -23,6 +23,11 @@ Behavioral map/status findings from these sources and our own probes:
   a candidate source for maintenance warnings.
 - `infoType` 20002 carries map metadata such as map/path IDs, dimensions,
   resolution, area list, compressed length, and an encoded map body.
+- Tuya-based Proscenic 850T references expose consumable remaining-life fields
+  for sensor, filter, side brush, and main brush, plus event/exception
+  candidates such as `case_info` and `exception_info`. This is only a
+  behavioral hint for endpoint discovery on the verified M7 Pro legacy backend;
+  it is not a source-compatible protocol contract.
 - Known map renderers treat the encoded map body as private robot map data and
   combine it with coordinate fields and path/charger positions. The MIT adapter
   therefore exposes only safe metadata until a separate local-only map rendering

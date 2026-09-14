@@ -38,6 +38,7 @@ Initial states:
 | `device.code` | string | `info.name` |  | selected cloud device |
 | `device.model` | string | `info.name` |  | selected cloud device |
 | `device.online` | boolean | `indicator.reachable` |  | selected cloud device |
+| `device.image` | string | `text` |  | bundled product image for verified M7 Pro |
 | `connection.cloud` | boolean | `indicator.connected` |  | login/device discovery |
 | `connection.gateway` | boolean | `indicator.connected` |  | gateway socket |
 | `connection.lastError` | string | `text` |  | redacted adapter error |

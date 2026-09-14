@@ -34,6 +34,7 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("device.code", "Device code", "string", "info.name"),
 	state("device.model", "Device model", "string", "info.name"),
 	state("device.online", "Device online", "boolean", "indicator.reachable"),
+	state("device.image", "Device image", "string", "text"),
 	state("connection.cloud", "Cloud connected", "boolean", "indicator.connected"),
 	state("connection.gateway", "Gateway connected", "boolean", "indicator.connected"),
 	state("connection.lastError", "Last redacted error", "string", "text"),
