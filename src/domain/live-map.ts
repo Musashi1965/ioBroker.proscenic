@@ -47,8 +47,7 @@ const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
-const COLOR_PATH_ON_ROOM: Color = [56, 130, 188];
-const COLOR_PATH_ON_BACKGROUND: Color = [255, 255, 255];
+const COLOR_PATH: Color = [126, 216, 96];
 const COLOR_HEADING: Color = [20, 20, 20];
 const MIN_PATH_SEGMENT_DISTANCE_SQUARED = 1.5 ** 2;
 const MAX_PATH_SEGMENT_DISTANCE_SQUARED = 30 ** 2;
@@ -184,7 +183,6 @@ function drawRobotRuntime(
 		}))
 		.filter((pose): pose is { point: [number, number]; phi: number | undefined } => pose.point !== undefined);
 
-	const basePixels = Buffer.from(pixels);
 	let pathLineSegments = 0;
 	let skippedPathSegments = 0;
 
@@ -196,16 +194,7 @@ function drawRobotRuntime(
 			segmentDistanceSquared >= MIN_PATH_SEGMENT_DISTANCE_SQUARED &&
 			segmentDistanceSquared <= MAX_PATH_SEGMENT_DISTANCE_SQUARED
 		) {
-			drawAdaptivePathLine(
-				pixels,
-				basePixels,
-				sample.width,
-				sample.height,
-				previous[0],
-				previous[1],
-				current[0],
-				current[1],
-			);
+			drawAdaptivePathLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1]);
 			pathLineSegments += 1;
 		} else {
 			skippedPathSegments += 1;
@@ -239,7 +228,6 @@ function drawRobotRuntime(
 
 function drawAdaptivePathLine(
 	pixels: Buffer,
-	basePixels: Buffer,
 	width: number,
 	height: number,
 	x1: number,
@@ -247,15 +235,12 @@ function drawAdaptivePathLine(
 	x2: number,
 	y2: number,
 ): void {
-	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, (x, y) =>
-		isRoomPixel(basePixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
-	);
-	drawLineNeighbors(pixels, basePixels, width, height, x1, y1, x2, y2);
+	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, () => COLOR_PATH);
+	drawLineNeighbors(pixels, width, height, x1, y1, x2, y2);
 }
 
 function drawLineNeighbors(
 	pixels: Buffer,
-	basePixels: Buffer,
 	width: number,
 	height: number,
 	x1: number,
@@ -268,9 +253,7 @@ function drawLineNeighbors(
 			if ((dx === 0 && dy === 0) || dx * dx + dy * dy > PATH_LINE_RADIUS * PATH_LINE_RADIUS) {
 				continue;
 			}
-			drawLineWithPixelColor(pixels, width, height, x1 + dx, y1 + dy, x2 + dx, y2 + dy, (x, y) =>
-				isRoomPixel(basePixels, width, height, x, y) ? COLOR_PATH_ON_ROOM : COLOR_PATH_ON_BACKGROUND,
-			);
+			drawLineWithPixelColor(pixels, width, height, x1 + dx, y1 + dy, x2 + dx, y2 + dy, () => COLOR_PATH);
 		}
 	}
 }
@@ -518,20 +501,6 @@ function setPixel(pixels: Buffer, width: number, height: number, x: number, y: n
 	pixels[offset] = color[0];
 	pixels[offset + 1] = color[1];
 	pixels[offset + 2] = color[2];
-}
-
-function getPixel(pixels: Buffer, width: number, height: number, x: number, y: number): Color | undefined {
-	if (x < 0 || x >= width || y < 0 || y >= height) {
-		return undefined;
-	}
-
-	const offset = (y * width + x) * 3;
-	return [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
-}
-
-function isRoomPixel(pixels: Buffer, width: number, height: number, x: number, y: number): boolean {
-	const pixel = getPixel(pixels, width, height, x, y);
-	return pixel !== undefined && pixel[0] >= 245 && pixel[1] >= 245 && pixel[2] >= 245;
 }
 
 function blendPixel(

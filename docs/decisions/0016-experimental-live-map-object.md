@@ -36,9 +36,9 @@ orientation, an app-oriented color palette, and overlays available coordinate
 metadata plus in-memory robot poses from 20001 events when present. For the
 observed M7 Pro, occupancy value `255` is rendered as the medium-blue unknown
 background, `127` as the white room area, and `0` as the darker blue map line.
-The adapter-owned pose trail uses adaptive contrast: blue on white room pixels
-and white on non-white background pixels. The pose trail is rendered wider than
-one pixel for VIS readability.
+The adapter-owned pose trail uses a dedicated light-green overlay color instead
+of reusing the background, room, or wall colors. The pose trail is rendered
+wider than one pixel for VIS readability.
 
 The in-memory pose trail is scoped to the active map path. When a later 20002
 event reports a different `pathId`, the adapter clears its own collected pose

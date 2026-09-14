@@ -76,7 +76,7 @@ describe("live map rendering", () => {
 		expect(center[2]).to.be.lessThan(255);
 	});
 
-	it("renders the room white, the unknown background blue, and path lines with adaptive contrast", () => {
+	it("renders the room white, the unknown background blue, and path lines with their own green overlay color", () => {
 		const width = 20;
 		const height = 20;
 		const grid = Buffer.alloc(width * height, 255);
@@ -98,7 +98,9 @@ describe("live map rendering", () => {
 		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
 
 		expect(pixelAt(pixels, width, 0, 10)).to.deep.equal([184, 204, 216]);
-		expect(pixelAt(pixels, width, 10, 10)).to.deep.equal([56, 130, 188]);
+		expect(pixelAt(pixels, width, 10, 10)).to.deep.equal([126, 216, 96]);
+		expect(pixelAt(pixels, width, 10, 10)).to.not.deep.equal(pixelAt(pixels, width, 0, 10));
+		expect(pixelAt(pixels, width, 10, 10)).to.not.deep.equal([255, 255, 255]);
 		expect(image?.rawPoseCount).to.equal(2);
 		expect(image?.poseCount).to.equal(2);
 		expect(image?.pathLineSegments).to.equal(1);
