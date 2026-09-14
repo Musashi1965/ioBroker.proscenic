@@ -39,8 +39,8 @@ function normalizeConsumable(component: ConsumableComponent, value: unknown): Co
 	const usedSeconds = Math.trunc(value);
 	const intervalHours = CONSUMABLE_INTERVAL_HOURS[component];
 	const intervalSeconds = intervalHours * 3_600;
-	const remainingPercent = (1 - usedSeconds / intervalSeconds) * 100;
-	const overdueHours = Math.max(0, (usedSeconds - intervalSeconds) / 3_600);
+	const remainingPercent = roundToTwoDecimals((1 - usedSeconds / intervalSeconds) * 100);
+	const overdueHours = roundToTwoDecimals(Math.max(0, (usedSeconds - intervalSeconds) / 3_600));
 
 	return {
 		usedSeconds,
@@ -48,4 +48,8 @@ function normalizeConsumable(component: ConsumableComponent, value: unknown): Co
 		remainingPercent,
 		overdueHours,
 	};
+}
+
+function roundToTwoDecimals(value: number): number {
+	return Math.round(value * 100) / 100;
 }

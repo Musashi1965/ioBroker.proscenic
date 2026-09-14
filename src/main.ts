@@ -339,7 +339,7 @@ class Proscenic extends utils.Adapter {
 			if (!history) {
 				throw new Error("Maintenance history response did not contain usable events");
 			}
-			await projectMaintenanceHistory(this, history, this.maintenanceEventCount);
+			await projectMaintenanceHistory(this, history);
 		} catch (error) {
 			await setMaintenanceHistoryReadFailure(this, error);
 			this.log.debug(`Could not refresh Proscenic maintenance history: ${redactedErrorMessage(error)}`);

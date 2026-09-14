@@ -69,14 +69,9 @@ export async function projectMaintenanceMessage(
 	await adapter.setStateAsync("status.maintenance.updated", { val: new Date().toISOString(), ack: true });
 }
 
-export async function projectMaintenanceHistory(
-	adapter: ioBroker.Adapter,
-	history: MaintenanceHistory,
-	eventCount: number,
-): Promise<void> {
+export async function projectMaintenanceHistory(adapter: ioBroker.Adapter, history: MaintenanceHistory): Promise<void> {
 	const latest = history.messages[0];
 	if (latest) {
-		await projectMaintenanceMessage(adapter, latest, eventCount);
 		await setIfDefined(adapter, "status.maintenance.history.latestCode", latest.code);
 		await setIfDefined(adapter, "status.maintenance.history.latestLevel", latest.level);
 		await setIfDefined(adapter, "status.maintenance.history.latestMessage", latest.message ?? latest.title ?? "");

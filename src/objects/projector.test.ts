@@ -157,7 +157,7 @@ describe("projectMaintenanceMessage", () => {
 });
 
 describe("projectMaintenanceHistory", () => {
-	it("publishes a bounded safe REST history and the latest event summary", async () => {
+	it("publishes a bounded safe REST history without touching live event summary states", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
 		const adapter = {
 			setStateAsync: (id: string, state: ioBroker.SettableState) => {
@@ -166,28 +166,26 @@ describe("projectMaintenanceHistory", () => {
 			},
 		} as unknown as ioBroker.Adapter;
 
-		await projectMaintenanceHistory(
-			adapter,
-			{
-				messages: [
-					{
-						code: 6132,
-						level: 1,
-						title: "unkonw",
-						message: "The dust bag seems to be full",
-						eventTime: "2026-09-14T08:49:23.000Z",
-						details: '{"infoType":20003,"code":6132}',
-					},
-				],
-				totalElements: 12,
-				totalPages: 2,
-				page: 0,
-				size: 10,
-			},
-			12,
-		);
+		await projectMaintenanceHistory(adapter, {
+			messages: [
+				{
+					code: 6132,
+					level: 1,
+					title: "unkonw",
+					message: "The dust bag seems to be full",
+					eventTime: "2026-09-14T08:49:23.000Z",
+					details: '{"infoType":20003,"code":6132}',
+				},
+			],
+			totalElements: 12,
+			totalPages: 2,
+			page: 0,
+			size: 10,
+		});
 
-		expect(states.get("status.maintenance.code")).to.deep.equal({ val: 6132, ack: true });
+		expect(states.has("status.maintenance.code")).to.equal(false);
+		expect(states.has("status.maintenance.message")).to.equal(false);
+		expect(states.has("status.maintenance.eventCount")).to.equal(false);
 		expect(states.get("status.maintenance.history.latestCode")).to.deep.equal({ val: 6132, ack: true });
 		expect(states.get("status.maintenance.history.latestLevel")).to.deep.equal({ val: 1, ack: true });
 		expect(states.get("status.maintenance.history.latestMessage")).to.deep.equal({
@@ -229,36 +227,36 @@ describe("projectConsumables", () => {
 			filter: {
 				usedSeconds: 458_996,
 				intervalHours: 150,
-				remainingPercent: 15.00074074074074,
+				remainingPercent: 15,
 				overdueHours: 0,
 			},
 			sideBrush: {
 				usedSeconds: 458_996,
 				intervalHours: 200,
-				remainingPercent: 36.25055555555556,
+				remainingPercent: 36.25,
 				overdueHours: 0,
 			},
 			mainBrush: {
 				usedSeconds: 458_996,
 				intervalHours: 300,
-				remainingPercent: 57.50037037037037,
+				remainingPercent: 57.5,
 				overdueHours: 0,
 			},
 			sensors: {
 				usedSeconds: 458_996,
 				intervalHours: 30,
-				remainingPercent: -324.9962962962963,
-				overdueHours: 97.49888888888889,
+				remainingPercent: -325,
+				overdueHours: 97.5,
 			},
 		});
 
 		expect(states.get("consumables.filter.usedSeconds")).to.deep.equal({ val: 458_996, ack: true });
 		expect(states.get("consumables.filter.intervalHours")).to.deep.equal({ val: 150, ack: true });
 		expect(states.get("consumables.sensors.remainingPercent")).to.deep.equal({
-			val: -324.9962962962963,
+			val: -325,
 			ack: true,
 		});
-		expect(states.get("consumables.sensors.overdueHours")).to.deep.equal({ val: 97.49888888888889, ack: true });
+		expect(states.get("consumables.sensors.overdueHours")).to.deep.equal({ val: 97.5, ack: true });
 		expect(states.get("consumables.lastReadResult")).to.deep.equal({ val: "ok", ack: true });
 		expect(states.get("consumables.lastError")).to.deep.equal({ val: "", ack: true });
 		expect(states.get("capabilities.consumables")).to.deep.equal({ val: true, ack: true });

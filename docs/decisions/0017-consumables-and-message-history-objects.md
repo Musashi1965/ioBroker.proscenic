@@ -45,8 +45,10 @@ The four verified counters are interpreted as used seconds. Nominal intervals
 are 150 hours for the filter, 200 hours for the side brush, 300 hours for the
 main brush, and 30 hours for sensors. `remainingPercent` may be negative when a
 maintenance interval is exceeded. `overdueHours` is a non-negative derived
-diagnostic. The additional upstream `battery` field in `21015` is not exposed
-because its meaning is not verified.
+diagnostic. The derived percentage and overdue-hour values are rounded to two
+decimal places for object-tree readability; `usedSeconds` remains the unchanged
+integer counter. The additional upstream `battery` field in `21015` is not
+exposed because its meaning is not verified.
 
 Expose the current maintenance message history under a read-only
 `status.maintenance.history.*` object tree:
@@ -69,7 +71,10 @@ objects.
 
 The existing `status.maintenance.eventCount` remains a live gateway event
 counter. REST history refreshes must not increment it, because reconnects would
-otherwise count the same historical messages repeatedly.
+otherwise count the same historical messages repeatedly. REST history refreshes
+also must not write `status.maintenance.code`, `status.maintenance.level`,
+`status.maintenance.message`, or `status.maintenance.updated`; those states are
+reserved for live gateway `20003` events and status-derived diagnostics.
 
 The adapter also exposes:
 
