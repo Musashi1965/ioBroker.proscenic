@@ -63,6 +63,12 @@ Security policy and contribution requirements are documented in
 
 ## Changelog
 
+### 0.1.1 (2026-09-14)
+
+- Documented the npm first-publish bootstrap path and the Trusted Publishing
+  setup for future tag-triggered releases.
+- Normalized the npm repository URL metadata.
+
 ### 0.1.0 (2026-09-14)
 
 - Added the first real-device-validated command object tree for the M7 Pro:

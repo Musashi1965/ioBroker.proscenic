@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.1.0",
+		"version": "0.1.1",
 		"news": {
+			"0.1.1": {
+				"en": "Documented npm first-publish bootstrap and enabled the trusted publishing path for future releases",
+				"de": "npm-Erstveröffentlichung dokumentiert und Trusted-Publishing-Pfad für zukünftige Releases aktiviert",
+				"ru": "Задокументирован первый выпуск npm и включен путь доверенной публикации для будущих релизов",
+				"pt": "Documentado o bootstrap da primeira publicação npm e ativado o caminho de publicação confiável para versões futuras",
+				"nl": "Bootstrap voor eerste npm-publicatie gedocumenteerd en trusted publishing voor toekomstige releases ingeschakeld",
+				"fr": "Documentation du premier bootstrap npm et activation de la publication de confiance pour les prochaines versions",
+				"it": "Documentato il bootstrap della prima pubblicazione npm e abilitato il percorso di pubblicazione attendibile futuro",
+				"es": "Documentado el primer bootstrap de publicación npm y activada la publicación confiable para futuras versiones",
+				"pl": "Udokumentowano pierwszy bootstrap publikacji npm i włączono zaufaną publikację dla przyszłych wydań",
+				"uk": "Задокументовано перший bootstrap публікації npm і ввімкнено довірену публікацію для майбутніх релізів",
+				"zh-cn": "记录 npm 首次发布引导流程，并为后续版本启用可信发布路径"
+			},
 			"0.1.0": {
 				"en": "Added M7 Pro commands, status projection, consumables, maintenance history, and experimental live map rendering",
 				"de": "M7-Pro-Kommandos, Statusprojektion, Verbrauchswerte, Wartungshistorie und experimentelles Live-Karten-Rendering hinzugefügt",
@@ -15,19 +28,6 @@
 				"pl": "Dodano polecenia M7 Pro, stany, materiały eksploatacyjne, historię konserwacji i eksperymentalne renderowanie mapy",
 				"uk": "Додано команди M7 Pro, стани, витратні матеріали, історію обслуговування та експериментальне відображення карти",
 				"zh-cn": "添加 M7 Pro 命令、状态投影、耗材、维护历史和实验性实时地图渲染"
-			},
-			"0.0.1": {
-				"en": "initial release",
-				"de": "Erstveröffentlichung",
-				"ru": "Начальная версия",
-				"pt": "lançamento inicial",
-				"nl": "Eerste uitgave",
-				"fr": "Première version",
-				"it": "Versione iniziale",
-				"es": "Versión inicial",
-				"pl": "Pierwsze wydanie",
-				"uk": "Початкова версія",
-				"zh-cn": "首次出版"
 			}
 		},
 		"titleLang": {
