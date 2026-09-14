@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-There is no released adapter version yet. Supported release lines will be
-listed here after the first publication.
+The adapter is in early `0.y.z` development. Security fixes are provided for
+the latest published `0.y.z` version.
 
 ## Reporting a vulnerability
 

@@ -4,7 +4,17 @@ This project is licensed under the MIT License. Third-party packages, source
 materials, services, and trademarks remain subject to their own licenses and
 terms.
 
-No third-party runtime dependency or vendored source has been adopted yet.
+No third-party source has been vendored. Runtime and development dependencies
+are installed from npm and remain subject to their own licenses.
+
+## Runtime dependencies
+
+### ioBroker adapter core
+
+- Package: `@iobroker/adapter-core`
+- Source: https://www.npmjs.com/package/@iobroker/adapter-core
+- License: MIT
+- Use: official ioBroker adapter runtime foundation
 
 ## Development dependencies
 
@@ -13,14 +23,14 @@ No third-party runtime dependency or vendored source has been adopted yet.
 - Package: `typescript`
 - Source: https://www.npmjs.com/package/typescript
 - License: Apache-2.0
-- Use: compile the local read-only protocol PoC
+- Use: compile the TypeScript adapter and local protocol tools
 
 ### Node.js type definitions
 
 - Package: `@types/node`
 - Source: https://www.npmjs.com/package/@types/node
 - License: MIT
-- Use: TypeScript declarations for Node.js APIs used by the local PoC
+- Use: TypeScript declarations for Node.js APIs
 
 ### Undici type definitions
 

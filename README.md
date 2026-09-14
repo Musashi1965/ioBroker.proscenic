@@ -4,6 +4,8 @@ Development-stage ioBroker adapter for supported Proscenic vacuum robots,
 initially the Proscenic M7 Pro (`M7_PRO`, model `811_LDS`) through the legacy
 Proscenic cloud/gateway path.
 
+Manufacturer/product information: [Proscenic robot vacuums](https://www.proscenic.com/collections/robot-vacuums).
+
 ## Project status
 
 This repository contains a TypeScript ioBroker adapter that can authenticate
@@ -58,6 +60,7 @@ Security policy and contribution requirements are documented in
 - [Upstream research and provenance](docs/UPSTREAM_RESEARCH.md)
 - [Publication checklist](docs/PUBLICATION_CHECKLIST.md)
 - [Architecture decisions](docs/decisions/README.md)
+- [Changelog](CHANGELOG.md)
 
 ## Independence
 

@@ -1,6 +1,7 @@
 {
 	"common": {
 		"name": "proscenic",
+		"title": "Proscenic",
 		"version": "0.1.0",
 		"news": {
 			"0.1.0": {
