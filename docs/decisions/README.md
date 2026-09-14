@@ -32,6 +32,7 @@ Current decisions:
   object for local visual debugging
 - [ADR 0017](0017-consumables-and-message-history-objects.md): consumables and
   message history objects
+- [ADR 0018](0018-single-publication-mandate.md): single publication mandate
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, command confirmation behavior, public

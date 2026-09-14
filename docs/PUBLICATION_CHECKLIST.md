@@ -1,7 +1,78 @@
 # Publication Checklist
 
-This checklist is binding for GitHub, npm, and ioBroker publication. Each
-externally visible step requires explicit user authorization.
+This checklist is binding for GitHub, npm, and ioBroker publication. A single
+explicit publication mandate from the user may authorize the complete standard
+release path below; separate repeated confirmations are not required for each
+normal sub-step.
+
+## Standard publication mandate
+
+The user can authorize a complete publication run with one clear instruction,
+for example:
+
+```text
+Release und Veröffentlichung für vMAJOR.MINOR.PATCH komplett durchführen.
+```
+
+or:
+
+```text
+Nächste Patch-Version vorbereiten, veröffentlichen und den ioBroker-latest-PR
+anstoßen.
+```
+
+Such a mandate authorizes the agent to perform the full standard chain without
+asking again for each individual step:
+
+1. classify the release according to ADR 0005;
+2. update version metadata, `common.news`, changelog/release notes, and
+   publication documentation when required;
+3. run the applicable quality gate, including `npm run release:preflight` for a
+   public release;
+4. create focused commits on `main`;
+5. push `main` after the required pre-push summary;
+6. create and push the immutable `vMAJOR.MINOR.PATCH` tag;
+7. monitor the tag-triggered GitHub Actions release workflow;
+8. verify npm Trusted Publishing, npm version/dist-tag/provenance, GitHub
+   Release, tag identity, and branch synchronization;
+9. create or update the ioBroker `latest` repository pull request when the
+   mandate includes publication beyond GitHub/npm;
+10. report the exact final state, links, checks, and remaining external review
+    items.
+
+The mandate does not authorize unsafe or materially different actions. Stop and
+ask before force-pushing, deleting or moving tags, replacing published npm
+versions, changing repository visibility, introducing long-lived npm tokens,
+publishing private data, weakening privacy rules, changing the project identity,
+or requesting ioBroker `stable` before the documented stability criteria are
+met.
+
+Some external systems can still require live user interaction even under a
+complete mandate. Browser authentication, OTP/2FA, npm owner changes, and
+manual ioBroker review comments are treated as external blockers: the agent
+should run the prepared command, explain the exact required user action, and
+continue automatically after the user reports completion.
+
+## One-time external setup blockers
+
+These items should be cleared once so later releases can run without avoidable
+manual interruption:
+
+- Add the required ioBroker npm collaborator when the npm account has a live
+  OTP/2FA code available:
+
+  ```sh
+  npm owner add bluefox iobroker.proscenic
+  ```
+
+  If npm returns `OTP required for authentication`, this is not a policy
+  approval question; it is an external authentication challenge. Keep the
+  command and release context intact, obtain a fresh OTP from the maintainer,
+  and retry immediately.
+
+- Decide and document a public maintainer/contact e-mail address acceptable for
+  ioBroker metadata. Do not use private account e-mail addresses or commit them
+  merely to satisfy checker warnings.
 
 ## Repository foundation
 
@@ -46,6 +117,12 @@ externally visible step requires explicit user authorization.
 - Cloud failure, authentication failure, token renewal, reconnect, and command
   error behavior are verified without leaking secrets.
 - Exact package tarball and checksum are reviewed.
+
+Run the bundled preflight before creating the immutable release tag:
+
+```sh
+npm run release:preflight -- MAJOR.MINOR.PATCH
+```
 
 ## npm and GitHub release
 
@@ -148,8 +225,9 @@ matching, the `id-token: write` permission, and the `--allow-publish` flag.
 
 ## ioBroker repositories
 
-- Submission to `latest` is separately authorized after npm/GitHub verification
-  and representative user testing.
+- Submission to `latest` is included in a complete publication mandate after
+  npm/GitHub verification and representative user testing, unless the user
+  explicitly limits the mandate to GitHub/npm only.
 - Repository checker and review requirements are satisfied.
 - Stable inclusion is requested only after the current ioBroker stability
   criteria, sufficient user feedback, migration behavior, and supported-device

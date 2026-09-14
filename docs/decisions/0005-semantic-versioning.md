@@ -30,7 +30,10 @@ During `0.y.z`:
 
 Published npm versions and Git tags are immutable. Version selection, version
 file changes, tag creation, npm publication, GitHub release creation, and
-ioBroker repository submission require explicit user authorization.
+ioBroker repository submission require explicit user authorization. A single
+clear publication mandate may authorize the complete standard chain for one
+release, as defined in `docs/PUBLICATION_CHECKLIST.md`; the agent must not stop
+for repeated per-step confirmation while staying inside that mandate.
 
 The normal npm publication path is npm Trusted Publishing from the reviewed
 GitHub Actions tag workflow. The first publication of a new npm package may
@@ -46,6 +49,11 @@ An authorized release keeps `package.json`, the root lockfile entry,
 `io-package.json`, `common.news`, release notes/changelog, and
 `vMAJOR.MINOR.PATCH` tag consistent. Do not bump versions speculatively during
 ordinary work.
+
+The standard release gate includes `npm run release:preflight -- VERSION`,
+which verifies version consistency, clean working tree, absent release tag,
+`git diff --check`, `npm run check:full`, package contents, and the current npm
+registry state before the immutable tag is created.
 
 ## Consequences
 

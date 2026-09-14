@@ -70,6 +70,7 @@
     "check:full": "npm run lint && npm run check && npm run build && npm test && npm run test:integration",
     "lint": "eslint -c eslint.config.mjs .",
     "translate": "translate-adapter",
+    "release:preflight": "scripts/publication-preflight.sh",
     "release": "release-script",
     "dev-server": "dev-server"
   },
