@@ -52,14 +52,14 @@ const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
 
 interface PendingConsumableRead {
-	timer: ReturnType<typeof setTimeout>;
+	timer: ioBroker.Timeout;
 	resolve: (consumables: ConsumableStates) => void;
 	reject: (error: Error) => void;
 }
 
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
-	private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+	private reconnectTimer: ioBroker.Timeout | undefined;
 	private reconnectAttempt = 0;
 	private reconnectInProgress = false;
 	private commandInProgress = false;
@@ -224,7 +224,7 @@ class Proscenic extends utils.Adapter {
 		this.log.info(
 			`Scheduling Proscenic gateway reconnect in ${Math.round(delayMs / 1_000)} seconds after ${reason}.`,
 		);
-		this.reconnectTimer = setTimeout(() => {
+		this.reconnectTimer = this.setTimeout(() => {
 			this.reconnectTimer = undefined;
 			void this.connectReadOnlyGateway();
 		}, delayMs);
@@ -232,7 +232,7 @@ class Proscenic extends utils.Adapter {
 
 	private clearReconnectTimer(): void {
 		if (this.reconnectTimer) {
-			clearTimeout(this.reconnectTimer);
+			this.clearTimeout(this.reconnectTimer);
 			this.reconnectTimer = undefined;
 		}
 	}
@@ -368,10 +368,14 @@ class Proscenic extends utils.Adapter {
 		this.rejectPendingConsumableRead(new Error("Superseded by a newer consumable read"));
 
 		return new Promise<ConsumableStates>((resolve, reject) => {
-			const timer = setTimeout(() => {
+			const timer = this.setTimeout(() => {
 				this.pendingConsumableRead = undefined;
 				reject(new Error(`No consumable gateway event received within ${CONSUMABLE_GATEWAY_TIMEOUT_MS} ms`));
 			}, CONSUMABLE_GATEWAY_TIMEOUT_MS);
+			if (timer === undefined) {
+				reject(new Error("Could not schedule consumable gateway timeout"));
+				return;
+			}
 			this.pendingConsumableRead = { timer, resolve, reject };
 		});
 	}
@@ -380,7 +384,7 @@ class Proscenic extends utils.Adapter {
 		if (!this.pendingConsumableRead) {
 			return;
 		}
-		clearTimeout(this.pendingConsumableRead.timer);
+		this.clearTimeout(this.pendingConsumableRead.timer);
 		this.pendingConsumableRead.resolve(consumables);
 		this.pendingConsumableRead = undefined;
 	}
@@ -389,7 +393,7 @@ class Proscenic extends utils.Adapter {
 		if (!this.pendingConsumableRead) {
 			return;
 		}
-		clearTimeout(this.pendingConsumableRead.timer);
+		this.clearTimeout(this.pendingConsumableRead.timer);
 		this.pendingConsumableRead.reject(error);
 		this.pendingConsumableRead = undefined;
 	}

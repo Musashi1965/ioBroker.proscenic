@@ -37,8 +37,8 @@ The initial Admin configuration exposes only non-command setup fields:
 - `password`;
 - `deviceCode`.
 
-The `password` native field is listed in both `common.protectedNative` and
-`common.encryptedNative`. Runtime code must not log credentials, tokens, serial
+The `password` native field is listed in both `protectedNative` and
+`encryptedNative`. Runtime code must not log credentials, tokens, serial
 numbers, gateway endpoints, map data, positions, or raw payloads.
 
 ## Consequences

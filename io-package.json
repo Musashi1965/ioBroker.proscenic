@@ -1,7 +1,6 @@
 {
 	"common": {
 		"name": "proscenic",
-		"title": "Proscenic",
 		"version": "0.1.0",
 		"news": {
 			"0.1.0": {
@@ -58,7 +57,7 @@
 			"zh-cn": "使用传统 Proscenic 云网关的 Proscenic 真空机器人的 ioBroker 适配器"
 		},
 		"authors": ["C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>"],
-		"keywords": ["iobroker", "proscenic", "vacuum", "robot", "m7 pro", "smarthome"],
+		"keywords": ["proscenic", "vacuum", "robot", "m7 pro"],
 		"licenseInformation": {
 			"type": "free",
 			"license": "MIT"
@@ -73,13 +72,12 @@
 		"mode": "daemon",
 		"type": "household",
 		"compact": true,
+		"nogit": true,
 		"connectionType": "cloud",
 		"dataSource": "push",
 		"adminUI": {
 			"config": "json"
 		},
-		"protectedNative": ["username", "password"],
-		"encryptedNative": ["username", "password"],
 		"dependencies": [
 			{
 				"js-controller": ">=6.0.11"
@@ -87,10 +85,12 @@
 		],
 		"globalDependencies": [
 			{
-				"admin": ">=7.0.23"
+				"admin": ">=7.6.20"
 			}
 		]
 	},
+	"protectedNative": ["username", "password"],
+	"encryptedNative": ["username", "password"],
 	"native": {
 		"region": "eu",
 		"vendor": "proscenic",
