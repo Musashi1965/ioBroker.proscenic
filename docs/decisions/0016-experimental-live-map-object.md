@@ -24,6 +24,11 @@ Expose an explicit experimental live-map image under:
 - `map.live.rawPoseCount`;
 - `map.live.pathLineSegments`;
 - `map.live.skippedPathSegments`;
+- `map.live.currentAreaCount`;
+- `map.live.cachedAreaCount`;
+- `map.live.renderedForbiddenAreaCount`;
+- `map.live.renderedRoomAreaCount`;
+- `map.live.hasCachedStaticOverlays`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
 - `map.live.pathResetCount`;
@@ -40,19 +45,36 @@ The adapter-owned pose trail uses a dedicated light-green overlay color instead
 of reusing the background, room, or wall colors. The pose trail is rendered
 wider than one pixel for VIS readability.
 
-The adapter keeps the last valid coordinate metadata for no-go areas and the
-charging station in memory per `mapId`. If a later 20002 map frame for the same
-map omits that metadata, rendering carries the cached metadata forward so
-VIS does not lose static overlays during a cleaning run. A `mapId` change drops
-the cached coordinate metadata.
+The adapter keeps the last valid coordinate metadata for static overlays and
+the charging station in memory per `mapId`. Observed M7 Pro captures show that
+20002 `area` frames are partial and transient: one frame can contain the
+configured no-go area plus user-created room zones, while later frames for the
+same map can contain only the no-go area. The adapter therefore deduplicates
+areas and merges them into the per-map cache instead of letting the last frame
+win. A `mapId` change drops the cached coordinate metadata.
+
+Area classification is intentionally heuristic during local development.
+Duplicate area entries in a multi-area frame and single-area frames are treated
+as no-go/forbidden overlays. Other deduplicated entries from a multi-area frame
+are treated as room-zone overlays and rendered in a distinct translucent blue.
+The observed `forbidType` field is not sufficient for classification because
+the same value appeared on both the confirmed no-go area and likely room zones.
+Different app accounts can expose different permissions and metadata; the main
+adapter account is authoritative for this development adapter, while screenshots
+from a shared app account are treated as visual references only.
 
 The in-memory pose trail is scoped to the active map path. When a later 20002
 event reports a different `pathId`, the adapter clears its own collected pose
 trail before rendering the new path. Any old route still visible after that
 comes from the robot-provided 20002 occupancy/map snapshot or from the app, not
 from the adapter's 20001 pose overlay. The renderer skips duplicate or tiny
-pose movements and implausibly long jumps between two gateway samples instead
-of drawing misleading straight lines across the map.
+pose movements and implausibly long jumps between two gateway samples. For
+moderate gateway gaps it first tries the direct segment. If that direct segment
+would cross a wall or obstacle pixel in the decoded occupancy grid, the
+renderer searches for a short local collision-free route and draws that
+instead. The path brush itself is clipped to traversable map pixels so
+interpolation cannot paint the robot through walls. If no bounded local route
+is found, the segment is skipped.
 
 The diagnostic states explain why the current image changed and how much of
 the in-memory pose trail was rendered:
@@ -64,6 +86,14 @@ the in-memory pose trail was rendered:
 - `pathLineSegments` is the number of accepted pose-to-pose line segments.
 - `skippedPathSegments` is the number of rejected duplicate, too-small, or
   implausibly large pose jumps.
+- `currentAreaCount` is the raw `area` count in the latest 20002 frame.
+- `cachedAreaCount` is the deduplicated per-map overlay count kept in memory.
+- `renderedForbiddenAreaCount` is the number of no-go overlays drawn into the
+  latest image.
+- `renderedRoomAreaCount` is the number of room-zone overlays drawn into the
+  latest image.
+- `hasCachedStaticOverlays` indicates whether the latest render used cached
+  static overlay metadata.
 - `renderReason` is `map` for a new 20002 map snapshot and `pose` for a 20001
   pose-triggered refresh.
 - `lastPathId` is the latest observed map path identifier.

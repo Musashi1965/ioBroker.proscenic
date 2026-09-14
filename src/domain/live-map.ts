@@ -13,13 +13,23 @@ export interface LiveMapImage {
 	rawPoseCount: number;
 	pathLineSegments: number;
 	skippedPathSegments: number;
+	renderedForbiddenAreaCount: number;
+	renderedRoomAreaCount: number;
 	orientation: "flip-y";
 	decompressedBytes: number;
 }
 
+export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
+
+export interface LiveMapAreaMetadata {
+	key: string;
+	kind: LiveMapAreaKind;
+	source: Record<string, unknown>;
+}
+
 export interface LiveMapCoordinateMetadata {
 	mapId?: number;
-	area?: unknown[];
+	area?: LiveMapAreaMetadata[];
 	chargeHandlePos?: [number, number];
 }
 
@@ -36,6 +46,7 @@ interface MapSample {
 
 interface MapArea {
 	vertices: Array<[number, number]>;
+	kind: LiveMapAreaKind;
 }
 
 type Color = readonly [number, number, number];
@@ -51,12 +62,17 @@ const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
 const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
+const COLOR_ROOM_AREA: Color = [112, 125, 236];
+const COLOR_ROOM_AREA_OUTLINE: Color = [68, 84, 210];
+const ROOM_AREA_ALPHA = 0.3;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
 const COLOR_PATH: Color = [126, 216, 96];
 const COLOR_HEADING: Color = [20, 20, 20];
 const MIN_PATH_SEGMENT_DISTANCE_SQUARED = 1.5 ** 2;
-const MAX_PATH_SEGMENT_DISTANCE_SQUARED = 30 ** 2;
+const MAX_PATH_SEGMENT_DISTANCE_SQUARED = 90 ** 2;
+const ROUTED_PATH_PADDING_PIXELS = 24;
+const MAX_ROUTED_PATH_CELLS = 20_000;
 const PATH_LINE_RADIUS = 1;
 
 export function extractRobotPose20001(data: unknown): RobotPose | undefined {
@@ -85,8 +101,8 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 	}
 
 	const pixels = renderOccupancy(sample.width, sample.height, occupancy);
-	drawCoordinateMetadata(sample, pixels);
-	const runtime = drawRobotRuntime(sample, pixels, poses);
+	const coordinateMetadata = drawCoordinateMetadata(sample, pixels);
+	const runtime = drawRobotRuntime(sample, occupancy, pixels, poses);
 
 	const png = encodeRgbPng(sample.width, sample.height, pixels);
 	const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
@@ -102,6 +118,8 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 		rawPoseCount: poses.length,
 		pathLineSegments: runtime.pathLineSegments,
 		skippedPathSegments: runtime.skippedPathSegments,
+		renderedForbiddenAreaCount: coordinateMetadata.renderedForbiddenAreaCount,
+		renderedRoomAreaCount: coordinateMetadata.renderedRoomAreaCount,
 		orientation: "flip-y",
 		decompressedBytes: occupancy.length,
 	};
@@ -117,8 +135,9 @@ export function extractLiveMapCoordinateMetadata20002(data: unknown): LiveMapCoo
 	if (typeof record.mapId === "number") {
 		metadata.mapId = record.mapId;
 	}
-	if (Array.isArray(record.area) && record.area.length > 0) {
-		metadata.area = record.area;
+	const areas = normalizeMapAreaMetadata(record.area);
+	if (areas.length > 0) {
+		metadata.area = areas;
 	}
 
 	const chargeHandlePos = parsePoint(record.chargeHandlePos);
@@ -145,13 +164,35 @@ export function mergeLiveMapCoordinateMetadata20002(
 	}
 
 	const merged = { ...record };
-	if (metadata.area && (!Array.isArray(record.area) || record.area.length === 0)) {
-		merged.area = metadata.area;
+	if (metadata.area && metadata.area.length > 0) {
+		merged.area = metadata.area.map(area => ({
+			...area.source,
+			__proscenicKind: area.kind,
+		}));
 	}
 	if (metadata.chargeHandlePos && !parsePoint(record.chargeHandlePos)) {
 		merged.chargeHandlePos = metadata.chargeHandlePos;
 	}
 	return merged;
+}
+
+export function countLiveMapAreas20002(data: unknown): number {
+	const record = getRecord(data);
+	return Array.isArray(record?.area) ? record.area.length : 0;
+}
+
+export function mergeLiveMapCoordinateMetadataCache(
+	previous: LiveMapCoordinateMetadata | undefined,
+	next: LiveMapCoordinateMetadata,
+): LiveMapCoordinateMetadata {
+	const sameMap = previous?.mapId === undefined || next.mapId === undefined || previous.mapId === next.mapId;
+	const previousAreas = sameMap ? (previous?.area ?? []) : [];
+
+	return {
+		mapId: next.mapId ?? previous?.mapId,
+		area: mergeAreaMetadata(previousAreas, next.area ?? []),
+		chargeHandlePos: next.chargeHandlePos ?? (sameMap ? previous?.chargeHandlePos : undefined),
+	};
 }
 
 function parseMapSample(data: unknown): MapSample | undefined {
@@ -205,14 +246,26 @@ function renderOccupancy(width: number, height: number, occupancy: Buffer): Buff
 	return pixels;
 }
 
-function drawCoordinateMetadata(sample: MapSample, pixels: Buffer): void {
+function drawCoordinateMetadata(
+	sample: MapSample,
+	pixels: Buffer,
+): { renderedForbiddenAreaCount: number; renderedRoomAreaCount: number } {
+	let renderedForbiddenAreaCount = 0;
+	let renderedRoomAreaCount = 0;
 	for (const area of sample.areas) {
 		const projected = area.vertices
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);
 		if (projected.length >= 3) {
-			fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA, FORBIDDEN_AREA_ALPHA);
-			drawPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_OUTLINE);
+			if (area.kind === "room") {
+				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_ROOM_AREA, ROOM_AREA_ALPHA);
+				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_ROOM_AREA_OUTLINE);
+				renderedRoomAreaCount += 1;
+			} else {
+				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA, FORBIDDEN_AREA_ALPHA);
+				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_OUTLINE);
+				renderedForbiddenAreaCount += 1;
+			}
 		}
 	}
 
@@ -222,10 +275,13 @@ function drawCoordinateMetadata(sample: MapSample, pixels: Buffer): void {
 			plotMarker(pixels, sample.width, sample.height, charge[0], charge[1], 5, COLOR_DOCK);
 		}
 	}
+
+	return { renderedForbiddenAreaCount, renderedRoomAreaCount };
 }
 
 function drawRobotRuntime(
 	sample: MapSample,
+	occupancy: Buffer,
 	pixels: Buffer,
 	poses: readonly RobotPose[],
 ): { projectedPoseCount: number; pathLineSegments: number; skippedPathSegments: number } {
@@ -247,8 +303,13 @@ function drawRobotRuntime(
 			segmentDistanceSquared >= MIN_PATH_SEGMENT_DISTANCE_SQUARED &&
 			segmentDistanceSquared <= MAX_PATH_SEGMENT_DISTANCE_SQUARED
 		) {
-			drawAdaptivePathLine(pixels, sample.width, sample.height, previous[0], previous[1], current[0], current[1]);
-			pathLineSegments += 1;
+			const routedPath = findDrawablePath(sample, occupancy, previous, current);
+			if (routedPath) {
+				drawAdaptivePathPolyline(sample, occupancy, pixels, sample.width, sample.height, routedPath);
+				pathLineSegments += 1;
+			} else {
+				skippedPathSegments += 1;
+			}
 		} else {
 			skippedPathSegments += 1;
 		}
@@ -287,9 +348,209 @@ function drawAdaptivePathLine(
 	y1: number,
 	x2: number,
 	y2: number,
+	canDraw?: (x: number, y: number) => boolean,
 ): void {
-	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, () => COLOR_PATH);
-	drawLineNeighbors(pixels, width, height, x1, y1, x2, y2);
+	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, (x, y) =>
+		canDraw && !canDraw(x, y) ? undefined : COLOR_PATH,
+	);
+	drawLineNeighbors(pixels, width, height, x1, y1, x2, y2, canDraw);
+}
+
+function drawAdaptivePathPolyline(
+	sample: MapSample,
+	occupancy: Buffer,
+	pixels: Buffer,
+	width: number,
+	height: number,
+	points: readonly [number, number][],
+): void {
+	const canDraw = (x: number, y: number): boolean => isTraversableMapPixel(sample, occupancy, x, y);
+	for (let index = 1; index < points.length; index++) {
+		const [x1, y1] = points[index - 1];
+		const [x2, y2] = points[index];
+		drawAdaptivePathLine(pixels, width, height, x1, y1, x2, y2, canDraw);
+	}
+}
+
+function findDrawablePath(
+	sample: MapSample,
+	occupancy: Buffer,
+	start: [number, number],
+	end: [number, number],
+): Array<[number, number]> | undefined {
+	if (isDirectPathTraversable(sample, occupancy, start, end)) {
+		return [start, end];
+	}
+
+	return findRoutedPath(sample, occupancy, start, end);
+}
+
+function isDirectPathTraversable(
+	sample: MapSample,
+	occupancy: Buffer,
+	start: [number, number],
+	end: [number, number],
+): boolean {
+	let traversedCells = 0;
+	let blockedCells = 0;
+	forEachLinePoint(start[0], start[1], end[0], end[1], (x, y) => {
+		traversedCells += 1;
+		if (!isTraversableMapPixel(sample, occupancy, x, y)) {
+			blockedCells += 1;
+		}
+	});
+	return traversedCells > 0 && blockedCells === 0;
+}
+
+function findRoutedPath(
+	sample: MapSample,
+	occupancy: Buffer,
+	start: [number, number],
+	end: [number, number],
+): Array<[number, number]> | undefined {
+	const routeStart = nearestTraversablePoint(sample, occupancy, start);
+	const routeEnd = nearestTraversablePoint(sample, occupancy, end);
+	if (!routeStart || !routeEnd) {
+		return undefined;
+	}
+
+	const minX = Math.max(0, Math.min(routeStart[0], routeEnd[0]) - ROUTED_PATH_PADDING_PIXELS);
+	const maxX = Math.min(sample.width - 1, Math.max(routeStart[0], routeEnd[0]) + ROUTED_PATH_PADDING_PIXELS);
+	const minY = Math.max(0, Math.min(routeStart[1], routeEnd[1]) - ROUTED_PATH_PADDING_PIXELS);
+	const maxY = Math.min(sample.height - 1, Math.max(routeStart[1], routeEnd[1]) + ROUTED_PATH_PADDING_PIXELS);
+	const searchWidth = maxX - minX + 1;
+	const searchHeight = maxY - minY + 1;
+	if (searchWidth * searchHeight > MAX_ROUTED_PATH_CELLS) {
+		return undefined;
+	}
+
+	const distance = new Map<number, number>();
+	const previous = new Map<number, number>();
+	const queue: Array<{ key: number; score: number }> = [];
+	const startKey = localPointKey(routeStart[0], routeStart[1], minX, minY, searchWidth);
+	const endKey = localPointKey(routeEnd[0], routeEnd[1], minX, minY, searchWidth);
+	distance.set(startKey, 0);
+	queue.push({ key: startKey, score: heuristic(routeStart, routeEnd) });
+
+	while (queue.length > 0) {
+		queue.sort((left, right) => left.score - right.score);
+		const current = queue.shift();
+		if (!current) {
+			break;
+		}
+		if (current.key === endKey) {
+			return restoreRoutedPath(previous, current.key, minX, minY, searchWidth);
+		}
+
+		const [currentX, currentY] = pointFromLocalKey(current.key, minX, minY, searchWidth);
+		const currentDistance = distance.get(current.key) ?? Number.POSITIVE_INFINITY;
+		for (let dy = -1; dy <= 1; dy++) {
+			for (let dx = -1; dx <= 1; dx++) {
+				if (dx === 0 && dy === 0) {
+					continue;
+				}
+				const nextX = currentX + dx;
+				const nextY = currentY + dy;
+				if (
+					nextX < minX ||
+					nextX > maxX ||
+					nextY < minY ||
+					nextY > maxY ||
+					!isTraversableMapPixel(sample, occupancy, nextX, nextY)
+				) {
+					continue;
+				}
+
+				const nextKey = localPointKey(nextX, nextY, minX, minY, searchWidth);
+				const nextDistance = currentDistance + (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1);
+				if (nextDistance >= (distance.get(nextKey) ?? Number.POSITIVE_INFINITY)) {
+					continue;
+				}
+				distance.set(nextKey, nextDistance);
+				previous.set(nextKey, current.key);
+				queue.push({ key: nextKey, score: nextDistance + heuristic([nextX, nextY], routeEnd) });
+			}
+		}
+	}
+
+	return undefined;
+}
+
+function restoreRoutedPath(
+	previous: ReadonlyMap<number, number>,
+	endKey: number,
+	minX: number,
+	minY: number,
+	width: number,
+): Array<[number, number]> {
+	const keys = [endKey];
+	let current = endKey;
+	while (previous.has(current)) {
+		current = previous.get(current) ?? current;
+		keys.push(current);
+	}
+	return simplifyPath(keys.reverse().map(key => pointFromLocalKey(key, minX, minY, width)));
+}
+
+function simplifyPath(points: Array<[number, number]>): Array<[number, number]> {
+	if (points.length <= 2) {
+		return points;
+	}
+	const simplified: Array<[number, number]> = [points[0]];
+	let previousDirection: [number, number] | undefined;
+	for (let index = 1; index < points.length; index++) {
+		const direction: [number, number] = [
+			Math.sign(points[index][0] - points[index - 1][0]),
+			Math.sign(points[index][1] - points[index - 1][1]),
+		];
+		if (previousDirection && (direction[0] !== previousDirection[0] || direction[1] !== previousDirection[1])) {
+			simplified.push(points[index - 1]);
+		}
+		previousDirection = direction;
+	}
+	simplified.push(points.at(-1) ?? points[0]);
+	return simplified;
+}
+
+function nearestTraversablePoint(
+	sample: MapSample,
+	occupancy: Buffer,
+	point: [number, number],
+): [number, number] | undefined {
+	if (isTraversableMapPixel(sample, occupancy, point[0], point[1])) {
+		return point;
+	}
+	for (let radius = 1; radius <= 3; radius++) {
+		for (let y = point[1] - radius; y <= point[1] + radius; y++) {
+			for (let x = point[0] - radius; x <= point[0] + radius; x++) {
+				if (isTraversableMapPixel(sample, occupancy, x, y)) {
+					return [x, y];
+				}
+			}
+		}
+	}
+	return undefined;
+}
+
+function isTraversableMapPixel(sample: MapSample, occupancy: Buffer, x: number, y: number): boolean {
+	if (x < 0 || x >= sample.width || y < 0 || y >= sample.height) {
+		return false;
+	}
+	const sourceY = sample.height - 1 - y;
+	const value = occupancy[sourceY * sample.width + x];
+	return value >= 127;
+}
+
+function localPointKey(x: number, y: number, minX: number, minY: number, width: number): number {
+	return (y - minY) * width + (x - minX);
+}
+
+function pointFromLocalKey(key: number, minX: number, minY: number, width: number): [number, number] {
+	return [minX + (key % width), minY + Math.floor(key / width)];
+}
+
+function heuristic(left: [number, number], right: [number, number]): number {
+	return Math.hypot(left[0] - right[0], left[1] - right[1]);
 }
 
 function drawLineNeighbors(
@@ -300,13 +561,16 @@ function drawLineNeighbors(
 	y1: number,
 	x2: number,
 	y2: number,
+	canDraw?: (x: number, y: number) => boolean,
 ): void {
 	for (let dy = -PATH_LINE_RADIUS; dy <= PATH_LINE_RADIUS; dy++) {
 		for (let dx = -PATH_LINE_RADIUS; dx <= PATH_LINE_RADIUS; dx++) {
 			if ((dx === 0 && dy === 0) || dx * dx + dy * dy > PATH_LINE_RADIUS * PATH_LINE_RADIUS) {
 				continue;
 			}
-			drawLineWithPixelColor(pixels, width, height, x1 + dx, y1 + dy, x2 + dx, y2 + dy, () => COLOR_PATH);
+			drawLineWithPixelColor(pixels, width, height, x1 + dx, y1 + dy, x2 + dx, y2 + dy, (x, y) =>
+				canDraw && !canDraw(x, y) ? undefined : COLOR_PATH,
+			);
 		}
 	}
 }
@@ -327,26 +591,126 @@ function projectRobotCoordinate(sample: MapSample, point: [number, number]): [nu
 }
 
 function parseMapAreas(value: unknown): MapArea[] {
+	return normalizeMapAreaMetadata(value).map(area => ({
+		vertices: parseVertices(area.source.vertexs),
+		kind: area.kind,
+	}));
+}
+
+function normalizeMapAreaMetadata(value: unknown): LiveMapAreaMetadata[] {
 	if (!Array.isArray(value)) {
 		return [];
 	}
 
-	const areas: MapArea[] = [];
-	for (const entry of value) {
-		const record = getRecord(entry);
-		if (!record || !Array.isArray(record.vertexs)) {
-			continue;
-		}
+	const candidates = value
+		.map(entry => {
+			const record = getRecord(entry);
+			if (!record) {
+				return undefined;
+			}
+			const vertices = parseVertices(record.vertexs);
+			if (vertices.length < 3) {
+				return undefined;
+			}
+			const key = mapAreaKey(record, vertices);
+			const explicitKind = parseAreaKind(record.__proscenicKind);
+			return {
+				key,
+				explicitKind,
+				source: record,
+			};
+		})
+		.filter(
+			(
+				entry,
+			): entry is {
+				key: string;
+				explicitKind: LiveMapAreaKind | undefined;
+				source: Record<string, unknown>;
+			} => entry !== undefined,
+		);
 
-		const vertices = record.vertexs
-			.map(vertex => parsePoint(vertex))
-			.filter((vertex): vertex is [number, number] => vertex !== undefined);
-		if (vertices.length >= 3) {
-			areas.push({ vertices });
-		}
+	const counts = new Map<string, number>();
+	for (const candidate of candidates) {
+		counts.set(candidate.key, (counts.get(candidate.key) ?? 0) + 1);
 	}
 
-	return areas;
+	const normalized = new Map<string, LiveMapAreaMetadata>();
+	for (const candidate of candidates) {
+		const kind =
+			candidate.explicitKind ??
+			(counts.get(candidate.key) !== undefined && (counts.get(candidate.key) ?? 0) > 1
+				? "forbidden"
+				: candidates.length === 1
+					? "forbidden"
+					: "room");
+		const existing = normalized.get(candidate.key);
+		const next = {
+			key: candidate.key,
+			kind,
+			source: withoutInternalAreaMetadata(candidate.source),
+		};
+		normalized.set(candidate.key, existing ? mergeAreaMetadataEntry(existing, next) : next);
+	}
+
+	return [...normalized.values()];
+}
+
+function mergeAreaMetadata(
+	previous: readonly LiveMapAreaMetadata[],
+	next: readonly LiveMapAreaMetadata[],
+): LiveMapAreaMetadata[] {
+	const merged = new Map<string, LiveMapAreaMetadata>();
+	for (const area of [...previous, ...next]) {
+		const existing = merged.get(area.key);
+		merged.set(area.key, existing ? mergeAreaMetadataEntry(existing, area) : area);
+	}
+	return [...merged.values()];
+}
+
+function mergeAreaMetadataEntry(left: LiveMapAreaMetadata, right: LiveMapAreaMetadata): LiveMapAreaMetadata {
+	return {
+		key: right.key,
+		kind: strongestAreaKind(left.kind, right.kind),
+		source: right.source,
+	};
+}
+
+function strongestAreaKind(left: LiveMapAreaKind, right: LiveMapAreaKind): LiveMapAreaKind {
+	if (left === "forbidden" || right === "forbidden") {
+		return "forbidden";
+	}
+	if (left === "room" || right === "room") {
+		return "room";
+	}
+	return "unknown";
+}
+
+function parseAreaKind(value: unknown): LiveMapAreaKind | undefined {
+	return value === "forbidden" || value === "room" || value === "unknown" ? value : undefined;
+}
+
+function withoutInternalAreaMetadata(record: Record<string, unknown>): Record<string, unknown> {
+	const clone = { ...record };
+	delete clone.__proscenicKind;
+	return clone;
+}
+
+function parseVertices(value: unknown): Array<[number, number]> {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value.map(vertex => parsePoint(vertex)).filter((vertex): vertex is [number, number] => vertex !== undefined);
+}
+
+function mapAreaKey(record: Record<string, unknown>, vertices: readonly [number, number][]): string {
+	const id = record.id;
+	if (typeof id === "number" || typeof id === "string") {
+		return `id:${String(id)}`;
+	}
+	const xs = vertices.map(([x]) => x);
+	const ys = vertices.map(([, y]) => y);
+	return `shape:${vertices.length}:${Math.min(...xs)}:${Math.min(...ys)}:${Math.max(...xs)}:${Math.max(...ys)}`;
 }
 
 function parsePoint(value: unknown): [number, number] | undefined {
@@ -488,6 +852,38 @@ function drawLine(
 	drawLineWithPixelColor(pixels, width, height, x1, y1, x2, y2, () => color);
 }
 
+function forEachLinePoint(
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	callback: (x: number, y: number) => void,
+): void {
+	const dx = Math.abs(x2 - x1);
+	const sx = x1 < x2 ? 1 : -1;
+	const dy = -Math.abs(y2 - y1);
+	const sy = y1 < y2 ? 1 : -1;
+	let error = dx + dy;
+	let x = x1;
+	let y = y1;
+
+	while (true) {
+		callback(x, y);
+		if (x === x2 && y === y2) {
+			break;
+		}
+		const error2 = 2 * error;
+		if (error2 >= dy) {
+			error += dy;
+			x += sx;
+		}
+		if (error2 <= dx) {
+			error += dx;
+			y += sy;
+		}
+	}
+}
+
 function drawLineWithPixelColor(
 	pixels: Buffer,
 	width: number,
@@ -496,7 +892,7 @@ function drawLineWithPixelColor(
 	y1: number,
 	x2: number,
 	y2: number,
-	pickColor: (x: number, y: number) => Color,
+	pickColor: (x: number, y: number) => Color | undefined,
 ): void {
 	const dx = Math.abs(x2 - x1);
 	const sx = x1 < x2 ? 1 : -1;
@@ -508,7 +904,10 @@ function drawLineWithPixelColor(
 
 	while (true) {
 		if (x >= 0 && x < width && y >= 0 && y < height) {
-			setPixel(pixels, width, height, x, y, pickColor(x, y));
+			const color = pickColor(x, y);
+			if (color) {
+				setPixel(pixels, width, height, x, y, color);
+			}
 		}
 		if (x === x2 && y === y2) {
 			break;

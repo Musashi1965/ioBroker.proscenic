@@ -87,6 +87,8 @@ describe("projectLiveMapImage", () => {
 				rawPoseCount: 4,
 				pathLineSegments: 2,
 				skippedPathSegments: 1,
+				renderedForbiddenAreaCount: 1,
+				renderedRoomAreaCount: 2,
 				orientation: "flip-y",
 				decompressedBytes: 4,
 			},
@@ -95,6 +97,9 @@ describe("projectLiveMapImage", () => {
 				lastPathId: 456,
 				pathResetCount: 1,
 				lastPoseUpdated: "2026-09-13T15:00:00.000Z",
+				currentAreaCount: 1,
+				cachedAreaCount: 3,
+				hasCachedStaticOverlays: true,
 			},
 		);
 
@@ -106,6 +111,11 @@ describe("projectLiveMapImage", () => {
 		expect(states.get("map.live.rawPoseCount")).to.deep.equal({ val: 4, ack: true });
 		expect(states.get("map.live.pathLineSegments")).to.deep.equal({ val: 2, ack: true });
 		expect(states.get("map.live.skippedPathSegments")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.currentAreaCount")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.cachedAreaCount")).to.deep.equal({ val: 3, ack: true });
+		expect(states.get("map.live.renderedForbiddenAreaCount")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.renderedRoomAreaCount")).to.deep.equal({ val: 2, ack: true });
+		expect(states.get("map.live.hasCachedStaticOverlays")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("map.live.renderReason")).to.deep.equal({ val: "pose", ack: true });
 		expect(states.get("map.live.lastPathId")).to.deep.equal({ val: 456, ack: true });
 		expect(states.get("map.live.pathResetCount")).to.deep.equal({ val: 1, ack: true });
@@ -133,12 +143,17 @@ describe("projectLiveMapImage", () => {
 				rawPoseCount: 0,
 				pathLineSegments: 0,
 				skippedPathSegments: 0,
+				renderedForbiddenAreaCount: 0,
+				renderedRoomAreaCount: 0,
 				orientation: "flip-y",
 				decompressedBytes: 4,
 			},
 			{
 				renderReason: "map",
 				pathResetCount: 2,
+				currentAreaCount: 0,
+				cachedAreaCount: 0,
+				hasCachedStaticOverlays: false,
 			},
 		);
 

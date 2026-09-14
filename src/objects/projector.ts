@@ -8,6 +8,9 @@ export interface LiveMapProjectionDiagnostics {
 	lastPathId?: number;
 	pathResetCount: number;
 	lastPoseUpdated?: string;
+	currentAreaCount: number;
+	cachedAreaCount: number;
+	hasCachedStaticOverlays: boolean;
 }
 
 export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Promise<void> {
@@ -70,6 +73,17 @@ export async function projectLiveMapImage(
 	await adapter.setStateAsync("map.live.rawPoseCount", { val: image.rawPoseCount, ack: true });
 	await adapter.setStateAsync("map.live.pathLineSegments", { val: image.pathLineSegments, ack: true });
 	await adapter.setStateAsync("map.live.skippedPathSegments", { val: image.skippedPathSegments, ack: true });
+	await adapter.setStateAsync("map.live.currentAreaCount", { val: diagnostics.currentAreaCount, ack: true });
+	await adapter.setStateAsync("map.live.cachedAreaCount", { val: diagnostics.cachedAreaCount, ack: true });
+	await adapter.setStateAsync("map.live.renderedForbiddenAreaCount", {
+		val: image.renderedForbiddenAreaCount,
+		ack: true,
+	});
+	await adapter.setStateAsync("map.live.renderedRoomAreaCount", { val: image.renderedRoomAreaCount, ack: true });
+	await adapter.setStateAsync("map.live.hasCachedStaticOverlays", {
+		val: diagnostics.hasCachedStaticOverlays,
+		ack: true,
+	});
 	await adapter.setStateAsync("map.live.renderReason", { val: diagnostics.renderReason, ack: true });
 	await setIfDefined(adapter, "map.live.lastPathId", diagnostics.lastPathId);
 	await adapter.setStateAsync("map.live.pathResetCount", { val: diagnostics.pathResetCount, ack: true });

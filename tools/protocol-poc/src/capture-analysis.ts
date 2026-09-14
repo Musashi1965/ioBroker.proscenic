@@ -109,6 +109,7 @@ export interface CaptureAnalysis {
     availableCount: number;
     metadataRanges: Record<string, NumberRange>;
     areaCounts: Record<string, number>;
+    areaSamples: MapAreaSample[];
     encodedByteRanges: NumberRange | undefined;
     sequences: Record<string, FieldSequence>;
     pathSegments: MapPathSegment[];
@@ -142,6 +143,25 @@ export interface MapPathSegment {
   areaCounts: Record<string, number>;
 }
 
+export interface MapAreaSample {
+  event: number;
+  mapId: SafeSequenceValue;
+  pathId: SafeSequenceValue;
+  areaCount: number;
+  areas: MapAreaSummary[];
+}
+
+export interface MapAreaSummary {
+  index: number;
+  keys: string[];
+  vertexCount: number;
+  projectedBounds: Bounds | undefined;
+  numberHints: Record<string, number>;
+  stringHints: Record<string, string>;
+  booleanHints: Record<string, boolean>;
+  guessedKind: "forbidden" | "room" | "unknown";
+}
+
 interface MapBlockState {
   firstPayload: Buffer | undefined;
   previousPayload: Buffer | undefined;
@@ -161,6 +181,13 @@ export interface NumberRange {
 export interface BooleanCounts {
   true: number;
   false: number;
+}
+
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
 
 export type SafeSequenceValue = string | number | boolean | null;
@@ -270,6 +297,7 @@ function createEmptyAnalysis(filePath: string): CaptureAnalysis {
       availableCount: 0,
       metadataRanges: {},
       areaCounts: {},
+      areaSamples: [],
       encodedByteRanges: undefined,
       sequences: {},
       pathSegments: [],
@@ -462,6 +490,9 @@ function analyzeMap20002(analysis: CaptureAnalysis, data: unknown, eventIndex: n
 
   if (Array.isArray(record.area)) {
     increment(analysis.map20002.areaCounts, String(record.area.length));
+    if (record.area.length > 0) {
+      analysis.map20002.areaSamples.push(summarizeMapAreas(record, eventIndex));
+    }
   }
 
   const sequenceValues = safeMapSequenceValues(record);
@@ -508,6 +539,157 @@ function updateMapPathSegment(
   if (Array.isArray(record.area)) {
     increment(segment.areaCounts, String(record.area.length));
   }
+}
+
+function summarizeMapAreas(record: Record<string, unknown>, eventIndex: number): MapAreaSample {
+  const width = getNumber(record, "width");
+  const height = getNumber(record, "height");
+  const resolution = getNumber(record, "resolution");
+  const xMin = getNumber(record, "x_min");
+  const yMin = getNumber(record, "y_min");
+  const canProject = width !== undefined && height !== undefined && resolution !== undefined && xMin !== undefined && yMin !== undefined;
+  const areas = Array.isArray(record.area) ? record.area : [];
+
+  return {
+    event: eventIndex,
+    mapId: safeExtraSequenceValue("mapId", record.mapId) ?? "unknown",
+    pathId: safeExtraSequenceValue("pathId", record.pathId) ?? "unknown",
+    areaCount: areas.length,
+    areas: areas.map((entry, index) => summarizeMapAreaEntry(entry, index, {
+      width,
+      height,
+      resolution,
+      xMin,
+      yMin,
+      canProject,
+    })),
+  };
+}
+
+function summarizeMapAreaEntry(
+  entry: unknown,
+  index: number,
+  projection: {
+    width: number | undefined;
+    height: number | undefined;
+    resolution: number | undefined;
+    xMin: number | undefined;
+    yMin: number | undefined;
+    canProject: boolean;
+  },
+): MapAreaSummary {
+  const record = getRecord(entry);
+  if (!record) {
+    return {
+      index,
+      keys: [],
+      vertexCount: 0,
+      projectedBounds: undefined,
+      numberHints: {},
+      stringHints: {},
+      booleanHints: {},
+      guessedKind: "unknown",
+    };
+  }
+
+  const vertices = parseAreaVertices(record.vertexs);
+  const projected = projection.canProject
+    ? vertices.map((point) => projectAreaPoint(point, projection)).filter((point): point is [number, number] => point !== undefined)
+    : [];
+  const keys = Object.keys(record).sort();
+  const numberHints: Record<string, number> = {};
+  const stringHints: Record<string, string> = {};
+  const booleanHints: Record<string, boolean> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "vertexs" || key === "points" || key === "coordinates") {
+      continue;
+    }
+    if (typeof value === "number") {
+      numberHints[key] = value;
+    } else if (typeof value === "boolean") {
+      booleanHints[key] = value;
+    } else if (typeof value === "string") {
+      stringHints[key] = safeAreaStringHint(key, value);
+    }
+  }
+
+  return {
+    index,
+    keys,
+    vertexCount: vertices.length,
+    projectedBounds: boundsFor(projected),
+    numberHints,
+    stringHints,
+    booleanHints,
+    guessedKind: guessAreaKind(keys, numberHints, stringHints, booleanHints),
+  };
+}
+
+function parseAreaVertices(value: unknown): Array<[number, number]> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((vertex) => parsePoint(vertex))
+    .filter((point): point is [number, number] => point !== undefined);
+}
+
+function projectAreaPoint(
+  point: [number, number],
+  projection: {
+    width: number | undefined;
+    height: number | undefined;
+    resolution: number | undefined;
+    xMin: number | undefined;
+    yMin: number | undefined;
+  },
+): [number, number] | undefined {
+  if (
+    projection.width === undefined ||
+    projection.height === undefined ||
+    projection.resolution === undefined ||
+    projection.xMin === undefined ||
+    projection.yMin === undefined
+  ) {
+    return undefined;
+  }
+
+  return [
+    Math.round((point[0] / 1000 - projection.xMin) / projection.resolution),
+    projection.height - 1 - Math.round((point[1] / 1000 - projection.yMin) / projection.resolution),
+  ];
+}
+
+function safeAreaStringHint(key: string, value: string): string {
+  if (looksPrivateString(value)) {
+    return "<redacted>";
+  }
+  if (/type|kind|mode/iu.test(key) && value.length <= 80) {
+    return value;
+  }
+  return `<string:${value.length}>`;
+}
+
+function guessAreaKind(
+  keys: string[],
+  numberHints: Record<string, number>,
+  stringHints: Record<string, string>,
+  booleanHints: Record<string, boolean>,
+): "forbidden" | "room" | "unknown" {
+  const text = [...keys, ...Object.keys(numberHints), ...Object.keys(stringHints), ...Object.values(stringHints)]
+    .join(" ")
+    .toLowerCase();
+  if (/room|zimmer|bedroom|office|bureau|areaid|autoarea/iu.test(text)) {
+    return "room";
+  }
+  if (/forbid|ban|block|restrict|virtual|wall|zone|avoid/iu.test(text)) {
+    return "forbidden";
+  }
+  if (booleanHints.enable === true || booleanHints.enabled === true) {
+    return "unknown";
+  }
+  return "unknown";
 }
 
 function analyzeMapBlockSignals(analysis: AnalysisWithPrivateState, encodedMap: string): void {
@@ -623,6 +805,31 @@ function getRecord(value: unknown): Record<string, unknown> | undefined {
 function getNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
   const value = record?.[key];
   return typeof value === "number" ? value : undefined;
+}
+
+function parsePoint(value: unknown): [number, number] | undefined {
+  if (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    typeof value[1] === "number"
+  ) {
+    return [value[0], value[1]];
+  }
+  return undefined;
+}
+
+function boundsFor(points: Array<[number, number]>): Bounds | undefined {
+  if (points.length === 0) {
+    return undefined;
+  }
+
+  return {
+    minX: Math.min(...points.map(([x]) => x)),
+    minY: Math.min(...points.map(([, y]) => y)),
+    maxX: Math.max(...points.map(([x]) => x)),
+    maxY: Math.max(...points.map(([, y]) => y)),
+  };
 }
 
 function safeExtraSequenceValue(key: string, value: unknown): SafeSequenceValue | undefined {

@@ -12,8 +12,10 @@ import {
 	type RobotCommand,
 } from "./domain/commands";
 import {
+	countLiveMapAreas20002,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
+	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
 	renderLiveMapImage20002,
 	type LiveMapCoordinateMetadata,
@@ -257,7 +259,7 @@ class Proscenic extends utils.Adapter {
 					this.latestMapId = map.mapId;
 				}
 				if (coordinateMetadata) {
-					this.latestMapCoordinateMetadata = mergeCoordinateMetadata(
+					this.latestMapCoordinateMetadata = mergeLiveMapCoordinateMetadataCache(
 						this.latestMapCoordinateMetadata,
 						coordinateMetadata,
 					);
@@ -286,6 +288,11 @@ class Proscenic extends utils.Adapter {
 					lastPathId: this.latestMapPathId,
 					pathResetCount: this.liveMapPathResetCount,
 					lastPoseUpdated: this.lastPoseUpdated,
+					currentAreaCount: countLiveMapAreas20002(this.latestMapData),
+					cachedAreaCount: this.latestMapCoordinateMetadata?.area?.length ?? 0,
+					hasCachedStaticOverlays:
+						(this.latestMapCoordinateMetadata?.area?.length ?? 0) > 0 ||
+						this.latestMapCoordinateMetadata?.chargeHandlePos !== undefined,
 				});
 			}
 		} catch (error) {
@@ -435,19 +442,6 @@ function selectDevice(devices: DeviceRecord[], deviceCode: string): DeviceRecord
 
 function isM7Pro(device: DeviceRecord): boolean {
 	return device.code === "M7_PRO" && device.model === "811_LDS";
-}
-
-function mergeCoordinateMetadata(
-	previous: LiveMapCoordinateMetadata | undefined,
-	next: LiveMapCoordinateMetadata,
-): LiveMapCoordinateMetadata {
-	const sameMap = previous?.mapId === undefined || next.mapId === undefined || previous.mapId === next.mapId;
-
-	return {
-		mapId: next.mapId ?? previous?.mapId,
-		area: next.area ?? (sameMap ? previous?.area : undefined),
-		chargeHandlePos: next.chargeHandlePos ?? (sameMap ? previous?.chargeHandlePos : undefined),
-	};
 }
 
 function selectGatewayEndpoint(gateway: GatewayData): GatewayEndpoint {

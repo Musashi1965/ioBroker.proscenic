@@ -59,6 +59,11 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.rawPoseCount");
 		expect(ids).to.include("map.live.pathLineSegments");
 		expect(ids).to.include("map.live.skippedPathSegments");
+		expect(ids).to.include("map.live.currentAreaCount");
+		expect(ids).to.include("map.live.cachedAreaCount");
+		expect(ids).to.include("map.live.renderedForbiddenAreaCount");
+		expect(ids).to.include("map.live.renderedRoomAreaCount");
+		expect(ids).to.include("map.live.hasCachedStaticOverlays");
 		expect(ids).to.include("map.live.renderReason");
 		expect(ids).to.include("map.live.lastPathId");
 		expect(ids).to.include("map.live.pathResetCount");

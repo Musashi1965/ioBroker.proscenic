@@ -3,6 +3,7 @@ import { inflateSync } from "node:zlib";
 import {
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
+	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
 	renderLiveMapImage20002,
 } from "./live-map";
@@ -38,6 +39,8 @@ describe("live map rendering", () => {
 		expect(image?.poseCount).to.equal(0);
 		expect(image?.pathLineSegments).to.equal(0);
 		expect(image?.skippedPathSegments).to.equal(0);
+		expect(image?.renderedForbiddenAreaCount).to.equal(1);
+		expect(image?.renderedRoomAreaCount).to.equal(0);
 		expect(image?.dataUrl.startsWith("data:image/png;base64,")).to.equal(true);
 		expect(decodePngDataUrl(image?.dataUrl)[25]).to.equal(2);
 	});
@@ -190,6 +193,122 @@ describe("live map rendering", () => {
 		expect(image?.skippedPathSegments).to.equal(0);
 	});
 
+	it("connects moderate gateway pose gaps so the visible path remains continuous", () => {
+		const width = 100;
+		const height = 100;
+		const grid = Buffer.alloc(width * height, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [500, 500] }, { pos: [3_500, 500] }],
+		);
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+
+		expect(image?.pathLineSegments).to.equal(1);
+		expect(image?.skippedPathSegments).to.equal(0);
+		expect(pixelAt(pixels, width, 40, 89)).to.deep.equal([126, 216, 96]);
+	});
+
+	it("routes moderate pose gaps around wall pixels instead of drawing through walls", () => {
+		const width = 20;
+		const height = 20;
+		const grid = Buffer.alloc(width * height, 127);
+		for (let renderedY = 0; renderedY <= 15; renderedY++) {
+			setRenderedGridPixel(grid, width, height, 10, renderedY, 0);
+		}
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [250, 450] }, { pos: [750, 450] }],
+		);
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+
+		expect(image?.pathLineSegments).to.equal(1);
+		expect(image?.skippedPathSegments).to.equal(0);
+		expect(pixelAt(pixels, width, 10, 5)).to.deep.equal([56, 130, 188]);
+		expect(pixelAt(pixels, width, 10, 16)).to.deep.equal([126, 216, 96]);
+	});
+
+	it("keeps deduplicated room zones when later frames only contain the no-go area", () => {
+		const grid = Buffer.alloc(100, 127);
+		const fullMap = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			mapId: 42,
+			width: 10,
+			height: 10,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				area(1003, [
+					[50, 50],
+					[150, 50],
+					[150, 150],
+					[50, 150],
+				]),
+				area(1001, [
+					[250, 50],
+					[350, 50],
+					[350, 150],
+					[250, 150],
+				]),
+				area(1002, [
+					[250, 250],
+					[350, 250],
+					[350, 350],
+					[250, 350],
+				]),
+				area(1003, [
+					[50, 50],
+					[150, 50],
+					[150, 150],
+					[50, 150],
+				]),
+			],
+		};
+		const laterMapWithOnlyNoGo = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			mapId: 42,
+			width: 10,
+			height: 10,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				area(1003, [
+					[50, 50],
+					[150, 50],
+					[150, 150],
+					[50, 150],
+				]),
+			],
+		};
+
+		const fullMetadata = extractLiveMapCoordinateMetadata20002(fullMap);
+		const laterMetadata = extractLiveMapCoordinateMetadata20002(laterMapWithOnlyNoGo);
+		const cached = laterMetadata ? mergeLiveMapCoordinateMetadataCache(fullMetadata, laterMetadata) : fullMetadata;
+		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithOnlyNoGo, cached);
+		const image = renderLiveMapImage20002(merged);
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 10, 10);
+
+		expect(cached?.area?.map(entry => entry.key)).to.have.members(["id:1001", "id:1002", "id:1003"]);
+		expect(image?.renderedForbiddenAreaCount).to.equal(1);
+		expect(image?.renderedRoomAreaCount).to.equal(2);
+		expect(pixelAt(pixels, 10, 2, 2)).to.not.deep.equal(pixelAt(pixels, 10, 6, 2));
+	});
+
 	it("skips implausible path jumps without dropping later plausible segments", () => {
 		const width = 100;
 		const height = 100;
@@ -203,7 +322,7 @@ describe("live map rendering", () => {
 				x_min: 0,
 				y_min: 0,
 			},
-			[{ pos: [500, 500] }, { pos: [4_000, 4_000] }, { pos: [3_000, 4_000] }],
+			[{ pos: [500, 500] }, { pos: [4_900, 4_900] }, { pos: [4_500, 4_900] }],
 		);
 
 		expect(image?.rawPoseCount).to.equal(3);
@@ -229,6 +348,22 @@ function encodeLiteralOnlyLz4(payload: Buffer): Buffer {
 	}
 	chunks.push(payload);
 	return Buffer.concat(chunks);
+}
+
+function area(id: number, vertexs: Array<[number, number]>): Record<string, unknown> {
+	return { id, vertexs, forbidType: "all" };
+}
+
+function setRenderedGridPixel(
+	grid: Buffer,
+	width: number,
+	height: number,
+	x: number,
+	renderedY: number,
+	value: number,
+): void {
+	const sourceY = height - 1 - renderedY;
+	grid[sourceY * width + x] = value;
 }
 
 function decodePngDataUrl(dataUrl: string | undefined): Buffer {

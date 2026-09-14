@@ -47,7 +47,19 @@ describe("capture analysis", () => {
         decrypted: {
           infoType: 20002,
           data: {
-            area: [{ id: 1 }],
+            area: [
+              {
+                id: 1,
+                type: "room",
+                name: "private room name",
+                vertexs: [
+                  [0, 0],
+                  [100, 0],
+                  [100, 100],
+                  [0, 100],
+                ],
+              },
+            ],
             base64_len: 19,
             chargeHandlePos: [3, 4],
             height: 187,
@@ -59,6 +71,8 @@ describe("capture analysis", () => {
             resolution: 0.05,
             SN: "fixture-serial",
             width: 205,
+            x_min: 0,
+            y_min: 0,
           },
         },
       }),
@@ -135,6 +149,22 @@ describe("capture analysis", () => {
     assert.equal(analysis.map20002.blockSignals.samples, 2);
     assert.equal(analysis.map20002.blockSignals.adjacentChangedPayload, 1);
     assert.equal(analysis.map20002.blockSignals.interpretation, "snapshot-like");
+    assert.equal(analysis.map20002.areaSamples.length, 2);
+    assert.equal(analysis.map20002.areaSamples[0].areaCount, 1);
+    assert.deepEqual(analysis.map20002.areaSamples[0].areas[0].keys, ["id", "name", "type", "vertexs"]);
+    assert.equal(analysis.map20002.areaSamples[0].areas[0].vertexCount, 4);
+    assert.deepEqual(analysis.map20002.areaSamples[0].areas[0].projectedBounds, {
+      minX: 0,
+      minY: 184,
+      maxX: 2,
+      maxY: 186,
+    });
+    assert.deepEqual(analysis.map20002.areaSamples[0].areas[0].numberHints, { id: 1 });
+    assert.deepEqual(analysis.map20002.areaSamples[0].areas[0].stringHints, {
+      name: "<string:17>",
+      type: "room",
+    });
+    assert.equal(analysis.map20002.areaSamples[0].areas[0].guessedKind, "room");
     assert.equal(analysis.map20002.pathSegments.length, 2);
     assert.equal(analysis.map20002.pathSegments[0].events, 1);
     assert.equal(analysis.map20002.pathSegments[1].pathId, 1789117424);
@@ -160,6 +190,7 @@ describe("capture analysis", () => {
     assert.equal(serialized.includes("fixture-map-payload"), false);
     assert.equal(serialized.includes("fixture-map-payload-new"), false);
     assert.equal(serialized.includes("fixture warning"), false);
+    assert.equal(serialized.includes("private room name"), false);
     assert.equal(serialized.includes("safe fixture text"), false);
     assert.equal(serialized.includes("nested fixture text"), false);
     assert.equal(serialized.includes("[1,2]"), false);
