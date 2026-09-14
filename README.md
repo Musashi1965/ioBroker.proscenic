@@ -71,6 +71,11 @@ Security policy and contribution requirements are documented in
 
 ## Changelog
 
+### 0.1.3 (2026-09-14)
+
+- Fixed ioBroker object role metadata for command buttons and the water level
+  state.
+
 ### 0.1.2 (2026-09-14)
 
 - Updated public maintainer/contact metadata for ioBroker latest review.

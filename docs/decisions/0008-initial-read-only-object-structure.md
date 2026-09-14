@@ -63,7 +63,7 @@ Initial states:
 | `status.clean.totalTime` | number | `value` | `s` | `infoType` 20001 |
 | `status.battery.percent` | number | `value.battery` | `%` | `infoType` 20001 |
 | `status.battery.rawPercent` | number | `value.battery` | `%` | `infoType` 20001 |
-| `status.water.level` | number | `level` |  | `infoType` 20001 |
+| `status.water.level` | number | `value` |  | `infoType` 20001 |
 | `status.mop.mode` | number | `state` |  | `infoType` 20001 |
 | `status.fan.mode` | string | `state` |  | `infoType` 20001 |
 | `status.error.rawCount` | number | `value` |  | derived from `errorState` |
@@ -111,6 +111,10 @@ Some value semantics remain candidate-level before public release. In
 particular, `cleanArea`, `allArea`, `allTime`, `elec`, `elecReal`, `water`,
 `mop`, `workNoisy`, and station-related behavior still need comparison against
 the Proscenic app and additional real-device observations.
+
+`status.water.level` intentionally uses the read-only compatible role `value`
+until a writable water-level command path and acknowledgement semantics are
+validated. ioBroker's `level` role is reserved for writable level states.
 
 ## Validation
 

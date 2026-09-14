@@ -39,6 +39,11 @@ normalized back to `false` with `ack=true` without sending a command. After
 every accepted command trigger, the adapter also resets the button to `false`
 with `ack=true`.
 
+Each command button state is intentionally write-only from the public object
+metadata perspective: `role: "button"`, `common.read: false`, and
+`common.write: true`. The reset write with `ack=true` is an adapter-side
+normalization step and does not make the button a readable status source.
+
 Expose command result metadata as read-only states:
 
 - `commands.lastCommand`

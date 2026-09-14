@@ -6,8 +6,8 @@ describe("initial object definitions", () => {
 		for (const definition of STATE_DEFINITIONS) {
 			if (!definition.id.startsWith("commands.") || definition.id.startsWith("commands.last")) {
 				expect(definition.object.common.write, definition.id).to.equal(false);
+				expect(definition.object.common.read, definition.id).to.equal(true);
 			}
-			expect(definition.object.common.read, definition.id).to.equal(true);
 		}
 	});
 
@@ -58,6 +58,22 @@ describe("initial object definitions", () => {
 			"commands.deepCleaning",
 			"commands.collectDust",
 		]);
+		for (const definition of STATE_DEFINITIONS) {
+			if (writableIds.includes(definition.id)) {
+				expect(definition.object.common.role, definition.id).to.equal("button");
+				expect(definition.object.common.read, definition.id).to.equal(false);
+				expect(definition.object.common.write, definition.id).to.equal(true);
+			}
+		}
+	});
+
+	it("keeps the observed water level read-only until write semantics are validated", () => {
+		const waterLevel = STATE_DEFINITIONS.find(definition => definition.id === "status.water.level");
+
+		expect(waterLevel).to.not.equal(undefined);
+		expect(waterLevel?.object.common.role).to.equal("value");
+		expect(waterLevel?.object.common.read).to.equal(true);
+		expect(waterLevel?.object.common.write).to.equal(false);
 	});
 
 	it("exposes safe map metadata and an explicit experimental live image without raw maps, positions, serials, or gateway endpoints", () => {

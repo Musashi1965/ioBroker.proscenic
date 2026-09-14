@@ -32,7 +32,7 @@ from proposed to accepted after value-level real-device verification.
 | `elecReal` | `status.battery.rawPercent` | number | `value.battery` | `%` | candidate | Second battery-like value; public value pending. |
 | `mode` | `status.mode` | string | `state` |  | candidate | Observed values include `charge`, `sweep`, `pause`, `backcharge`, and `dormant`; not reliable enough by itself as app-equivalent activity state. |
 | `subMode` | `status.subMode` | string | `state` |  | observed | Observed values: `total`, literal string `null`. |
-| `water` | `status.water.level` | number | `level` |  | candidate | Likely mopping water level; range pending. |
+| `water` | `status.water.level` | number | `value` |  | candidate | Likely mopping water level; range pending. Uses a read-only compatible role until write semantics are validated. |
 | `mop` | `status.mop.mode` | number | `state` |  | candidate | Mopping-related mode; semantics pending. |
 | `workNoisy` | `status.fan.mode` | string | `state` |  | candidate | Likely suction/fan mode; enum values pending. |
 | `errorState` | `status.error.rawCount` | number | `value` |  | candidate | Expose only derived count, not raw vendor error array. |
