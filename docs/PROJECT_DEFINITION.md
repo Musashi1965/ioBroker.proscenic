@@ -1,6 +1,6 @@
 # General Project Definition
 
-Status: first local-development adapter milestone, 2026-09-14
+Status: early public beta release, 2026-09-14
 
 ## Identity
 
@@ -36,7 +36,8 @@ handshake, framing, and AES decryption on one real M7 Pro. Later owner-local
 adapter validation added bounded reconnect/unload behavior, the first
 real-device-tested command buttons, safe status projection, consumable counters,
 maintenance/message history, and experimental live-map rendering for VIS
-debugging. The exact public release contract remains under development.
+debugging. The repository and npm package are public; the exact stable release
+contract remains under development.
 
 ## Initial goals
 

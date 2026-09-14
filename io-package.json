@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.1.1",
+		"version": "0.1.2",
 		"news": {
+			"0.1.2": {
+				"en": "Updated public maintainer metadata for ioBroker latest review",
+				"de": "Öffentliche Maintainer-Metadaten für die ioBroker-Latest-Prüfung aktualisiert",
+				"ru": "Обновлены публичные метаданные сопровождающего для проверки ioBroker latest",
+				"pt": "Metadados públicos do mantenedor atualizados para a revisão ioBroker latest",
+				"nl": "Openbare maintainer-metadata bijgewerkt voor ioBroker latest-controle",
+				"fr": "Métadonnées publiques du mainteneur mises à jour pour la revue ioBroker latest",
+				"it": "Metadati pubblici del manutentore aggiornati per la revisione ioBroker latest",
+				"es": "Metadatos públicos del mantenedor actualizados para la revisión de ioBroker latest",
+				"pl": "Zaktualizowano publiczne metadane opiekuna do przeglądu ioBroker latest",
+				"uk": "Оновлено публічні метадані супровідника для перевірки ioBroker latest",
+				"zh-cn": "更新公开维护者元数据以用于 ioBroker latest 审核"
+			},
 			"0.1.1": {
 				"en": "Documented npm first-publish bootstrap and enabled the trusted publishing path for future releases",
 				"de": "npm-Erstveröffentlichung dokumentiert und Trusted-Publishing-Pfad für zukünftige Releases aktiviert",
@@ -56,7 +69,7 @@
 			"uk": "Адаптер ioBroker для вакуумних роботів Proscenic, які використовують застарілий хмарний шлюз Proscenic",
 			"zh-cn": "使用传统 Proscenic 云网关的 Proscenic 真空机器人的 ioBroker 适配器"
 		},
-		"authors": ["C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>"],
+		"authors": ["C@ptain Ch@os <butan_akrobat1t@icloud.com>"],
 		"keywords": ["proscenic", "vacuum", "robot", "m7 pro"],
 		"licenseInformation": {
 			"type": "free",

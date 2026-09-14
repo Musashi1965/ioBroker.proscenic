@@ -27,11 +27,11 @@ Verified on one owner-local Proscenic M7 Pro so far:
   app-oriented map colors, no-go areas, room-zone candidates, charger marker,
   and an interpolated pose trail.
 
-The adapter is not a public release yet. The supported hardware claim is limited
-to the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
+The adapter is an early public beta. The supported hardware claim is limited to
+the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
 models, accounts, regions, firmware versions, Tuya-local control, room-cleaning
-commands, final map storage/retention policy, and production release readiness
-still require separate evidence.
+commands, and final map storage/retention policy still require separate
+evidence.
 
 Raw payloads, serial numbers, gateway endpoints, device addresses, credentials,
 packet captures, private maps, and home-layout data are not committed or exposed
@@ -62,6 +62,10 @@ Security policy and contribution requirements are documented in
 - [Architecture decisions](docs/decisions/README.md)
 
 ## Changelog
+
+### 0.1.2 (2026-09-14)
+
+- Updated public maintainer/contact metadata for ioBroker latest review.
 
 ### 0.1.1 (2026-09-14)
 
@@ -96,4 +100,4 @@ their respective owners.
 
 MIT License. See [LICENSE](LICENSE).
 
-Copyright (c) 2026 C@ptain Ch@os
+Copyright (c) 2026 C@ptain Ch@os <butan_akrobat1t@icloud.com>
