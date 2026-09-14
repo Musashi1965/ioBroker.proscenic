@@ -35,7 +35,7 @@ Initial states:
 
 | State ID | Type | Role | Unit | Source |
 | --- | --- | --- | --- | --- |
-| `device.code` | string | `info.name` |  | selected cloud device |
+| `device.code` | string | `info.name` |  | selected cloud device code with `PROSCENIC` display prefix |
 | `device.model` | string | `info.name` |  | selected cloud device |
 | `device.online` | boolean | `indicator.reachable` |  | selected cloud device |
 | `device.image` | string | `text` |  | bundled product image for verified M7 Pro |

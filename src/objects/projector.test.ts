@@ -55,7 +55,7 @@ describe("projectDevice", () => {
 			status: true,
 		});
 
-		expect(states.get("device.code")).to.deep.equal({ val: "M7_PRO", ack: true });
+		expect(states.get("device.code")).to.deep.equal({ val: "PROSCENIC M7_PRO", ack: true });
 		expect(states.get("device.model")).to.deep.equal({ val: "811_LDS", ack: true });
 		expect(states.get("device.online")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("device.image")?.ack).to.equal(true);

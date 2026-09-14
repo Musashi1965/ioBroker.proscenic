@@ -26,7 +26,7 @@ export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Pro
 }
 
 export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRecord): Promise<void> {
-	await setIfDefined(adapter, "device.code", device.code);
+	await setIfDefined(adapter, "device.code", displayDeviceCode(device.code));
 	await setIfDefined(adapter, "device.model", device.model);
 	await setIfDefined(adapter, "device.online", device.status);
 	await adapter.setStateAsync("device.image", { val: deviceImageDataUrl(device), ack: true });
@@ -214,6 +214,10 @@ function deviceImageDataUrl(device: DeviceRecord): string {
 
 	cachedM7ProImageDataUrl ??= readAssetDataUrl("proscenic-m7-pro.png");
 	return cachedM7ProImageDataUrl;
+}
+
+function displayDeviceCode(code: string | undefined): string | undefined {
+	return code ? `PROSCENIC ${code}` : undefined;
 }
 
 function readAssetDataUrl(fileName: string): string {
