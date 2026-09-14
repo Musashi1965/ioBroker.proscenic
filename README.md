@@ -1,5 +1,10 @@
 # ioBroker.proscenic
 
+<img width="147" height="139" alt="image" src="https://github.com/user-attachments/assets/c5d6a8c4-e6e4-42d6-be61-2c79e37f5a60" />
+
+
+
+
 Development-stage ioBroker adapter for supported Proscenic vacuum robots,
 initially the Proscenic M7 Pro (`M7_PRO`, model `811_LDS`) through the legacy
 Proscenic cloud/gateway path.
@@ -13,7 +18,10 @@ against the verified legacy European Proscenic cloud, enumerate one real M7 Pro,
 connect to the cloud gateway, project normalized runtime states, and expose the
 first real-device-validated control and maintenance objects.
 
-Verified on one owner-local Proscenic M7 Pro so far:
+Verified on Proscenic M7 Pro so far:
+
+<img width="1136" height="378" alt="image" src="https://github.com/user-attachments/assets/8a53c100-3ec4-41a0-8254-29cdf28c7000" />
+
 
 - cloud login, token acquisition, device discovery, gateway discovery, framed
   socket reception, decryption, bounded reconnect, and adapter unload cleanup;
@@ -23,7 +31,7 @@ Verified on one owner-local Proscenic M7 Pro so far:
   modes, deep cleaning, and dust collection;
 - consumable counters for filter, side brush, main brush, and sensors;
 - recent maintenance/message history, including dust-bag messages;
-- experimental local-development live-map rendering for VIS debugging, including
+- local-development live-map rendering for VIS, including
   app-oriented map colors, no-go areas, room-zone candidates, charger marker,
   and an interpolated pose trail.
 
