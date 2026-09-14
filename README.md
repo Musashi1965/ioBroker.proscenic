@@ -80,12 +80,14 @@ Security policy and contribution requirements are documented in
 
 - Initial adapter skeleton and project foundation.
 
-## License
-
-MIT License. See [LICENSE](LICENSE).
-
 ## Independence
 
 This is an independent interoperability project and is not affiliated with,
 endorsed by, or sponsored by Proscenic. Product and company names belong to
 their respective owners.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 C@ptain Ch@os

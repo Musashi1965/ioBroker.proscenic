@@ -5,5 +5,5 @@
 	"cloudEmail": "Cloud email address",
 	"cloudPassword": "Cloud password",
 	"preferredDeviceCode": "Preferred device code",
-	"preferredDeviceCodeHelp": "Optional filter for the first supported target. Keep M7_PRO for the verified Proscenic M7 Pro."
+	"preferredDeviceCodeHelp": "Необов’язковий фільтр для першого підтримуваного пристрою. Залиште M7_PRO для перевіреного Proscenic M7 Pro."
 }

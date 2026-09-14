@@ -159,7 +159,6 @@ export class ProscenicRestClient {
 			const rejectWithError = (error: unknown): void => {
 				reject(error instanceof Error ? error : new Error(String(error)));
 			};
-			const context: { timer?: NodeJS.Timeout } = {};
 			const req = httpsRequest(
 				url,
 				{
@@ -174,9 +173,6 @@ export class ProscenicRestClient {
 					const chunks: Buffer[] = [];
 					res.on("data", (chunk: Buffer) => chunks.push(chunk));
 					res.on("end", () => {
-						if (context.timer) {
-							clearTimeout(context.timer);
-						}
 						const text = Buffer.concat(chunks).toString("utf8");
 						try {
 							const parsed = JSON.parse(text) as ProscenicEnvelope<T>;
@@ -196,14 +192,11 @@ export class ProscenicRestClient {
 				},
 			);
 
-			context.timer = setTimeout(() => {
+			req.on("timeout", () => {
 				req.destroy(new Error(`Request timed out after ${this.options.timeoutMs} ms`));
-			}, this.options.timeoutMs);
+			});
 
 			req.on("error", error => {
-				if (context.timer) {
-					clearTimeout(context.timer);
-				}
 				rejectWithError(error);
 			});
 			req.write(body);
