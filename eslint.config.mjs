@@ -7,6 +7,7 @@ export default [
 	{
 		// specify files to exclude from linting here
 		ignores: [
+			'**/.poc-private/**',
 			'.dev-server/',
 			'.vscode/',
 			'tools/command-poc/',

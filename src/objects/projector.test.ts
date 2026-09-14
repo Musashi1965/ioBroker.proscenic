@@ -3,6 +3,7 @@ import {
 	projectDevice,
 	projectLiveMapImage,
 	projectMapMetadata,
+	projectMaintenanceMessage,
 	redactedErrorMessage,
 	setConnectionState,
 } from "./projector";
@@ -117,6 +118,42 @@ describe("projectMapMetadata", () => {
 	});
 });
 
+describe("projectMaintenanceMessage", () => {
+	it("publishes the latest 20003 maintenance event summary", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectMaintenanceMessage(
+			adapter,
+			{
+				code: 6131,
+				level: 1,
+				title: "Event",
+				message: "Collection started",
+				details: '{"infoType":20003,"code":6131}',
+			},
+			3,
+		);
+
+		expect(states.has("status.maintenance.hasWarning")).to.equal(false);
+		expect(states.get("status.maintenance.code")).to.deep.equal({ val: 6131, ack: true });
+		expect(states.get("status.maintenance.level")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("status.maintenance.message")).to.deep.equal({ val: "Collection started", ack: true });
+		expect(states.get("status.maintenance.details")).to.deep.equal({
+			val: '{"infoType":20003,"code":6131}',
+			ack: true,
+		});
+		expect(states.get("status.maintenance.eventCount")).to.deep.equal({ val: 3, ack: true });
+		expect(states.get("status.maintenance.updated")?.ack).to.equal(true);
+		expect(states.get("status.maintenance.updated")?.val).to.be.a("string");
+	});
+});
+
 describe("projectLiveMapImage", () => {
 	it("publishes the experimental rendered map image and render diagnostics", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
@@ -133,6 +170,15 @@ describe("projectLiveMapImage", () => {
 				dataUrl: "data:image/png;base64,fixture",
 				width: 2,
 				height: 2,
+				areas: [
+					{
+						key: "id:1001",
+						kind: "room",
+						id: 1001,
+						label: "Office",
+						bounds: { minX: 1, minY: 2, maxX: 3, maxY: 4 },
+					},
+				],
 				poseCount: 3,
 				rawPoseCount: 4,
 				pathLineSegments: 2,
@@ -154,6 +200,15 @@ describe("projectLiveMapImage", () => {
 		);
 
 		expect(states.get("map.live.image")).to.deep.equal({ val: "data:image/png;base64,fixture", ack: true });
+		expect(JSON.parse(states.get("map.live.areas")?.val as string)).to.deep.equal([
+			{
+				key: "id:1001",
+				kind: "room",
+				id: 1001,
+				label: "Office",
+				bounds: { minX: 1, minY: 2, maxX: 3, maxY: 4 },
+			},
+		]);
 		expect(states.get("map.live.updated")?.ack).to.equal(true);
 		expect(states.get("map.live.updated")?.val).to.be.a("string");
 		expect(states.get("map.live.orientation")).to.deep.equal({ val: "flip-y", ack: true });
@@ -189,6 +244,7 @@ describe("projectLiveMapImage", () => {
 				dataUrl: "data:image/png;base64,fixture",
 				width: 2,
 				height: 2,
+				areas: [],
 				poseCount: 0,
 				rawPoseCount: 0,
 				pathLineSegments: 0,

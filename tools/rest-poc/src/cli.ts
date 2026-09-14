@@ -18,6 +18,8 @@ async function main(): Promise<void> {
   const deviceRegion = parseRegion(process.env.PROSCENIC_DEVICE_REGION ?? process.env.PROSCENIC_REGION ?? "eu");
   const deviceBaseUrl = parseBaseUrl(process.env.PROSCENIC_DEVICE_BASE_URL);
   const timeoutMs = parsePositiveInt(process.env.PROSCENIC_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+  const probeTimeoutMs = parsePositiveInt(process.env.PROSCENIC_PROBE_TIMEOUT_MS, timeoutMs);
+  const deviceTimeoutMs = parsePositiveInt(process.env.PROSCENIC_DEVICE_TIMEOUT_MS, timeoutMs);
   const deviceIndex = parseNonNegativeInt(process.env.PROSCENIC_DEVICE_INDEX, 0);
   const group = process.env.PROSCENIC_REST_GROUP ?? "all";
   const startIndex = parseNonNegativeInt(process.env.PROSCENIC_REST_START_INDEX, 0);
@@ -28,12 +30,12 @@ async function main(): Promise<void> {
     console.log("Private REST capture: enabled, ignored local file created");
   }
 
-  const client = new ProscenicRestProbeClient({ email, password, region, timeoutMs, baseUrl });
+  const client = new ProscenicRestProbeClient({ email, password, region, timeoutMs: probeTimeoutMs, baseUrl });
   const deviceClient = new ProscenicRestProbeClient({
     email,
     password,
     region: deviceRegion,
-    timeoutMs,
+    timeoutMs: deviceTimeoutMs,
     baseUrl: deviceBaseUrl,
   });
   console.log("Login: starting");
@@ -79,6 +81,8 @@ async function main(): Promise<void> {
     kind: "run",
     createdAt: new Date().toISOString(),
     group,
+    region,
+    deviceRegion,
     device: {
       index: deviceIndex,
       code: device.code ?? null,
@@ -90,6 +94,8 @@ async function main(): Promise<void> {
     startIndex,
     maxCandidates: maxCandidates || null,
     logMode,
+    probeTimeoutMs,
+    deviceTimeoutMs,
   });
 
   let interestingResponses = 0;

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { MaintenanceMessage } from "../domain/maintenance-message";
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
 import type { RobotStatus } from "../domain/status";
@@ -50,6 +51,21 @@ export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStat
 	await adapter.setStateAsync("connection.lastStatusEvent", { val: new Date().toISOString(), ack: true });
 }
 
+export async function projectMaintenanceMessage(
+	adapter: ioBroker.Adapter,
+	message: MaintenanceMessage,
+	eventCount: number,
+): Promise<void> {
+	// 20003 also contains ordinary events. Level 1 is shared by informational
+	// and warning messages; receipt alone must not set or clear an active alarm.
+	await setIfDefined(adapter, "status.maintenance.code", message.code);
+	await setIfDefined(adapter, "status.maintenance.level", message.level);
+	await setIfDefined(adapter, "status.maintenance.message", message.message ?? message.title ?? "");
+	await adapter.setStateAsync("status.maintenance.details", { val: message.details, ack: true });
+	await adapter.setStateAsync("status.maintenance.eventCount", { val: eventCount, ack: true });
+	await adapter.setStateAsync("status.maintenance.updated", { val: new Date().toISOString(), ack: true });
+}
+
 export async function projectMapMetadata(adapter: ioBroker.Adapter, map: MapMetadata): Promise<void> {
 	await setIfDefined(adapter, "map.available", map.available);
 	await setIfDefined(adapter, "map.id", map.mapId);
@@ -70,6 +86,7 @@ export async function projectLiveMapImage(
 	diagnostics: LiveMapProjectionDiagnostics,
 ): Promise<void> {
 	await adapter.setStateAsync("map.live.image", { val: image.dataUrl, ack: true });
+	await adapter.setStateAsync("map.live.areas", { val: JSON.stringify(image.areas), ack: true });
 	await adapter.setStateAsync("map.live.updated", { val: new Date().toISOString(), ack: true });
 	await adapter.setStateAsync("map.live.orientation", { val: image.orientation, ack: true });
 	await adapter.setStateAsync("map.live.poseCount", { val: image.poseCount, ack: true });

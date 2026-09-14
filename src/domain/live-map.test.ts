@@ -41,6 +41,13 @@ describe("live map rendering", () => {
 		expect(image?.skippedPathSegments).to.equal(0);
 		expect(image?.renderedForbiddenAreaCount).to.equal(1);
 		expect(image?.renderedRoomAreaCount).to.equal(0);
+		expect(image?.areas).to.deep.equal([
+			{
+				key: "shape:4:0:0:100:50",
+				kind: "forbidden",
+				bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
+			},
+		]);
 		expect(image?.dataUrl.startsWith("data:image/png;base64,")).to.equal(true);
 		expect(decodePngDataUrl(image?.dataUrl)[25]).to.equal(2);
 	});
@@ -306,6 +313,11 @@ describe("live map rendering", () => {
 		expect(cached?.area?.map(entry => entry.key)).to.have.members(["id:1001", "id:1002", "id:1003"]);
 		expect(image?.renderedForbiddenAreaCount).to.equal(1);
 		expect(image?.renderedRoomAreaCount).to.equal(2);
+		expect(image?.areas.map(entry => ({ key: entry.key, kind: entry.kind, id: entry.id }))).to.have.deep.members([
+			{ key: "id:1001", kind: "room", id: 1001 },
+			{ key: "id:1002", kind: "room", id: 1002 },
+			{ key: "id:1003", kind: "forbidden", id: 1003 },
+		]);
 		expect(pixelAt(pixels, 10, 2, 2)).to.not.deep.equal(pixelAt(pixels, 10, 6, 2));
 	});
 

@@ -16,11 +16,11 @@ Examples:
   ./run-private-scan.sh messages 0 50 tw 2000 interesting
 
 Arguments:
-  group       device | maintenance | messages | map | rooms | all
+  group       observed | device | maintenance | messages | map | rooms | all
   start       zero-based candidate start index, default: 0
   limit       number of candidates, default: 1000
   region      probe region eu | tw, default: eu
-  timeout-ms  per-request timeout, default: 10000 for eu, 2000 for tw
+  timeout-ms  per-probe timeout, default: 10000 for eu, 2000 for tw
   log-mode    all | interesting | summary, default: interesting
 
 The script loads private credentials from:
@@ -38,7 +38,7 @@ if [[ -z "${group}" || "${group}" == "--help" || "${group}" == "-h" ]]; then
 fi
 
 case "${group}" in
-  device | maintenance | messages | map | rooms | all) ;;
+  observed | device | maintenance | messages | map | rooms | all) ;;
   *)
     echo "Unsupported group: ${group}" >&2
     usage >&2
@@ -103,7 +103,9 @@ export PROSCENIC_DEVICE_REGION="${PROSCENIC_DEVICE_REGION:-eu}"
 export PROSCENIC_REST_GROUP="${group}"
 export PROSCENIC_REST_START_INDEX="${start}"
 export PROSCENIC_REST_MAX_CANDIDATES="${limit}"
-export PROSCENIC_TIMEOUT_MS="${timeout}"
+export PROSCENIC_TIMEOUT_MS="${PROSCENIC_TIMEOUT_MS:-10000}"
+export PROSCENIC_DEVICE_TIMEOUT_MS="${PROSCENIC_DEVICE_TIMEOUT_MS:-10000}"
+export PROSCENIC_PROBE_TIMEOUT_MS="${timeout}"
 export PROSCENIC_REST_LOG_MODE="${log_mode}"
 
 npm start

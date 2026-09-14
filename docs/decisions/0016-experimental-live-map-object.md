@@ -18,6 +18,7 @@ when it is not a raw payload.
 Expose an explicit experimental live-map image under:
 
 - `map.live.image`;
+- `map.live.areas`;
 - `map.live.updated`;
 - `map.live.orientation`;
 - `map.live.poseCount`;
@@ -44,6 +45,15 @@ background, `127` as the white room area, and `0` as the darker blue map line.
 The adapter-owned pose trail uses a dedicated light-green overlay color instead
 of reusing the background, room, or wall colors. The pose trail is rendered
 wider than one pixel for VIS readability.
+
+`map.live.areas` contains a small JSON summary derived from the same coordinate
+metadata used for rendering. Each entry may include the stable area key, the
+heuristic kind (`forbidden`, `room`, or `unknown`), the upstream area ID when
+present, the app-provided label when present, and projected pixel bounds. This
+state is intentionally experimental and read-only. It gives VIS/debug tooling a
+way to inspect discovered room/no-go IDs for later targeted cleaning work
+without exposing the raw 20002 map payload, raw vertices, serial number, or
+gateway data.
 
 The adapter keeps the last valid coordinate metadata for static overlays and
 the charging station in memory per `mapId`. Observed M7 Pro captures show that
@@ -79,6 +89,8 @@ is found, the segment is skipped.
 The diagnostic states explain why the current image changed and how much of
 the in-memory pose trail was rendered:
 
+- `areas` is the current deduplicated experimental area summary used for the
+  live-map render.
 - `rawPoseCount` is the number of in-memory 20001 poses available for the
   current render.
 - `poseCount` is the number of those poses that could be projected into the

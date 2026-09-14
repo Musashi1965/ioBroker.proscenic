@@ -18,6 +18,10 @@ describe("initial object definitions", () => {
 		);
 
 		expect(ids).to.include("device.image");
+		expect(ids).to.include("status.maintenance.code");
+		expect(ids).to.include("status.maintenance.level");
+		expect(ids).to.include("status.maintenance.eventCount");
+		expect(ids).to.include("status.maintenance.updated");
 		expect(ids).to.include("commands.start");
 		expect(ids).to.include("commands.pause");
 		expect(ids).to.include("commands.continue");
@@ -54,6 +58,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.encodedBytes");
 		expect(ids).to.include("map.updated");
 		expect(ids).to.include("map.live.image");
+		expect(ids).to.include("map.live.areas");
 		expect(ids).to.include("map.live.updated");
 		expect(ids).to.include("map.live.orientation");
 		expect(ids).to.include("map.live.poseCount");

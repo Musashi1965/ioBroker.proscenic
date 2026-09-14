@@ -62,8 +62,12 @@ Initial states:
 | `status.features.cleanComponents` | boolean | `indicator` |  | `infoType` 20001 |
 | `status.maintenance.hasWarning` | boolean | `indicator` |  | derived from `errorState` |
 | `status.maintenance.warningCount` | number | `value` |  | derived from `errorState` |
-| `status.maintenance.message` | string | `text` |  | generic maintenance warning |
+| `status.maintenance.code` | number | `value` |  | latest `infoType` 20003 event code |
+| `status.maintenance.level` | number | `value` |  | latest `infoType` 20003 event level |
+| `status.maintenance.message` | string | `text` |  | generic maintenance warning or latest `infoType` 20003 message |
 | `status.maintenance.details` | string | `text` |  | redacted diagnostic summary |
+| `status.maintenance.eventCount` | number | `value` |  | accepted `infoType` 20003 event count since adapter start |
+| `status.maintenance.updated` | string | `date` |  | latest accepted `infoType` 20003 event |
 | `map.available` | boolean | `indicator` |  | derived from `infoType` 20002 |
 | `map.id` | number | `value` |  | `infoType` 20002 metadata |
 | `map.pathId` | number | `value` |  | `infoType` 20002 metadata |

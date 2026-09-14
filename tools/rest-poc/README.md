@@ -26,6 +26,22 @@ The tool must not:
 
 ## Usage
 
+The `observed` selection now contains two real-device-verified read requests:
+the consumable query `21015` and the paginated message history `20003`.
+Use it instead of repeating the speculative URL matrix:
+
+```sh
+./run-private-scan.sh observed 0 2
+```
+
+The consumable request returns an HTTP acknowledgement with `data=null`; its
+actual counters arrive separately as gateway `21015`. This REST-only scanner
+does not listen for that asynchronous response. The owner-local combined
+REST/gateway experiment has verified receipt twice. See
+[maintenance protocol findings](../../docs/MAINTENANCE_PROTOCOL_FINDINGS.md).
+No counter reset is included. Existing broad-scan indices remain unchanged
+because the observed requests are appended to the matrix.
+
 ```sh
 cd tools/rest-poc
 export PROSCENIC_EMAIL='your-real-proscenic-account@example.invalid'
@@ -93,12 +109,14 @@ PROSCENIC_REST_GROUP=maintenance PROSCENIC_REST_START_INDEX=0 PROSCENIC_REST_MAX
 For repeated private scans, prefer the wrapper. It loads
 `../../.poc-private/rest-poc/env.sh`, defaults to `LOG_MODE=interesting`, and
 keeps the terminal output focused on non-404 responses plus the completion
-summary:
+summary. The optional timeout argument controls the probe requests only; device
+enumeration still defaults to 10 seconds so `.tw` probes can use short per
+candidate timeouts while the known EU account/device lookup remains stable:
 
 ```sh
 ./run-private-scan.sh maintenance 0 1000
 ./run-private-scan.sh messages 1000 1000
-./run-private-scan.sh messages 0 50 tw
+./run-private-scan.sh messages 0 50 tw 2000
 ```
 
 When running several probes in the same shell, read and export

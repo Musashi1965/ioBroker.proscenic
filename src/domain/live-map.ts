@@ -9,6 +9,7 @@ export interface LiveMapImage {
 	dataUrl: string;
 	width: number;
 	height: number;
+	areas: LiveMapRenderedArea[];
 	poseCount: number;
 	rawPoseCount: number;
 	pathLineSegments: number;
@@ -33,6 +34,19 @@ export interface LiveMapCoordinateMetadata {
 	chargeHandlePos?: [number, number];
 }
 
+export interface LiveMapRenderedArea {
+	key: string;
+	kind: LiveMapAreaKind;
+	id?: number | string;
+	label?: string;
+	bounds?: {
+		minX: number;
+		minY: number;
+		maxX: number;
+		maxY: number;
+	};
+}
+
 interface MapSample {
 	encoded: string;
 	width: number;
@@ -45,8 +59,10 @@ interface MapSample {
 }
 
 interface MapArea {
+	key: string;
 	vertices: Array<[number, number]>;
 	kind: LiveMapAreaKind;
+	source: Record<string, unknown>;
 }
 
 type Color = readonly [number, number, number];
@@ -114,6 +130,7 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 		dataUrl,
 		width: sample.width,
 		height: sample.height,
+		areas: summarizeRenderedAreas(sample),
 		poseCount: runtime.projectedPoseCount,
 		rawPoseCount: poses.length,
 		pathLineSegments: runtime.pathLineSegments,
@@ -592,9 +609,50 @@ function projectRobotCoordinate(sample: MapSample, point: [number, number]): [nu
 
 function parseMapAreas(value: unknown): MapArea[] {
 	return normalizeMapAreaMetadata(value).map(area => ({
+		key: area.key,
 		vertices: parseVertices(area.source.vertexs),
 		kind: area.kind,
+		source: area.source,
 	}));
+}
+
+function summarizeRenderedAreas(sample: MapSample): LiveMapRenderedArea[] {
+	return sample.areas.map(area => {
+		const projected = area.vertices
+			.map(point => projectRobotCoordinate(sample, point))
+			.filter((point): point is [number, number] => point !== undefined);
+		const id =
+			typeof area.source.id === "number" || typeof area.source.id === "string" ? area.source.id : undefined;
+		const label = firstUsefulLabel(area.source.tag, area.source.name);
+
+		return {
+			key: area.key,
+			kind: area.kind,
+			...(id !== undefined ? { id } : {}),
+			...(label !== undefined ? { label } : {}),
+			...(projected.length > 0 ? { bounds: boundsFor(projected) } : {}),
+		};
+	});
+}
+
+function firstUsefulLabel(...values: unknown[]): string | undefined {
+	for (const value of values) {
+		if (typeof value === "string" && value.trim().length > 0) {
+			return value;
+		}
+	}
+	return undefined;
+}
+
+function boundsFor(points: readonly [number, number][]): LiveMapRenderedArea["bounds"] {
+	const xs = points.map(([x]) => x);
+	const ys = points.map(([, y]) => y);
+	return {
+		minX: Math.min(...xs),
+		minY: Math.min(...ys),
+		maxX: Math.max(...xs),
+		maxY: Math.max(...ys),
+	};
 }
 
 function normalizeMapAreaMetadata(value: unknown): LiveMapAreaMetadata[] {

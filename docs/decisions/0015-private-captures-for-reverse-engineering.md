@@ -31,6 +31,8 @@ artifacts:
 
 - store private captures only below ignored owner-local paths such as
   `.poc-private/` or the configured private test-host capture area;
+- exclude `.poc-private/` research artifacts from repository-wide lint input so
+  diagnostic output does not reproduce private scripts or third-party material;
 - never stage, commit, push, package, publish, release, paste into GitHub
   issues, or include private captures in public CI;
 - never use raw private payloads as test fixtures;

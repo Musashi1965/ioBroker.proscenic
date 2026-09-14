@@ -74,6 +74,22 @@ authentication, token issuance, one M7 Pro device record, gateway discovery,
 minimal read-only status contract. It is not sufficient to claim command, map,
 multi-device, reconnect, or release readiness.
 
+## Maintenance and message breakthrough (2026-09-14)
+
+Static owner-local inspection of ProscenicHome 1.5.5 yielded exact read contracts,
+which were independently verified against the real M7 Pro:
+
+- `POST /instructions/cmd21015/{sn}` requests used-second consumable counters;
+  values arrive asynchronously as gateway `21015`.
+- `POST /app/cleanRobot/20003/{sn}` returns paginated message history, including
+  the full-dust-bag warning missing from `20001.errorState`.
+- Old Android code translations conflict with live cloud messages for `6132`.
+  Neither the old dictionary nor `level=1` is a universal severity contract.
+
+See [maintenance findings](MAINTENANCE_PROTOCOL_FINDINGS.md) for request fields,
+units, provenance, limitations, and adapter integration requirements. These
+results supersede the earlier lack of consumable/message endpoint evidence.
+
 ## ioBroker baseline
 
 Use the official current `@iobroker/create-adapter` when creating the adapter

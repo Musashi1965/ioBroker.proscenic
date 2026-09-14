@@ -26,6 +26,23 @@ Expose only safe, derived maintenance and map information in the adapter:
   up to five entries from `errorState`. It keeps non-sensitive scalar fields and
   field names, but excludes keys that look like serials, accounts, addresses,
   maps, positions, paths, or endpoints.
+- `infoType` 20003 stores a bounded, redacted latest maintenance/warning event
+  summary in the existing `status.maintenance.*` channel:
+  - `status.maintenance.code`;
+  - `status.maintenance.level`;
+  - `status.maintenance.message`;
+  - `status.maintenance.details`;
+  - `status.maintenance.eventCount`;
+  - `status.maintenance.updated`.
+  Private captures observed stable fields `code`, `level`, `title`, and `msg`.
+  Receipt does not set or clear `hasWarning`: ordinary collection events and
+  a cloud bag warning share `level=1`. Active warning semantics require the
+  additional evidence in `../MAINTENANCE_PROTOCOL_FINDINGS.md`.
+  This is treated as an event/message source only. It must not be described as a
+  proven consumable remaining-life source until a real-device capture correlates
+  filter, side-brush, main-brush, sensor, or dust-bag values with this event or
+  another payload. The subsequently verified consumable source is `21015`;
+  see the maintenance findings for its separate read request.
 - `map.*` stores metadata from `infoType` 20002 only:
   - `map.available`;
   - `map.id`;
@@ -59,6 +76,12 @@ first local-development-only step.
 `status.maintenance.details` is diagnostic, not a localized user-facing
 translation. It must not claim that an unknown warning means "dust bag full"
 until the exact mapping is proven with private redacted evidence.
+
+For consumables, the current working hypothesis is that the robot owns the
+runtime counters and reports them to the cloud/app, while the app sends reset
+commands back to the robot. Endpoint and event work should therefore prioritize
+robot-originated gateway events and app-refresh captures over more blind REST
+path guessing.
 
 ## Alternatives Considered
 

@@ -21,6 +21,7 @@ import {
 	type LiveMapCoordinateMetadata,
 	type RobotPose,
 } from "./domain/live-map";
+import { normalizeMaintenanceMessage20003 } from "./domain/maintenance-message";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
@@ -29,6 +30,7 @@ import {
 	projectDevice,
 	projectLiveMapImage,
 	projectMapMetadata,
+	projectMaintenanceMessage,
 	projectStatus,
 	redactedErrorMessage,
 	setConnectionState,
@@ -61,6 +63,7 @@ class Proscenic extends utils.Adapter {
 	private latestMapCoordinateMetadata: LiveMapCoordinateMetadata | undefined;
 	private liveMapPathResetCount = 0;
 	private lastPoseUpdated: string | undefined;
+	private maintenanceEventCount = 0;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -268,6 +271,15 @@ class Proscenic extends utils.Adapter {
 			}
 			this.latestMapData = data;
 			await this.projectLatestLiveMapImage("map");
+			return;
+		}
+
+		if (infoType === 20003) {
+			const message = normalizeMaintenanceMessage20003(data);
+			if (message) {
+				this.maintenanceEventCount += 1;
+				await projectMaintenanceMessage(this, message, this.maintenanceEventCount);
+			}
 		}
 	}
 

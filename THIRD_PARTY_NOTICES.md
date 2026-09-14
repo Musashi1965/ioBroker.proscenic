@@ -48,8 +48,26 @@ No source or documentation is copied, adapted, translated, or vendored.
 - Use: legacy authentication, gateway, socket framing, encryption, and map
   behavior reference only
 
-The firmware image is not used or distributed. No repository source is copied,
-adapted, translated, or vendored.
+The firmware image was inspected locally on 2026-09-14 for protocol field names
+only. It and its extracted binaries remain in ignored research storage; they
+are not runtime dependencies or distributed artifacts. No repository source is
+copied, adapted, translated, or vendored.
+
+### ProscenicHome Android application
+
+- Publisher: Shenzhen Proscenic Technology Co.,Ltd
+- Package/version: `com.proscenic.robot`, `1.5.5` (version code `88`)
+- Acquisition: https://apkpure.net/proscenichome/com.proscenic.robot/download/1.5.5
+- APK SHA-256: `5272c5b10d3b9f78b2910421bd392afadd1cd40a3e3879e7ead4d6e73767ddd3`
+- License: proprietary; no source redistribution rights assumed
+- Use: owner-local static protocol research on 2026-09-14. Endpoint signatures,
+  counter units, and message-code meanings informed independent network probes.
+
+The APK, decoded resources, and decompiled output remain ignored local research
+artifacts. No application implementation or translation resource is copied,
+adapted, or vendored into the adapter. Backend observations take precedence when
+the legacy application and live server disagree. See
+`docs/MAINTENANCE_PROTOCOL_FINDINGS.md`.
 
 ### JuliusBlueTek/Proscenic-Home-Assistant
 

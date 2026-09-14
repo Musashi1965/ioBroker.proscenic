@@ -60,15 +60,31 @@ const PAGED_BODY_VARIANTS: readonly BodyVariant[] = [
   variant("empty", () => ({})),
 ];
 
+// Independently specified from app endpoint annotations, then verified against
+// the M7 Pro. 21015 requests counters; the response arrives over the gateway.
+export const OBSERVED_READ_ENDPOINTS: readonly EndpointCandidate[] = [
+  candidate("maintenance.observed.cmd21015", "maintenance", "POST",
+    ({ serial }) => `/instructions/cmd21015/${encodeURIComponent(serial)}`,
+    ({ username }) => ({ username }), true),
+  candidate("messages.observed.20003", "messages", "POST",
+    ({ serial }) => `/app/cleanRobot/20003/${encodeURIComponent(serial)}`,
+    ({ username }) => ({ username, language: "EN", model: "M7", page: "0", size: "10" }), true),
+];
+
 export const ENDPOINT_CANDIDATES: readonly EndpointCandidate[] = [
   ...fixedDeviceCandidates(),
   ...matrixCandidates("maintenance", maintenancePaths(), COMMON_BODY_VARIANTS),
   ...matrixCandidates("messages", messagePaths(), PAGED_BODY_VARIANTS),
   ...matrixCandidates("map", mapPaths(), COMMON_BODY_VARIANTS),
   ...matrixCandidates("rooms", roomPaths(), COMMON_BODY_VARIANTS),
+  // Append so previously recorded scan offsets remain valid.
+  ...OBSERVED_READ_ENDPOINTS,
 ];
 
 export function filterEndpointCandidates(group: string | undefined): EndpointCandidate[] {
+  if (group === "observed") {
+    return [...OBSERVED_READ_ENDPOINTS];
+  }
   if (!group || group === "all") {
     return [...ENDPOINT_CANDIDATES];
   }
