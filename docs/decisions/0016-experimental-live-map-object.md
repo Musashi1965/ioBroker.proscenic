@@ -40,6 +40,12 @@ The adapter-owned pose trail uses a dedicated light-green overlay color instead
 of reusing the background, room, or wall colors. The pose trail is rendered
 wider than one pixel for VIS readability.
 
+The adapter keeps the last valid coordinate metadata for no-go areas and the
+charging station in memory per `mapId`. If a later 20002 map frame for the same
+map omits that metadata, rendering carries the cached metadata forward so
+VIS does not lose static overlays during a cleaning run. A `mapId` change drops
+the cached coordinate metadata.
+
 The in-memory pose trail is scoped to the active map path. When a later 20002
 event reports a different `pathId`, the adapter clears its own collected pose
 trail before rendering the new path. Any old route still visible after that

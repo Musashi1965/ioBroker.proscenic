@@ -1,6 +1,11 @@
 import { expect } from "chai";
 import { inflateSync } from "node:zlib";
-import { extractRobotPose20001, renderLiveMapImage20002 } from "./live-map";
+import {
+	extractLiveMapCoordinateMetadata20002,
+	extractRobotPose20001,
+	mergeLiveMapCoordinateMetadata20002,
+	renderLiveMapImage20002,
+} from "./live-map";
 
 describe("live map rendering", () => {
 	it("renders a flip-y PNG data URL from a self-contained 20002 occupancy grid", () => {
@@ -74,6 +79,84 @@ describe("live map rendering", () => {
 		expect(center[0]).to.be.lessThan(255);
 		expect(center[1]).to.be.lessThan(255);
 		expect(center[2]).to.be.lessThan(255);
+	});
+
+	it("carries forward cached no-go metadata for later map frames with the same map ID", () => {
+		const grid = Buffer.alloc(25, 127);
+		const mapWithArea = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			mapId: 42,
+			width: 5,
+			height: 5,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				{
+					vertexs: [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					],
+				},
+			],
+		};
+		const laterMapWithoutArea = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			mapId: 42,
+			width: 5,
+			height: 5,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+		};
+
+		const metadata = extractLiveMapCoordinateMetadata20002(mapWithArea);
+		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithoutArea, metadata);
+		const image = renderLiveMapImage20002(merged);
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+
+		expect(pixelAt(pixels, 5, 2, 2)).to.not.deep.equal([255, 255, 255]);
+	});
+
+	it("does not carry cached no-go metadata across different map IDs", () => {
+		const grid = Buffer.alloc(25, 127);
+		const metadata = extractLiveMapCoordinateMetadata20002({
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			mapId: 42,
+			width: 5,
+			height: 5,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				{
+					vertexs: [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					],
+				},
+			],
+		});
+		const merged = mergeLiveMapCoordinateMetadata20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				mapId: 43,
+				width: 5,
+				height: 5,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			metadata,
+		);
+		const image = renderLiveMapImage20002(merged);
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+
+		expect(pixelAt(pixels, 5, 2, 2)).to.deep.equal([255, 255, 255]);
 	});
 
 	it("renders the room white, the unknown background blue, and path lines with their own green overlay color", () => {

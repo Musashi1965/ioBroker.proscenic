@@ -17,6 +17,12 @@ export interface LiveMapImage {
 	decompressedBytes: number;
 }
 
+export interface LiveMapCoordinateMetadata {
+	mapId?: number;
+	area?: unknown[];
+	chargeHandlePos?: [number, number];
+}
+
 interface MapSample {
 	encoded: string;
 	width: number;
@@ -99,6 +105,53 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 		orientation: "flip-y",
 		decompressedBytes: occupancy.length,
 	};
+}
+
+export function extractLiveMapCoordinateMetadata20002(data: unknown): LiveMapCoordinateMetadata | undefined {
+	const record = getRecord(data);
+	if (!record) {
+		return undefined;
+	}
+
+	const metadata: LiveMapCoordinateMetadata = {};
+	if (typeof record.mapId === "number") {
+		metadata.mapId = record.mapId;
+	}
+	if (Array.isArray(record.area) && record.area.length > 0) {
+		metadata.area = record.area;
+	}
+
+	const chargeHandlePos = parsePoint(record.chargeHandlePos);
+	if (chargeHandlePos) {
+		metadata.chargeHandlePos = chargeHandlePos;
+	}
+
+	return metadata.mapId !== undefined || metadata.area !== undefined || metadata.chargeHandlePos !== undefined
+		? metadata
+		: undefined;
+}
+
+export function mergeLiveMapCoordinateMetadata20002(
+	data: unknown,
+	metadata: LiveMapCoordinateMetadata | undefined,
+): unknown {
+	const record = getRecord(data);
+	if (!record || !metadata) {
+		return data;
+	}
+
+	if (metadata.mapId !== undefined && typeof record.mapId === "number" && metadata.mapId !== record.mapId) {
+		return data;
+	}
+
+	const merged = { ...record };
+	if (metadata.area && (!Array.isArray(record.area) || record.area.length === 0)) {
+		merged.area = metadata.area;
+	}
+	if (metadata.chargeHandlePos && !parsePoint(record.chargeHandlePos)) {
+		merged.chargeHandlePos = metadata.chargeHandlePos;
+	}
+	return merged;
 }
 
 function parseMapSample(data: unknown): MapSample | undefined {

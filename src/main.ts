@@ -11,7 +11,14 @@ import {
 	normalizeCommandButtonValue,
 	type RobotCommand,
 } from "./domain/commands";
-import { extractRobotPose20001, renderLiveMapImage20002, type RobotPose } from "./domain/live-map";
+import {
+	extractLiveMapCoordinateMetadata20002,
+	extractRobotPose20001,
+	mergeLiveMapCoordinateMetadata20002,
+	renderLiveMapImage20002,
+	type LiveMapCoordinateMetadata,
+	type RobotPose,
+} from "./domain/live-map";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
 import { normalizeStatus20001 } from "./domain/status";
@@ -48,6 +55,8 @@ class Proscenic extends utils.Adapter {
 	private recentRobotPoses: RobotPose[] = [];
 	private latestMapData: unknown;
 	private latestMapPathId: number | undefined;
+	private latestMapId: number | undefined;
+	private latestMapCoordinateMetadata: LiveMapCoordinateMetadata | undefined;
 	private liveMapPathResetCount = 0;
 	private lastPoseUpdated: string | undefined;
 
@@ -227,7 +236,11 @@ class Proscenic extends utils.Adapter {
 
 		if (infoType === 20002) {
 			const map = normalizeMap20002(data);
+			const coordinateMetadata = extractLiveMapCoordinateMetadata20002(data);
 			if (map) {
+				if (map.mapId !== undefined && this.latestMapId !== undefined && map.mapId !== this.latestMapId) {
+					this.latestMapCoordinateMetadata = undefined;
+				}
 				if (
 					map.pathId !== undefined &&
 					this.latestMapPathId !== undefined &&
@@ -239,6 +252,15 @@ class Proscenic extends utils.Adapter {
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
+				}
+				if (map.mapId !== undefined) {
+					this.latestMapId = map.mapId;
+				}
+				if (coordinateMetadata) {
+					this.latestMapCoordinateMetadata = mergeCoordinateMetadata(
+						this.latestMapCoordinateMetadata,
+						coordinateMetadata,
+					);
 				}
 				await projectMapMetadata(this, map);
 			}
@@ -253,7 +275,11 @@ class Proscenic extends utils.Adapter {
 		}
 
 		try {
-			const image = renderLiveMapImage20002(this.latestMapData, this.recentRobotPoses);
+			const renderData = mergeLiveMapCoordinateMetadata20002(
+				this.latestMapData,
+				this.latestMapCoordinateMetadata,
+			);
+			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses);
 			if (image) {
 				await projectLiveMapImage(this, image, {
 					renderReason,
@@ -409,6 +435,19 @@ function selectDevice(devices: DeviceRecord[], deviceCode: string): DeviceRecord
 
 function isM7Pro(device: DeviceRecord): boolean {
 	return device.code === "M7_PRO" && device.model === "811_LDS";
+}
+
+function mergeCoordinateMetadata(
+	previous: LiveMapCoordinateMetadata | undefined,
+	next: LiveMapCoordinateMetadata,
+): LiveMapCoordinateMetadata {
+	const sameMap = previous?.mapId === undefined || next.mapId === undefined || previous.mapId === next.mapId;
+
+	return {
+		mapId: next.mapId ?? previous?.mapId,
+		area: next.area ?? (sameMap ? previous?.area : undefined),
+		chargeHandlePos: next.chargeHandlePos ?? (sameMap ? previous?.chargeHandlePos : undefined),
+	};
 }
 
 function selectGatewayEndpoint(gateway: GatewayData): GatewayEndpoint {
