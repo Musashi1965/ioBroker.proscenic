@@ -58,6 +58,94 @@ externally visible step requires explicit user authorization.
 - Local `main`, `origin/main`, and GitHub default branch are synchronized and
   clean after publication.
 
+### npm first-publish and Trusted Publishing runbook
+
+Use this project-specific sequence so the npm bootstrap does not depend on chat
+memory.
+
+1. Verify the package does not already exist:
+
+   ```sh
+   npm view iobroker.proscenic version dist-tags --json
+   ```
+
+   For the first publication only, `E404` is the expected result.
+
+2. Prepare and push the release commit on `main`; wait until the full GitHub
+   Actions matrix is green. Then create the immutable tag:
+
+   ```sh
+   git tag --list 'vMAJOR.MINOR.PATCH'
+   git ls-remote --tags origin 'vMAJOR.MINOR.PATCH'
+   git tag -a vMAJOR.MINOR.PATCH -m 'Release vMAJOR.MINOR.PATCH'
+   git push origin vMAJOR.MINOR.PATCH
+   ```
+
+3. For normal releases after the first package publication, the tag-triggered
+   GitHub Actions `deploy` job is the only npm publication path. It uses npm
+   Trusted Publishing through GitHub Actions OIDC, so no long-lived npm token is
+   required.
+
+4. For the first package publication only, npm cannot create the GitHub trusted
+   publisher while the package endpoint does not exist. If
+   `npm trust github ...` fails with `404` on
+   `/-/package/iobroker.proscenic/trust`, publish the exact already-tagged
+   commit once from the maintainer machine:
+
+   ```sh
+   git status --short
+   git rev-parse HEAD
+   git rev-parse vMAJOR.MINOR.PATCH^{}
+   npm whoami
+   npm publish --access public
+   ```
+
+   `HEAD` and the tag commit must match before running `npm publish`. If npm
+   requests browser authentication, keep the publish command running, press
+   Enter to let npm open the current authentication URL, approve it in the
+   browser, and let the same command finish. Do not reuse URLs from old npm log
+   files; they expire and lead to npm `404` pages.
+
+5. Immediately after the first manual bootstrap publish, configure Trusted
+   Publishing for all future releases:
+
+   ```sh
+   npm trust github iobroker.proscenic \
+     --repo Musashi1965/ioBroker.proscenic \
+     --file test-and-release.yml \
+     --allow-publish \
+     -y
+   ```
+
+   The expected trusted publisher is:
+
+   - type: `github`
+   - repository: `Musashi1965/ioBroker.proscenic`
+   - workflow file: `test-and-release.yml`
+   - permissions: `publish` and staged publish
+
+   `npm trust list iobroker.proscenic` may be used as an additional
+   verification step, but it can require another browser/OTP proof-of-presence
+   even after the trust relationship has been created.
+
+6. If a tag-triggered deploy fails before npm publication, do not move or reuse
+   the tag. Fix the cause on `main`, bump to a new patch version, and release a
+   new immutable tag. If npm publication succeeds but GitHub Release creation is
+   skipped, create the GitHub Release manually for the existing tag and record
+   the reason in the release notes or follow-up documentation.
+
+7. Verify the released package and GitHub Release:
+
+   ```sh
+   npm view iobroker.proscenic version dist-tags repository dist --json
+   gh release view vMAJOR.MINOR.PATCH
+   npx @iobroker/repochecker Musashi1965/ioBroker.proscenic --success
+   ```
+
+References: npm Trusted Publishing documentation and `npm trust` CLI
+documentation describe the OIDC requirements, the GitHub workflow filename
+matching, the `id-token: write` permission, and the `--allow-publish` flag.
+
 ## ioBroker repositories
 
 - Submission to `latest` is separately authorized after npm/GitHub verification
@@ -70,6 +158,9 @@ externally visible step requires explicit user authorization.
 ## Prohibited shortcuts
 
 - No manual npm publication as an undocumented alternative to the workflow.
+  The only accepted manual npm publication exception is the documented
+  first-publish bootstrap above, and only when `HEAD` exactly matches the
+  already authorized immutable release tag.
 - No moving/reusing tags or replacing published versions.
 - No force-push to repair a release.
 - No deployment from a dirty tree or unrecorded source snapshot.

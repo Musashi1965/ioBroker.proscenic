@@ -32,6 +32,16 @@ Published npm versions and Git tags are immutable. Version selection, version
 file changes, tag creation, npm publication, GitHub release creation, and
 ioBroker repository submission require explicit user authorization.
 
+The normal npm publication path is npm Trusted Publishing from the reviewed
+GitHub Actions tag workflow. The first publication of a new npm package may
+require a one-time maintainer-machine bootstrap publish because the npm trusted
+publisher endpoint can be unavailable before the package exists. That exception
+is allowed only when the release tag already exists, `HEAD` resolves to the
+same commit as the tag, the full release gate has passed, and the exact process
+is documented in `docs/PUBLICATION_CHECKLIST.md`. After the bootstrap, configure
+npm Trusted Publishing for the package and return to the tag-triggered workflow
+for all later releases.
+
 An authorized release keeps `package.json`, the root lockfile entry,
 `io-package.json`, `common.news`, release notes/changelog, and
 `vMAJOR.MINOR.PATCH` tag consistent. Do not bump versions speculatively during
