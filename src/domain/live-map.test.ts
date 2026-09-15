@@ -8,6 +8,7 @@ import {
 	mergeLiveMapCoordinateMetadata20002,
 	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
+	shouldResetLiveMapPoseTrailAfterPathChange,
 } from "./live-map";
 
 describe("live map rendering", () => {
@@ -371,6 +372,12 @@ describe("live map rendering", () => {
 		expect(normalizeLiveMapBackgroundColor("ddeeff")).to.equal(undefined);
 		expect(normalizeLiveMapBackgroundColor("#ddeef")).to.equal(undefined);
 		expect(normalizeLiveMapBackgroundColor("#ddeeff00")).to.equal(undefined);
+	});
+
+	it("keeps the pose trail across room-to-room path changes during the same cleaning task", () => {
+		expect(shouldResetLiveMapPoseTrailAfterPathChange(false, 42)).to.equal(false);
+		expect(shouldResetLiveMapPoseTrailAfterPathChange(true, 0)).to.equal(false);
+		expect(shouldResetLiveMapPoseTrailAfterPathChange(true, 42)).to.equal(true);
 	});
 });
 

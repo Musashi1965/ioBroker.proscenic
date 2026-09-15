@@ -78,9 +78,12 @@ Different app accounts can expose different permissions and metadata; the main
 adapter account is authoritative for this development adapter, while screenshots
 from a shared app account are treated as visual references only.
 
-The in-memory pose trail is scoped to the active map path. When a later 20002
-event reports a different `pathId`, the adapter clears its own collected pose
-trail before rendering the new path. Any old route still visible after that
+The in-memory pose trail is scoped to the active cleaning task, not to every
+observed `pathId`. A `pathId` can change when the robot moves from one room or
+partial path to the next while the same cleaning task is still running. The
+adapter therefore keeps its collected 20001 pose trail across ordinary `pathId`
+changes and only resets it when a new cleaning task starts after a confirmed
+docked/charging state. Any old route still visible after such a task reset
 comes from the robot-provided 20002 occupancy/map snapshot or from the app, not
 from the adapter's 20001 pose overlay. The renderer skips duplicate or tiny
 pose movements and implausibly long jumps between two gateway samples. For
@@ -114,8 +117,8 @@ the in-memory pose trail was rendered:
 - `renderReason` is `map` for a new 20002 map snapshot and `pose` for a 20001
   pose-triggered refresh.
 - `lastPathId` is the latest observed map path identifier.
-- `pathResetCount` counts adapter-side pose trail resets caused by `pathId`
-  changes.
+- `pathResetCount` counts adapter-side pose trail resets caused by a new
+  cleaning task after a confirmed docked/charging state.
 - `lastPoseUpdated` records the latest accepted 20001 pose event timestamp.
 
 The adapter must not log or commit raw 20002 payloads, decompressed map bytes,

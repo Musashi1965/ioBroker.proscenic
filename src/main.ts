@@ -13,21 +13,22 @@ import {
 	type RobotCommand,
 } from "./domain/commands";
 import {
+	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	countLiveMapAreas20002,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
 	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
-	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
+	shouldResetLiveMapPoseTrailAfterPathChange,
 	type LiveMapCoordinateMetadata,
 	type RobotPose,
 } from "./domain/live-map";
 import { normalizeMaintenanceHistory20003, normalizeMaintenanceMessage20003 } from "./domain/maintenance-message";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
-import { normalizeStatus20001 } from "./domain/status";
+import { normalizeStatus20001, type RobotStatus } from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
@@ -78,6 +79,7 @@ class Proscenic extends utils.Adapter {
 	private latestMapId: number | undefined;
 	private latestMapCoordinateMetadata: LiveMapCoordinateMetadata | undefined;
 	private liveMapPathResetCount = 0;
+	private liveMapDockedSinceLastCleaning = false;
 	private lastPoseUpdated: string | undefined;
 	private maintenanceEventCount = 0;
 	private auxiliaryReadInProgress = false;
@@ -267,6 +269,12 @@ class Proscenic extends utils.Adapter {
 		}
 
 		if (infoType === 20001) {
+			const status = normalizeStatus20001(data);
+			if (status) {
+				this.updateLiveMapTaskState(status);
+				await projectStatus(this, status);
+			}
+
 			const pose = extractRobotPose20001(data);
 			if (pose) {
 				this.lastPoseUpdated = new Date().toISOString();
@@ -275,11 +283,6 @@ class Proscenic extends utils.Adapter {
 					this.recentRobotPoses = this.recentRobotPoses.slice(-MAX_LIVE_MAP_POSES);
 				}
 				await this.projectLatestLiveMapImage("pose");
-			}
-
-			const status = normalizeStatus20001(data);
-			if (status) {
-				await projectStatus(this, status);
 			}
 			return;
 		}
@@ -296,9 +299,7 @@ class Proscenic extends utils.Adapter {
 					this.latestMapPathId !== undefined &&
 					map.pathId !== this.latestMapPathId
 				) {
-					this.recentRobotPoses = [];
-					this.liveMapPathResetCount += 1;
-					this.lastPoseUpdated = undefined;
+					this.resetLiveMapPoseTrailAfterDock();
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
@@ -415,6 +416,31 @@ class Proscenic extends utils.Adapter {
 		this.clearTimeout(this.pendingConsumableRead.timer);
 		this.pendingConsumableRead.reject(error);
 		this.pendingConsumableRead = undefined;
+	}
+
+	private updateLiveMapTaskState(status: RobotStatus): void {
+		if (status.mode === "charge") {
+			this.liveMapDockedSinceLastCleaning = true;
+			return;
+		}
+		if (status.mode === "sweep") {
+			this.resetLiveMapPoseTrailAfterDock();
+			this.liveMapDockedSinceLastCleaning = false;
+		}
+	}
+
+	private resetLiveMapPoseTrailAfterDock(): void {
+		if (
+			!shouldResetLiveMapPoseTrailAfterPathChange(
+				this.liveMapDockedSinceLastCleaning,
+				this.recentRobotPoses.length,
+			)
+		) {
+			return;
+		}
+		this.recentRobotPoses = [];
+		this.liveMapPathResetCount += 1;
+		this.lastPoseUpdated = undefined;
 	}
 
 	private async projectLatestLiveMapImage(renderReason: "map" | "pose"): Promise<void> {

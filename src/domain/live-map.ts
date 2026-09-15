@@ -117,6 +117,13 @@ export function normalizeLiveMapBackgroundColor(value: unknown): string | undefi
 	return /^#[0-9a-f]{6}$/iu.test(trimmed) ? trimmed.toLowerCase() : undefined;
 }
 
+export function shouldResetLiveMapPoseTrailAfterPathChange(
+	dockedSinceLastCleaning: boolean,
+	poseCount: number,
+): boolean {
+	return dockedSinceLastCleaning && poseCount > 0;
+}
+
 export function renderLiveMapImage20002(
 	data: unknown,
 	poses: readonly RobotPose[] = [],
