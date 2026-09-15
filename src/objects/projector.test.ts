@@ -62,6 +62,7 @@ describe("projectDevice", () => {
 		expect(states.get("device.online")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("device.onlineUpdated")?.ack).to.equal(true);
 		expect(states.get("device.onlineUpdated")?.val).to.be.a("string");
+		expect(states.get("device.onlineFresh")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("device.onlineStale")).to.deep.equal({ val: false, ack: true });
 		expect(states.get("device.image")?.ack).to.equal(true);
 		expect(states.get("device.image")?.val)
@@ -100,6 +101,7 @@ describe("device freshness diagnostics", () => {
 
 		await setDeviceOnlineStale(adapter, true);
 
+		expect(states.get("device.onlineFresh")).to.deep.equal({ val: false, ack: true });
 		expect(states.get("device.onlineStale")).to.deep.equal({ val: true, ack: true });
 	});
 

@@ -1,10 +1,12 @@
 import { expect } from "chai";
 import { inflateSync } from "node:zlib";
 import {
+	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
 	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
+	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
 } from "./live-map";
 
@@ -341,6 +343,34 @@ describe("live map rendering", () => {
 		expect(image?.poseCount).to.equal(3);
 		expect(image?.pathLineSegments).to.equal(1);
 		expect(image?.skippedPathSegments).to.equal(1);
+	});
+
+	it("renders the unknown map background with a caller-provided color", () => {
+		const width = 2;
+		const height = 1;
+		const grid = Buffer.from([255, 127]);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+			},
+			[],
+			{ backgroundColor: "#ddeeff" },
+		);
+
+		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+
+		expect(pixelAt(pixels, width, 0, 0)).to.deep.equal([221, 238, 255]);
+		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([255, 255, 255]);
+	});
+
+	it("normalizes writable live-map background colors", () => {
+		expect(DEFAULT_LIVE_MAP_BACKGROUND_COLOR).to.equal("#b8ccd8");
+		expect(normalizeLiveMapBackgroundColor(" #DDEEFF ")).to.equal("#ddeeff");
+		expect(normalizeLiveMapBackgroundColor("ddeeff")).to.equal(undefined);
+		expect(normalizeLiveMapBackgroundColor("#ddeef")).to.equal(undefined);
+		expect(normalizeLiveMapBackgroundColor("#ddeeff00")).to.equal(undefined);
 	});
 });
 

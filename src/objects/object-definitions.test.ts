@@ -26,8 +26,13 @@ describe("initial object definitions", () => {
 		expect(extended).to.deep.equal(expectedIds);
 	});
 
-	it("keeps non-command states read-only", () => {
+	it("keeps non-command states read-only except documented VIS tuning states", () => {
 		for (const definition of STATE_DEFINITIONS) {
+			if (definition.id === "map.live.backgroundColor") {
+				expect(definition.object.common.write, definition.id).to.equal(true);
+				expect(definition.object.common.read, definition.id).to.equal(true);
+				continue;
+			}
 			if (!definition.id.startsWith("commands.") || definition.id.startsWith("commands.last")) {
 				expect(definition.object.common.write, definition.id).to.equal(false);
 				expect(definition.object.common.read, definition.id).to.equal(true);
@@ -81,13 +86,21 @@ describe("initial object definitions", () => {
 			"commands.fan.strong",
 			"commands.deepCleaning",
 			"commands.collectDust",
+			"map.live.backgroundColor",
 		]);
 		expect(ids).to.include("device.onlineUpdated");
+		expect(ids).to.include("device.onlineFresh");
 		expect(ids).to.include("device.onlineStale");
 		expect(ids).to.include("connection.lastDeviceListResult");
 		expect(ids).to.include("connection.lastDeviceListCount");
 		expect(ids).to.include("connection.lastDeviceListUpdate");
 		for (const definition of STATE_DEFINITIONS) {
+			if (definition.id === "map.live.backgroundColor") {
+				expect(definition.object.common.role, definition.id).to.equal("level.color.rgb");
+				expect(definition.object.common.read, definition.id).to.equal(true);
+				expect(definition.object.common.write, definition.id).to.equal(true);
+				continue;
+			}
 			if (writableIds.includes(definition.id)) {
 				expect(definition.object.common.role, definition.id).to.equal("button");
 				expect(definition.object.common.read, definition.id).to.equal(false);
@@ -131,6 +144,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.renderedForbiddenAreaCount");
 		expect(ids).to.include("map.live.renderedRoomAreaCount");
 		expect(ids).to.include("map.live.hasCachedStaticOverlays");
+		expect(ids).to.include("map.live.backgroundColor");
 		expect(ids).to.include("map.live.renderReason");
 		expect(ids).to.include("map.live.lastPathId");
 		expect(ids).to.include("map.live.pathResetCount");

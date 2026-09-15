@@ -1,5 +1,6 @@
 import type { CommandDefinition } from "../domain/commands";
 import { COMMAND_DEFINITIONS } from "../domain/commands";
+import { DEFAULT_LIVE_MAP_BACKGROUND_COLOR } from "../domain/live-map";
 
 export interface StateDefinition {
 	id: string;
@@ -41,7 +42,8 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("device.model", "Device model", "string", "info.name"),
 	state("device.online", "Device online", "boolean", "indicator.reachable"),
 	state("device.onlineUpdated", "Last device online update", "string", "date"),
-	state("device.onlineStale", "Device online value is stale", "boolean", "indicator"),
+	state("device.onlineFresh", "Device online status is fresh", "boolean", "indicator"),
+	state("device.onlineStale", "Device online status is stale", "boolean", "indicator"),
 	state("device.image", "Device image", "string", "text"),
 	state("connection.cloud", "Cloud connected", "boolean", "indicator.connected"),
 	state("connection.gateway", "Gateway connected", "boolean", "indicator.connected"),
@@ -122,6 +124,9 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("map.live.renderedForbiddenAreaCount", "Rendered forbidden area count", "number", "value", { min: 0 }),
 	state("map.live.renderedRoomAreaCount", "Rendered room area count", "number", "value", { min: 0 }),
 	state("map.live.hasCachedStaticOverlays", "Has cached static live map overlays", "boolean", "indicator"),
+	writableState("map.live.backgroundColor", "Live map background color", "string", "level.color.rgb", {
+		def: DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
+	}),
 	state("map.live.renderReason", "Last live map render reason", "string", "state"),
 	state("map.live.lastPathId", "Last live map path ID", "number", "value", { min: 0 }),
 	state("map.live.pathResetCount", "Live map path reset count", "number", "value", { min: 0 }),
@@ -178,6 +183,31 @@ function state(
 				role,
 				read: true,
 				write: false,
+				...options,
+			},
+			native: {},
+		},
+	};
+}
+
+function writableState(
+	id: string,
+	name: string,
+	type: ioBroker.CommonType,
+	role: string,
+	options: Partial<ioBroker.StateCommon> = {},
+): StateDefinition {
+	return {
+		id,
+		object: {
+			_id: id,
+			type: "state",
+			common: {
+				name,
+				type,
+				role,
+				read: true,
+				write: true,
 				...options,
 			},
 			native: {},

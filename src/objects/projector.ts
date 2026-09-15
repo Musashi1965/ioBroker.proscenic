@@ -35,6 +35,7 @@ export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRec
 }
 
 export async function setDeviceOnlineStale(adapter: ioBroker.Adapter, stale: boolean): Promise<void> {
+	await adapter.setStateAsync("device.onlineFresh", { val: !stale, ack: true });
 	await adapter.setStateAsync("device.onlineStale", { val: stale, ack: true });
 }
 

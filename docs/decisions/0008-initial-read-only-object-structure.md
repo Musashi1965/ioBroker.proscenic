@@ -39,6 +39,7 @@ Initial states:
 | `device.model` | string | `info.name` |  | selected cloud device |
 | `device.online` | boolean | `indicator.reachable` |  | selected cloud device |
 | `device.onlineUpdated` | string | `date` |  | latest successful device-list projection |
+| `device.onlineFresh` | boolean | `indicator` |  | true when `device.online` was freshly confirmed |
 | `device.onlineStale` | boolean | `indicator` |  | true when `device.online` is only a retained last-known value |
 | `device.image` | string | `text` |  | bundled product image for verified M7 Pro |
 | `connection.cloud` | boolean | `indicator.connected` |  | login/device discovery |
@@ -102,13 +103,16 @@ Initial states:
 | `map.compressedBytes` | number | `value` | `B` | `infoType` 20002 metadata |
 | `map.encodedBytes` | number | `value` | `B` | derived from encoded map length |
 | `map.updated` | string | `date` |  | last safe map metadata update |
+| `map.live.backgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for unknown map background |
 
-All states are read-only and are written by the adapter with `ack=true`.
-Raw map objects, positions, raw events, and full upstream JSON remain out of
-scope. Writable command buttons are now defined separately by ADR 0013.
+All states are read-only and are written by the adapter with `ack=true`, except
+the writable command buttons defined by ADR 0013 and the documented local
+VIS-tuning state `map.live.backgroundColor`. Raw map objects, positions, raw
+events, and full upstream JSON remain out of scope.
 
 `device.online` is a last-known cloud device-list value. Its freshness is
-explicitly indicated by `device.onlineUpdated` and `device.onlineStale`.
+explicitly indicated by `device.onlineUpdated`, `device.onlineFresh`, and
+`device.onlineStale`.
 `info.connection` and `connection.cloud` remain adapter/backend health
 indicators and must not be interpreted as the robot's app-visible availability.
 

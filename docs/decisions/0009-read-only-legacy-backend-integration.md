@@ -50,8 +50,9 @@ backend health indicator and does not mirror transient gateway socket closure.
 
 The selected device's `device.online` value is retained as a last-known value.
 Whenever startup or reconnect can no longer confirm the selected device through
-the cloud device list, the adapter marks `device.onlineStale=true` and updates
-`connection.lastDeviceList*` diagnostics.
+the cloud device list, the adapter marks `device.onlineStale=true` and
+`device.onlineFresh=false`, then updates `connection.lastDeviceList*`
+diagnostics.
 
 ## Validation
 

@@ -20,6 +20,10 @@ export interface LiveMapImage {
 	decompressedBytes: number;
 }
 
+export interface LiveMapRenderOptions {
+	backgroundColor?: string;
+}
+
 export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
 
 export interface LiveMapAreaMetadata {
@@ -71,6 +75,7 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 const CRC_TABLE = createCrcTable();
 const MAX_LIVE_MAP_PIXELS = 512 * 512;
 const MAX_LIVE_MAP_DATA_URL_BYTES = 256 * 1024;
+export const DEFAULT_LIVE_MAP_BACKGROUND_COLOR = "#b8ccd8";
 const COLOR_UNKNOWN: Color = [184, 204, 216];
 const COLOR_ROOM: Color = [255, 255, 255];
 const COLOR_WALL: Color = [56, 130, 188];
@@ -104,7 +109,19 @@ export function extractRobotPose20001(data: unknown): RobotPose | undefined {
 	};
 }
 
-export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose[] = []): LiveMapImage | undefined {
+export function normalizeLiveMapBackgroundColor(value: unknown): string | undefined {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+	const trimmed = value.trim();
+	return /^#[0-9a-f]{6}$/iu.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+export function renderLiveMapImage20002(
+	data: unknown,
+	poses: readonly RobotPose[] = [],
+	options: LiveMapRenderOptions = {},
+): LiveMapImage | undefined {
 	const sample = parseMapSample(data);
 	if (!sample) {
 		return undefined;
@@ -116,7 +133,8 @@ export function renderLiveMapImage20002(data: unknown, poses: readonly RobotPose
 		return undefined;
 	}
 
-	const pixels = renderOccupancy(sample.width, sample.height, occupancy);
+	const unknownColor = colorFromHex(options.backgroundColor) ?? COLOR_UNKNOWN;
+	const pixels = renderOccupancy(sample.width, sample.height, occupancy, unknownColor);
 	const coordinateMetadata = drawCoordinateMetadata(sample, pixels);
 	const runtime = drawRobotRuntime(sample, occupancy, pixels, poses);
 
@@ -243,7 +261,7 @@ function parseMapSample(data: unknown): MapSample | undefined {
 	};
 }
 
-function renderOccupancy(width: number, height: number, occupancy: Buffer): Buffer {
+function renderOccupancy(width: number, height: number, occupancy: Buffer, unknownColor: Color): Buffer {
 	const pixels = Buffer.alloc(width * height * 3);
 	for (let index = 0; index < occupancy.length; index++) {
 		const sourceX = index % width;
@@ -255,12 +273,24 @@ function renderOccupancy(width: number, height: number, occupancy: Buffer): Buff
 		} else if (value === 127) {
 			setPixel(pixels, width, height, sourceX, targetY, COLOR_ROOM);
 		} else if (value === 255) {
-			setPixel(pixels, width, height, sourceX, targetY, COLOR_UNKNOWN);
+			setPixel(pixels, width, height, sourceX, targetY, unknownColor);
 		} else {
 			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : COLOR_ROOM);
 		}
 	}
 	return pixels;
+}
+
+function colorFromHex(value: string | undefined): Color | undefined {
+	const normalized = normalizeLiveMapBackgroundColor(value);
+	if (!normalized) {
+		return undefined;
+	}
+	return [
+		Number.parseInt(normalized.slice(1, 3), 16),
+		Number.parseInt(normalized.slice(3, 5), 16),
+		Number.parseInt(normalized.slice(5, 7), 16),
+	];
 }
 
 function drawCoordinateMetadata(

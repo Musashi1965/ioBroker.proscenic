@@ -18,6 +18,8 @@ import {
 	extractRobotPose20001,
 	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
+	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
+	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
 	type LiveMapCoordinateMetadata,
 	type RobotPose,
@@ -80,6 +82,7 @@ class Proscenic extends utils.Adapter {
 	private maintenanceEventCount = 0;
 	private auxiliaryReadInProgress = false;
 	private pendingConsumableRead: PendingConsumableRead | undefined;
+	private liveMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -105,7 +108,9 @@ class Proscenic extends utils.Adapter {
 		await setDeviceOnlineStale(this, true);
 		await setDeviceListDiagnostics(this, 0, "pending");
 		await setInitialCapabilityStates(this);
+		await this.initializeLiveMapBackgroundColor();
 		this.subscribeStates("commands.*");
+		this.subscribeStates("map.live.backgroundColor");
 
 		if (!this.config.username || !this.config.password) {
 			await setDeviceListDiagnostics(this, 0, "not-configured");
@@ -422,7 +427,9 @@ class Proscenic extends utils.Adapter {
 				this.latestMapData,
 				this.latestMapCoordinateMetadata,
 			);
-			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses);
+			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses, {
+				backgroundColor: this.liveMapBackgroundColor,
+			});
 			if (image) {
 				await projectLiveMapImage(this, image, {
 					renderReason,
@@ -468,6 +475,11 @@ class Proscenic extends utils.Adapter {
 		}
 
 		const relativeId = this.relativeStateId(id);
+		if (relativeId === "map.live.backgroundColor") {
+			void this.setLiveMapBackgroundColor(state.val);
+			return;
+		}
+
 		const command = commandForStateId(relativeId);
 		if (!command) {
 			this.log.debug(`Ignoring unsupported state command for ${relativeId}.`);
@@ -545,6 +557,26 @@ class Proscenic extends utils.Adapter {
 		this.commandClient = undefined;
 		this.commandToken = undefined;
 		this.commandSerial = undefined;
+	}
+
+	private async initializeLiveMapBackgroundColor(): Promise<void> {
+		const current = await this.getStateAsync("map.live.backgroundColor");
+		const normalized = normalizeLiveMapBackgroundColor(current?.val);
+		this.liveMapBackgroundColor = normalized ?? DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
+		await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapBackgroundColor, ack: true });
+	}
+
+	private async setLiveMapBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeLiveMapBackgroundColor(value);
+		if (!normalized) {
+			await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapBackgroundColor, ack: true });
+			this.log.warn("Ignoring invalid live map background color. Expected a #RRGGBB value.");
+			return;
+		}
+
+		this.liveMapBackgroundColor = normalized;
+		await this.setStateAsync("map.live.backgroundColor", { val: normalized, ack: true });
+		await this.projectLatestLiveMapImage("map");
 	}
 
 	// If you need to accept messages in your adapter, uncomment the following block and the corresponding line in the constructor.

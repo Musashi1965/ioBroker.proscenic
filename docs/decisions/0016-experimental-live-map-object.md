@@ -30,6 +30,7 @@ Expose an explicit experimental live-map image under:
 - `map.live.renderedForbiddenAreaCount`;
 - `map.live.renderedRoomAreaCount`;
 - `map.live.hasCachedStaticOverlays`;
+- `map.live.backgroundColor`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
 - `map.live.pathResetCount`;
@@ -41,10 +42,14 @@ Expose an explicit experimental live-map image under:
 orientation, an app-oriented color palette, and overlays available coordinate
 metadata plus in-memory robot poses from 20001 events when present. For the
 observed M7 Pro, occupancy value `255` is rendered as the medium-blue unknown
-background, `127` as the white room area, and `0` as the darker blue map line.
-The adapter-owned pose trail uses a dedicated light-green overlay color instead
-of reusing the background, room, or wall colors. The pose trail is rendered
-wider than one pixel for VIS readability.
+background by default, `127` as the white room area, and `0` as the darker blue
+map line. The unknown-background color can be adjusted locally through the
+writable `map.live.backgroundColor` state. It accepts only `#RRGGBB` values;
+the adapter acknowledges normalized valid writes with `ack=true` and restores
+the previous value for invalid writes. The adapter-owned pose trail uses a
+dedicated light-green overlay color instead of reusing the background, room, or
+wall colors. The pose trail is rendered wider than one pixel for VIS
+readability.
 
 `map.live.areas` contains a small JSON summary derived from the same coordinate
 metadata used for rendering. Each entry may include the stable area key, the
