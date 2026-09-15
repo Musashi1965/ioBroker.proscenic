@@ -30,6 +30,9 @@ Expose an explicit experimental live-map image under:
 - `map.live.renderedForbiddenAreaCount`;
 - `map.live.renderedRoomAreaCount`;
 - `map.live.hasCachedStaticOverlays`;
+- `map.live.canvasBackgroundColor`;
+- `map.live.mapBackgroundColor`;
+- `map.live.roomColor`;
 - `map.live.backgroundColor`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
@@ -41,15 +44,25 @@ Expose an explicit experimental live-map image under:
 20002 occupancy grid. The adapter uses the currently verified `flip-y`
 orientation, an app-oriented color palette, and overlays available coordinate
 metadata plus in-memory robot poses from 20001 events when present. For the
-observed M7 Pro, occupancy value `255` is rendered as the medium-blue unknown
+observed M7 Pro, occupancy value `255` is rendered as the medium-blue map
 background by default, `127` as the white room area, and `0` as the darker blue
-map line. The unknown-background color can be adjusted locally through the
-writable `map.live.backgroundColor` state. It accepts only `#RRGGBB` values;
-the adapter acknowledges normalized valid writes with `ack=true` and restores
-the previous value for invalid writes. The adapter-owned pose trail uses a
-dedicated light-green overlay color instead of reusing the background, room, or
-wall colors. The pose trail is rendered wider than one pixel for VIS
-readability.
+map line. Local VIS color tuning is exposed through three writable `#RRGGBB`
+states:
+
+- `map.live.canvasBackgroundColor` is the intended outer VIS/widget canvas
+  background color. The rendered PNG itself currently has no additional outer
+  canvas, so this state is primarily a stable VIS binding value.
+- `map.live.mapBackgroundColor` controls the map background/fill color for
+  occupancy value `255`.
+- `map.live.roomColor` controls the room/free-space color for occupancy value
+  `127`.
+
+The legacy writable `map.live.backgroundColor` state remains as a compatibility
+alias for `map.live.mapBackgroundColor`. The adapter acknowledges normalized
+valid writes with `ack=true` and restores the previous value for invalid
+writes. The adapter-owned pose trail uses a dedicated light-green overlay color
+instead of reusing the background, room, or wall colors. The pose trail is
+rendered wider than one pixel for VIS readability.
 
 `map.live.areas` contains a small JSON summary derived from the same coordinate
 metadata used for rendering. Each entry may include the stable area key, the

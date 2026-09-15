@@ -1,6 +1,10 @@
 import type { CommandDefinition } from "../domain/commands";
 import { COMMAND_DEFINITIONS } from "../domain/commands";
-import { DEFAULT_LIVE_MAP_BACKGROUND_COLOR } from "../domain/live-map";
+import {
+	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
+	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
+	DEFAULT_LIVE_MAP_ROOM_COLOR,
+} from "../domain/live-map";
 
 export interface StateDefinition {
 	id: string;
@@ -124,7 +128,16 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("map.live.renderedForbiddenAreaCount", "Rendered forbidden area count", "number", "value", { min: 0 }),
 	state("map.live.renderedRoomAreaCount", "Rendered room area count", "number", "value", { min: 0 }),
 	state("map.live.hasCachedStaticOverlays", "Has cached static live map overlays", "boolean", "indicator"),
-	writableState("map.live.backgroundColor", "Live map background color", "string", "level.color.rgb", {
+	writableState("map.live.canvasBackgroundColor", "Live map canvas background color", "string", "level.color.rgb", {
+		def: DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
+	}),
+	writableState("map.live.mapBackgroundColor", "Live map map background color", "string", "level.color.rgb", {
+		def: DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
+	}),
+	writableState("map.live.roomColor", "Live map room color", "string", "level.color.rgb", {
+		def: DEFAULT_LIVE_MAP_ROOM_COLOR,
+	}),
+	writableState("map.live.backgroundColor", "Legacy live map map background color", "string", "level.color.rgb", {
 		def: DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	}),
 	state("map.live.renderReason", "Last live map render reason", "string", "state"),

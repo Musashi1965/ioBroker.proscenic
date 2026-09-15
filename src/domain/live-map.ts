@@ -21,7 +21,9 @@ export interface LiveMapImage {
 }
 
 export interface LiveMapRenderOptions {
+	mapBackgroundColor?: string;
 	backgroundColor?: string;
+	roomColor?: string;
 }
 
 export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
@@ -76,6 +78,8 @@ const CRC_TABLE = createCrcTable();
 const MAX_LIVE_MAP_PIXELS = 512 * 512;
 const MAX_LIVE_MAP_DATA_URL_BYTES = 256 * 1024;
 export const DEFAULT_LIVE_MAP_BACKGROUND_COLOR = "#b8ccd8";
+export const DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR = "#d9d9d9";
+export const DEFAULT_LIVE_MAP_ROOM_COLOR = "#ffffff";
 const COLOR_UNKNOWN: Color = [184, 204, 216];
 const COLOR_ROOM: Color = [255, 255, 255];
 const COLOR_WALL: Color = [56, 130, 188];
@@ -140,8 +144,9 @@ export function renderLiveMapImage20002(
 		return undefined;
 	}
 
-	const unknownColor = colorFromHex(options.backgroundColor) ?? COLOR_UNKNOWN;
-	const pixels = renderOccupancy(sample.width, sample.height, occupancy, unknownColor);
+	const unknownColor = colorFromHex(options.mapBackgroundColor ?? options.backgroundColor) ?? COLOR_UNKNOWN;
+	const roomColor = colorFromHex(options.roomColor) ?? COLOR_ROOM;
+	const pixels = renderOccupancy(sample.width, sample.height, occupancy, unknownColor, roomColor);
 	const coordinateMetadata = drawCoordinateMetadata(sample, pixels);
 	const runtime = drawRobotRuntime(sample, occupancy, pixels, poses);
 
@@ -268,7 +273,13 @@ function parseMapSample(data: unknown): MapSample | undefined {
 	};
 }
 
-function renderOccupancy(width: number, height: number, occupancy: Buffer, unknownColor: Color): Buffer {
+function renderOccupancy(
+	width: number,
+	height: number,
+	occupancy: Buffer,
+	unknownColor: Color,
+	roomColor: Color,
+): Buffer {
 	const pixels = Buffer.alloc(width * height * 3);
 	for (let index = 0; index < occupancy.length; index++) {
 		const sourceX = index % width;
@@ -278,11 +289,11 @@ function renderOccupancy(width: number, height: number, occupancy: Buffer, unkno
 		if (value === 0) {
 			setPixel(pixels, width, height, sourceX, targetY, COLOR_WALL);
 		} else if (value === 127) {
-			setPixel(pixels, width, height, sourceX, targetY, COLOR_ROOM);
+			setPixel(pixels, width, height, sourceX, targetY, roomColor);
 		} else if (value === 255) {
 			setPixel(pixels, width, height, sourceX, targetY, unknownColor);
 		} else {
-			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : COLOR_ROOM);
+			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : roomColor);
 		}
 	}
 	return pixels;

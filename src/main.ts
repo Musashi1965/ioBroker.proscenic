@@ -14,6 +14,8 @@ import {
 } from "./domain/commands";
 import {
 	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
+	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
+	DEFAULT_LIVE_MAP_ROOM_COLOR,
 	countLiveMapAreas20002,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
@@ -84,7 +86,9 @@ class Proscenic extends utils.Adapter {
 	private maintenanceEventCount = 0;
 	private auxiliaryReadInProgress = false;
 	private pendingConsumableRead: PendingConsumableRead | undefined;
-	private liveMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
+	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
+	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
+	private liveMapRoomColor = DEFAULT_LIVE_MAP_ROOM_COLOR;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -110,9 +114,12 @@ class Proscenic extends utils.Adapter {
 		await setDeviceOnlineStale(this, true);
 		await setDeviceListDiagnostics(this, 0, "pending");
 		await setInitialCapabilityStates(this);
-		await this.initializeLiveMapBackgroundColor();
+		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
 		this.subscribeStates("map.live.backgroundColor");
+		this.subscribeStates("map.live.canvasBackgroundColor");
+		this.subscribeStates("map.live.mapBackgroundColor");
+		this.subscribeStates("map.live.roomColor");
 
 		if (!this.config.username || !this.config.password) {
 			await setDeviceListDiagnostics(this, 0, "not-configured");
@@ -454,7 +461,8 @@ class Proscenic extends utils.Adapter {
 				this.latestMapCoordinateMetadata,
 			);
 			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses, {
-				backgroundColor: this.liveMapBackgroundColor,
+				mapBackgroundColor: this.liveMapMapBackgroundColor,
+				roomColor: this.liveMapRoomColor,
 			});
 			if (image) {
 				await projectLiveMapImage(this, image, {
@@ -501,8 +509,16 @@ class Proscenic extends utils.Adapter {
 		}
 
 		const relativeId = this.relativeStateId(id);
-		if (relativeId === "map.live.backgroundColor") {
-			void this.setLiveMapBackgroundColor(state.val);
+		if (relativeId === "map.live.backgroundColor" || relativeId === "map.live.mapBackgroundColor") {
+			void this.setLiveMapMapBackgroundColor(state.val);
+			return;
+		}
+		if (relativeId === "map.live.canvasBackgroundColor") {
+			void this.setLiveMapCanvasBackgroundColor(state.val);
+			return;
+		}
+		if (relativeId === "map.live.roomColor") {
+			void this.setLiveMapRoomColor(state.val);
 			return;
 		}
 
@@ -585,23 +601,70 @@ class Proscenic extends utils.Adapter {
 		this.commandSerial = undefined;
 	}
 
-	private async initializeLiveMapBackgroundColor(): Promise<void> {
+	private async initializeLiveMapColors(): Promise<void> {
+		const currentCanvasBackground = await this.getStateAsync("map.live.canvasBackgroundColor");
+		const normalizedCanvasBackground = normalizeLiveMapBackgroundColor(currentCanvasBackground?.val);
+		this.liveMapCanvasBackgroundColor = normalizedCanvasBackground ?? DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
+		await this.setStateAsync("map.live.canvasBackgroundColor", {
+			val: this.liveMapCanvasBackgroundColor,
+			ack: true,
+		});
+
+		const currentMapBackground = await this.getStateAsync("map.live.mapBackgroundColor");
 		const current = await this.getStateAsync("map.live.backgroundColor");
-		const normalized = normalizeLiveMapBackgroundColor(current?.val);
-		this.liveMapBackgroundColor = normalized ?? DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
-		await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapBackgroundColor, ack: true });
+		const normalizedNewMapBackground = normalizeLiveMapBackgroundColor(currentMapBackground?.val);
+		const normalizedLegacyMapBackground = normalizeLiveMapBackgroundColor(current?.val);
+		const normalizedMapBackground = normalizedNewMapBackground ?? normalizedLegacyMapBackground;
+		this.liveMapMapBackgroundColor = normalizedMapBackground ?? DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
+		await this.setStateAsync("map.live.mapBackgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
+		await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
+
+		const currentRoomColor = await this.getStateAsync("map.live.roomColor");
+		const normalizedRoomColor = normalizeLiveMapBackgroundColor(currentRoomColor?.val);
+		this.liveMapRoomColor = normalizedRoomColor ?? DEFAULT_LIVE_MAP_ROOM_COLOR;
+		await this.setStateAsync("map.live.roomColor", { val: this.liveMapRoomColor, ack: true });
 	}
 
-	private async setLiveMapBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
+	private async setLiveMapMapBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
 		const normalized = normalizeLiveMapBackgroundColor(value);
 		if (!normalized) {
-			await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapBackgroundColor, ack: true });
-			this.log.warn("Ignoring invalid live map background color. Expected a #RRGGBB value.");
+			await this.setStateAsync("map.live.mapBackgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
+			await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
+			this.log.warn("Ignoring invalid live map map background color. Expected a #RRGGBB value.");
 			return;
 		}
 
-		this.liveMapBackgroundColor = normalized;
+		this.liveMapMapBackgroundColor = normalized;
+		await this.setStateAsync("map.live.mapBackgroundColor", { val: normalized, ack: true });
 		await this.setStateAsync("map.live.backgroundColor", { val: normalized, ack: true });
+		await this.projectLatestLiveMapImage("map");
+	}
+
+	private async setLiveMapCanvasBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeLiveMapBackgroundColor(value);
+		if (!normalized) {
+			await this.setStateAsync("map.live.canvasBackgroundColor", {
+				val: this.liveMapCanvasBackgroundColor,
+				ack: true,
+			});
+			this.log.warn("Ignoring invalid live map canvas background color. Expected a #RRGGBB value.");
+			return;
+		}
+
+		this.liveMapCanvasBackgroundColor = normalized;
+		await this.setStateAsync("map.live.canvasBackgroundColor", { val: normalized, ack: true });
+	}
+
+	private async setLiveMapRoomColor(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeLiveMapBackgroundColor(value);
+		if (!normalized) {
+			await this.setStateAsync("map.live.roomColor", { val: this.liveMapRoomColor, ack: true });
+			this.log.warn("Ignoring invalid live map room color. Expected a #RRGGBB value.");
+			return;
+		}
+
+		this.liveMapRoomColor = normalized;
+		await this.setStateAsync("map.live.roomColor", { val: normalized, ack: true });
 		await this.projectLatestLiveMapImage("map");
 	}
 

@@ -103,12 +103,17 @@ Initial states:
 | `map.compressedBytes` | number | `value` | `B` | `infoType` 20002 metadata |
 | `map.encodedBytes` | number | `value` | `B` | derived from encoded map length |
 | `map.updated` | string | `date` |  | last safe map metadata update |
-| `map.live.backgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for unknown map background |
+| `map.live.canvasBackgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for outer widget/canvas background |
+| `map.live.mapBackgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for map background/fill cells |
+| `map.live.roomColor` | string | `level.color.rgb` |  | writable local VIS tuning color for room/free-space cells |
+| `map.live.backgroundColor` | string | `level.color.rgb` |  | legacy writable alias for `map.live.mapBackgroundColor` |
 
 All states are read-only and are written by the adapter with `ack=true`, except
 the writable command buttons defined by ADR 0013 and the documented local
-VIS-tuning state `map.live.backgroundColor`. Raw map objects, positions, raw
-events, and full upstream JSON remain out of scope.
+VIS-tuning states `map.live.canvasBackgroundColor`,
+`map.live.mapBackgroundColor`, `map.live.roomColor`, and the legacy alias
+`map.live.backgroundColor`. Raw map objects, positions, raw events, and full
+upstream JSON remain out of scope.
 
 `device.online` is a last-known cloud device-list value. Its freshness is
 explicitly indicated by `device.onlineUpdated`, `device.onlineFresh`, and
