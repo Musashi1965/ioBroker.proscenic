@@ -38,10 +38,15 @@ Initial states:
 | `device.code` | string | `info.name` |  | selected cloud device code with `PROSCENIC` display prefix |
 | `device.model` | string | `info.name` |  | selected cloud device |
 | `device.online` | boolean | `indicator.reachable` |  | selected cloud device |
+| `device.onlineUpdated` | string | `date` |  | latest successful device-list projection |
+| `device.onlineStale` | boolean | `indicator` |  | true when `device.online` is only a retained last-known value |
 | `device.image` | string | `text` |  | bundled product image for verified M7 Pro |
 | `connection.cloud` | boolean | `indicator.connected` |  | login/device discovery |
 | `connection.gateway` | boolean | `indicator.connected` |  | gateway socket |
 | `connection.lastError` | string | `text` |  | redacted adapter error |
+| `connection.lastDeviceListResult` | string | `text` |  | `pending`, `ok`, `empty`, `not-configured`, or `failed` |
+| `connection.lastDeviceListCount` | number | `value` |  | last cloud device-list count |
+| `connection.lastDeviceListUpdate` | string | `date` |  | last device-list diagnostic update |
 | `connection.lastStatusEvent` | string | `date` |  | last accepted status event |
 | `capabilities.statusRead` | boolean | `indicator` |  | implementation capability |
 | `capabilities.commands` | boolean | `indicator` |  | implementation capability |
@@ -101,6 +106,11 @@ Initial states:
 All states are read-only and are written by the adapter with `ack=true`.
 Raw map objects, positions, raw events, and full upstream JSON remain out of
 scope. Writable command buttons are now defined separately by ADR 0013.
+
+`device.online` is a last-known cloud device-list value. Its freshness is
+explicitly indicated by `device.onlineUpdated` and `device.onlineStale`.
+`info.connection` and `connection.cloud` remain adapter/backend health
+indicators and must not be interpreted as the robot's app-visible availability.
 
 On adapter startup, the adapter creates missing public objects and refreshes the
 defined public object metadata for existing objects. This allows role, type,

@@ -38,6 +38,8 @@ import {
 	redactedErrorMessage,
 	setConsumablesReadFailure,
 	setConnectionState,
+	setDeviceListDiagnostics,
+	setDeviceOnlineStale,
 	setInitialCapabilityStates,
 	setLastError,
 	setMaintenanceHistoryReadFailure,
@@ -99,10 +101,14 @@ class Proscenic extends utils.Adapter {
 		await this.setState("info.connection", false, true);
 		await setConnectionState(this, "cloud", false);
 		await setConnectionState(this, "gateway", false);
+		await this.setStateAsync("device.onlineUpdated", { val: "", ack: true });
+		await setDeviceOnlineStale(this, true);
+		await setDeviceListDiagnostics(this, 0, "pending");
 		await setInitialCapabilityStates(this);
 		this.subscribeStates("commands.*");
 
 		if (!this.config.username || !this.config.password) {
+			await setDeviceListDiagnostics(this, 0, "not-configured");
 			this.log.warn("Proscenic cloud credentials are not configured yet.");
 			return;
 		}
@@ -142,6 +148,7 @@ class Proscenic extends utils.Adapter {
 		} catch (error) {
 			this.clearCommandSession();
 			await setLastError(this, error);
+			await setDeviceOnlineStale(this, true);
 			await setConnectionState(this, "cloud", false);
 			await setConnectionState(this, "gateway", false);
 			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
@@ -164,11 +171,18 @@ class Proscenic extends utils.Adapter {
 		this.commandEnabled = false;
 		this.commandClient = client;
 		this.commandToken = token;
-		await setConnectionState(this, "cloud", true);
 
-		const devices = await client.listDevices();
+		let devices: DeviceRecord[];
+		try {
+			devices = await client.listDevices();
+		} catch (error) {
+			await setDeviceListDiagnostics(this, 0, "failed");
+			throw error;
+		}
+		await setDeviceListDiagnostics(this, devices.length, devices.length === 0 ? "empty" : "ok");
 		const device = selectDevice(devices, this.config.deviceCode);
 		await projectDevice(this, device);
+		await setConnectionState(this, "cloud", true);
 
 		if (!device.sn) {
 			throw new Error("Selected device cannot be used because its protocol serial is missing");

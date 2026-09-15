@@ -29,7 +29,13 @@ export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRec
 	await setIfDefined(adapter, "device.code", displayDeviceCode(device.code));
 	await setIfDefined(adapter, "device.model", device.model);
 	await setIfDefined(adapter, "device.online", device.status);
+	await adapter.setStateAsync("device.onlineUpdated", { val: new Date().toISOString(), ack: true });
+	await setDeviceOnlineStale(adapter, false);
 	await adapter.setStateAsync("device.image", { val: deviceImageDataUrl(device), ack: true });
+}
+
+export async function setDeviceOnlineStale(adapter: ioBroker.Adapter, stale: boolean): Promise<void> {
+	await adapter.setStateAsync("device.onlineStale", { val: stale, ack: true });
 }
 
 export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStatus): Promise<void> {
@@ -181,6 +187,16 @@ export async function setConnectionState(
 	if (id === "cloud") {
 		await adapter.setStateAsync("info.connection", { val: connected, ack: true });
 	}
+}
+
+export async function setDeviceListDiagnostics(
+	adapter: ioBroker.Adapter,
+	count: number,
+	result: "pending" | "ok" | "empty" | "not-configured" | "failed",
+): Promise<void> {
+	await adapter.setStateAsync("connection.lastDeviceListCount", { val: count, ack: true });
+	await adapter.setStateAsync("connection.lastDeviceListResult", { val: result, ack: true });
+	await adapter.setStateAsync("connection.lastDeviceListUpdate", { val: new Date().toISOString(), ack: true });
 }
 
 export async function setLastError(adapter: ioBroker.Adapter, error: unknown): Promise<void> {

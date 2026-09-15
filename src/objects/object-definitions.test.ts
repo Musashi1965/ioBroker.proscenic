@@ -82,6 +82,11 @@ describe("initial object definitions", () => {
 			"commands.deepCleaning",
 			"commands.collectDust",
 		]);
+		expect(ids).to.include("device.onlineUpdated");
+		expect(ids).to.include("device.onlineStale");
+		expect(ids).to.include("connection.lastDeviceListResult");
+		expect(ids).to.include("connection.lastDeviceListCount");
+		expect(ids).to.include("connection.lastDeviceListUpdate");
 		for (const definition of STATE_DEFINITIONS) {
 			if (writableIds.includes(definition.id)) {
 				expect(definition.object.common.role, definition.id).to.equal("button");

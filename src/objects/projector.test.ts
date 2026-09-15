@@ -8,6 +8,8 @@ import {
 	projectMaintenanceMessage,
 	redactedErrorMessage,
 	setConnectionState,
+	setDeviceListDiagnostics,
+	setDeviceOnlineStale,
 } from "./projector";
 
 describe("redactedErrorMessage", () => {
@@ -58,6 +60,9 @@ describe("projectDevice", () => {
 		expect(states.get("device.code")).to.deep.equal({ val: "PROSCENIC M7_PRO", ack: true });
 		expect(states.get("device.model")).to.deep.equal({ val: "811_LDS", ack: true });
 		expect(states.get("device.online")).to.deep.equal({ val: true, ack: true });
+		expect(states.get("device.onlineUpdated")?.ack).to.equal(true);
+		expect(states.get("device.onlineUpdated")?.val).to.be.a("string");
+		expect(states.get("device.onlineStale")).to.deep.equal({ val: false, ack: true });
 		expect(states.get("device.image")?.ack).to.equal(true);
 		expect(states.get("device.image")?.val)
 			.to.be.a("string")
@@ -80,6 +85,39 @@ describe("projectDevice", () => {
 		});
 
 		expect(states.get("device.image")).to.deep.equal({ val: "", ack: true });
+	});
+});
+
+describe("device freshness diagnostics", () => {
+	it("marks the last device online value as stale on connection failures", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await setDeviceOnlineStale(adapter, true);
+
+		expect(states.get("device.onlineStale")).to.deep.equal({ val: true, ack: true });
+	});
+
+	it("publishes explicit device list diagnostics", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await setDeviceListDiagnostics(adapter, 0, "empty");
+
+		expect(states.get("connection.lastDeviceListCount")).to.deep.equal({ val: 0, ack: true });
+		expect(states.get("connection.lastDeviceListResult")).to.deep.equal({ val: "empty", ack: true });
+		expect(states.get("connection.lastDeviceListUpdate")?.ack).to.equal(true);
+		expect(states.get("connection.lastDeviceListUpdate")?.val).to.be.a("string");
 	});
 });
 

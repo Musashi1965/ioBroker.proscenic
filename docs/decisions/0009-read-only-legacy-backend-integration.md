@@ -25,6 +25,9 @@ Wire the first read-only backend into the adapter runtime:
 - project only the ADR 0008 read-only object structure with `ack=true`;
 - mark `info.connection` from the cloud/backend connection, while exposing the
   gateway socket status separately as `connection.gateway`;
+- record the latest device-list count, result, and update time so that
+  "login succeeded but no devices were returned" is visible without relying on
+  logs;
 - clear the gateway socket on unload;
 - redact account, host, IP, and endpoint material before writing error states
   or logs.
@@ -44,6 +47,11 @@ The gateway implementation is intentionally small and bounded. If the gateway
 closes, the adapter marks `connection.gateway` offline instead of silently
 claiming an online socket state. `info.connection` remains the adapter-level
 backend health indicator and does not mirror transient gateway socket closure.
+
+The selected device's `device.online` value is retained as a last-known value.
+Whenever startup or reconnect can no longer confirm the selected device through
+the cloud device list, the adapter marks `device.onlineStale=true` and updates
+`connection.lastDeviceList*` diagnostics.
 
 ## Validation
 
