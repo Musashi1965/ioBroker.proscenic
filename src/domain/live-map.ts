@@ -21,9 +21,9 @@ export interface LiveMapImage {
 }
 
 export interface LiveMapRenderOptions {
+	canvasBackgroundColor?: string;
 	mapBackgroundColor?: string;
 	backgroundColor?: string;
-	roomColor?: string;
 }
 
 export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
@@ -79,9 +79,8 @@ const MAX_LIVE_MAP_PIXELS = 512 * 512;
 const MAX_LIVE_MAP_DATA_URL_BYTES = 256 * 1024;
 export const DEFAULT_LIVE_MAP_BACKGROUND_COLOR = "#b8ccd8";
 export const DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR = "#d9d9d9";
-export const DEFAULT_LIVE_MAP_ROOM_COLOR = "#ffffff";
 const COLOR_UNKNOWN: Color = [184, 204, 216];
-const COLOR_ROOM: Color = [255, 255, 255];
+const COLOR_CANVAS_BACKGROUND: Color = [217, 217, 217];
 const COLOR_WALL: Color = [56, 130, 188];
 const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
@@ -144,9 +143,9 @@ export function renderLiveMapImage20002(
 		return undefined;
 	}
 
-	const unknownColor = colorFromHex(options.mapBackgroundColor ?? options.backgroundColor) ?? COLOR_UNKNOWN;
-	const roomColor = colorFromHex(options.roomColor) ?? COLOR_ROOM;
-	const pixels = renderOccupancy(sample.width, sample.height, occupancy, unknownColor, roomColor);
+	const mapBackgroundColor = colorFromHex(options.mapBackgroundColor ?? options.backgroundColor) ?? COLOR_UNKNOWN;
+	const canvasBackgroundColor = colorFromHex(options.canvasBackgroundColor) ?? COLOR_CANVAS_BACKGROUND;
+	const pixels = renderOccupancy(sample.width, sample.height, occupancy, mapBackgroundColor, canvasBackgroundColor);
 	const coordinateMetadata = drawCoordinateMetadata(sample, pixels);
 	const runtime = drawRobotRuntime(sample, occupancy, pixels, poses);
 
@@ -277,8 +276,8 @@ function renderOccupancy(
 	width: number,
 	height: number,
 	occupancy: Buffer,
-	unknownColor: Color,
-	roomColor: Color,
+	mapBackgroundColor: Color,
+	canvasBackgroundColor: Color,
 ): Buffer {
 	const pixels = Buffer.alloc(width * height * 3);
 	for (let index = 0; index < occupancy.length; index++) {
@@ -289,11 +288,11 @@ function renderOccupancy(
 		if (value === 0) {
 			setPixel(pixels, width, height, sourceX, targetY, COLOR_WALL);
 		} else if (value === 127) {
-			setPixel(pixels, width, height, sourceX, targetY, roomColor);
+			setPixel(pixels, width, height, sourceX, targetY, canvasBackgroundColor);
 		} else if (value === 255) {
-			setPixel(pixels, width, height, sourceX, targetY, unknownColor);
+			setPixel(pixels, width, height, sourceX, targetY, mapBackgroundColor);
 		} else {
-			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : roomColor);
+			setPixel(pixels, width, height, sourceX, targetY, value < 127 ? COLOR_OBSTACLE : canvasBackgroundColor);
 		}
 	}
 	return pixels;

@@ -32,7 +32,6 @@ Expose an explicit experimental live-map image under:
 - `map.live.hasCachedStaticOverlays`;
 - `map.live.canvasBackgroundColor`;
 - `map.live.mapBackgroundColor`;
-- `map.live.roomColor`;
 - `map.live.backgroundColor`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
@@ -44,18 +43,15 @@ Expose an explicit experimental live-map image under:
 20002 occupancy grid. The adapter uses the currently verified `flip-y`
 orientation, an app-oriented color palette, and overlays available coordinate
 metadata plus in-memory robot poses from 20001 events when present. For the
-observed M7 Pro, occupancy value `255` is rendered as the medium-blue map
-background by default, `127` as the white room area, and `0` as the darker blue
-map line. Local VIS color tuning is exposed through three writable `#RRGGBB`
-states:
+observed M7 Pro, occupancy value `255` is rendered as the light/medium-blue map
+area by default, `127` as the white canvas/background area, and `0` as the
+darker blue map line. Local VIS color tuning is exposed through two writable
+`#RRGGBB` states:
 
-- `map.live.canvasBackgroundColor` is the intended outer VIS/widget canvas
-  background color. The rendered PNG itself currently has no additional outer
-  canvas, so this state is primarily a stable VIS binding value.
-- `map.live.mapBackgroundColor` controls the map background/fill color for
-  occupancy value `255`.
-- `map.live.roomColor` controls the room/free-space color for occupancy value
-  `127`.
+- `map.live.canvasBackgroundColor` controls the canvas/background pixels that
+  are white by default and correspond to occupancy value `127`.
+- `map.live.mapBackgroundColor` controls the light/medium-blue map-area pixels
+  that correspond to occupancy value `255`.
 
 The legacy writable `map.live.backgroundColor` state remains as a compatibility
 alias for `map.live.mapBackgroundColor`. The adapter acknowledges normalized

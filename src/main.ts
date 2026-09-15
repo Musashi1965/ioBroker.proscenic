@@ -15,7 +15,6 @@ import {
 import {
 	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
-	DEFAULT_LIVE_MAP_ROOM_COLOR,
 	countLiveMapAreas20002,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
@@ -88,7 +87,6 @@ class Proscenic extends utils.Adapter {
 	private pendingConsumableRead: PendingConsumableRead | undefined;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
-	private liveMapRoomColor = DEFAULT_LIVE_MAP_ROOM_COLOR;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -119,7 +117,6 @@ class Proscenic extends utils.Adapter {
 		this.subscribeStates("map.live.backgroundColor");
 		this.subscribeStates("map.live.canvasBackgroundColor");
 		this.subscribeStates("map.live.mapBackgroundColor");
-		this.subscribeStates("map.live.roomColor");
 
 		if (!this.config.username || !this.config.password) {
 			await setDeviceListDiagnostics(this, 0, "not-configured");
@@ -461,8 +458,8 @@ class Proscenic extends utils.Adapter {
 				this.latestMapCoordinateMetadata,
 			);
 			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses, {
+				canvasBackgroundColor: this.liveMapCanvasBackgroundColor,
 				mapBackgroundColor: this.liveMapMapBackgroundColor,
-				roomColor: this.liveMapRoomColor,
 			});
 			if (image) {
 				await projectLiveMapImage(this, image, {
@@ -515,10 +512,6 @@ class Proscenic extends utils.Adapter {
 		}
 		if (relativeId === "map.live.canvasBackgroundColor") {
 			void this.setLiveMapCanvasBackgroundColor(state.val);
-			return;
-		}
-		if (relativeId === "map.live.roomColor") {
-			void this.setLiveMapRoomColor(state.val);
 			return;
 		}
 
@@ -619,10 +612,7 @@ class Proscenic extends utils.Adapter {
 		await this.setStateAsync("map.live.mapBackgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
 		await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
 
-		const currentRoomColor = await this.getStateAsync("map.live.roomColor");
-		const normalizedRoomColor = normalizeLiveMapBackgroundColor(currentRoomColor?.val);
-		this.liveMapRoomColor = normalizedRoomColor ?? DEFAULT_LIVE_MAP_ROOM_COLOR;
-		await this.setStateAsync("map.live.roomColor", { val: this.liveMapRoomColor, ack: true });
+		await this.deleteObsoleteLiveMapRoomColor();
 	}
 
 	private async setLiveMapMapBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
@@ -630,7 +620,7 @@ class Proscenic extends utils.Adapter {
 		if (!normalized) {
 			await this.setStateAsync("map.live.mapBackgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
 			await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
-			this.log.warn("Ignoring invalid live map map background color. Expected a #RRGGBB value.");
+			this.log.warn("Ignoring invalid live map blue area color. Expected a #RRGGBB value.");
 			return;
 		}
 
@@ -653,19 +643,15 @@ class Proscenic extends utils.Adapter {
 
 		this.liveMapCanvasBackgroundColor = normalized;
 		await this.setStateAsync("map.live.canvasBackgroundColor", { val: normalized, ack: true });
+		await this.projectLatestLiveMapImage("map");
 	}
 
-	private async setLiveMapRoomColor(value: ioBroker.StateValue | undefined): Promise<void> {
-		const normalized = normalizeLiveMapBackgroundColor(value);
-		if (!normalized) {
-			await this.setStateAsync("map.live.roomColor", { val: this.liveMapRoomColor, ack: true });
-			this.log.warn("Ignoring invalid live map room color. Expected a #RRGGBB value.");
-			return;
+	private async deleteObsoleteLiveMapRoomColor(): Promise<void> {
+		try {
+			await this.delObjectAsync("map.live.roomColor");
+		} catch (error) {
+			this.log.debug(`Could not delete obsolete live map room color object: ${redactedErrorMessage(error)}`);
 		}
-
-		this.liveMapRoomColor = normalized;
-		await this.setStateAsync("map.live.roomColor", { val: normalized, ack: true });
-		await this.projectLatestLiveMapImage("map");
 	}
 
 	// If you need to accept messages in your adapter, uncomment the following block and the corresponding line in the constructor.

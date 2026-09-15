@@ -31,8 +31,7 @@ describe("initial object definitions", () => {
 			if (
 				definition.id === "map.live.backgroundColor" ||
 				definition.id === "map.live.canvasBackgroundColor" ||
-				definition.id === "map.live.mapBackgroundColor" ||
-				definition.id === "map.live.roomColor"
+				definition.id === "map.live.mapBackgroundColor"
 			) {
 				expect(definition.object.common.write, definition.id).to.equal(true);
 				expect(definition.object.common.read, definition.id).to.equal(true);
@@ -93,7 +92,6 @@ describe("initial object definitions", () => {
 			"commands.collectDust",
 			"map.live.canvasBackgroundColor",
 			"map.live.mapBackgroundColor",
-			"map.live.roomColor",
 			"map.live.backgroundColor",
 		]);
 		expect(ids).to.include("device.onlineUpdated");
@@ -106,8 +104,7 @@ describe("initial object definitions", () => {
 			if (
 				definition.id === "map.live.backgroundColor" ||
 				definition.id === "map.live.canvasBackgroundColor" ||
-				definition.id === "map.live.mapBackgroundColor" ||
-				definition.id === "map.live.roomColor"
+				definition.id === "map.live.mapBackgroundColor"
 			) {
 				expect(definition.object.common.role, definition.id).to.equal("level.color.rgb");
 				expect(definition.object.common.read, definition.id).to.equal(true);
@@ -159,7 +156,6 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.hasCachedStaticOverlays");
 		expect(ids).to.include("map.live.canvasBackgroundColor");
 		expect(ids).to.include("map.live.mapBackgroundColor");
-		expect(ids).to.include("map.live.roomColor");
 		expect(ids).to.include("map.live.backgroundColor");
 		expect(ids).to.include("map.live.renderReason");
 		expect(ids).to.include("map.live.lastPathId");

@@ -3,7 +3,6 @@ import { inflateSync } from "node:zlib";
 import {
 	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
-	DEFAULT_LIVE_MAP_ROOM_COLOR,
 	extractLiveMapCoordinateMetadata20002,
 	extractRobotPose20001,
 	mergeLiveMapCoordinateMetadataCache,
@@ -171,10 +170,10 @@ describe("live map rendering", () => {
 		const image = renderLiveMapImage20002(merged);
 		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
 
-		expect(pixelAt(pixels, 5, 2, 2)).to.deep.equal([255, 255, 255]);
+		expect(pixelAt(pixels, 5, 2, 2)).to.deep.equal([217, 217, 217]);
 	});
 
-	it("renders the room white, the unknown background blue, and path lines with their own green overlay color", () => {
+	it("renders the white background, blue map area, and path lines with their own green overlay color", () => {
 		const width = 20;
 		const height = 20;
 		const grid = Buffer.alloc(width * height, 255);
@@ -348,7 +347,7 @@ describe("live map rendering", () => {
 		expect(image?.skippedPathSegments).to.equal(1);
 	});
 
-	it("renders writable map background and room colors with caller-provided colors", () => {
+	it("renders writable canvas and map background colors with caller-provided colors", () => {
 		const width = 2;
 		const height = 1;
 		const grid = Buffer.from([255, 127]);
@@ -359,19 +358,18 @@ describe("live map rendering", () => {
 				height,
 			},
 			[],
-			{ mapBackgroundColor: "#ddeeff", roomColor: "#112233" },
+			{ canvasBackgroundColor: "#dddddd", mapBackgroundColor: "#b8ccd0" },
 		);
 
 		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
 
-		expect(pixelAt(pixels, width, 0, 0)).to.deep.equal([221, 238, 255]);
-		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([17, 34, 51]);
+		expect(pixelAt(pixels, width, 0, 0)).to.deep.equal([184, 204, 208]);
+		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([221, 221, 221]);
 	});
 
 	it("normalizes writable live-map background colors", () => {
 		expect(DEFAULT_LIVE_MAP_BACKGROUND_COLOR).to.equal("#b8ccd8");
 		expect(DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR).to.equal("#d9d9d9");
-		expect(DEFAULT_LIVE_MAP_ROOM_COLOR).to.equal("#ffffff");
 		expect(normalizeLiveMapBackgroundColor(" #DDEEFF ")).to.equal("#ddeeff");
 		expect(normalizeLiveMapBackgroundColor("ddeeff")).to.equal(undefined);
 		expect(normalizeLiveMapBackgroundColor("#ddeef")).to.equal(undefined);
