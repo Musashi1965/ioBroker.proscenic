@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.1.3",
+		"version": "0.1.4",
 		"news": {
+			"0.1.4": {
+				"en": "Refreshes existing ioBroker object metadata during adapter startup",
+				"de": "Aktualisiert bestehende ioBroker-Objektmetadaten beim Adapterstart",
+				"ru": "Обновляет существующие метаданные объектов ioBroker при запуске адаптера",
+				"pt": "Atualiza metadados de objetos ioBroker existentes durante a inicialização do adaptador",
+				"nl": "Werkt bestaande ioBroker-objectmetadata bij tijdens het starten van de adapter",
+				"fr": "Actualise les métadonnées des objets ioBroker existants au démarrage de l'adaptateur",
+				"it": "Aggiorna i metadati degli oggetti ioBroker esistenti all'avvio dell'adattatore",
+				"es": "Actualiza los metadatos de objetos ioBroker existentes al iniciar el adaptador",
+				"pl": "Odświeża istniejące metadane obiektów ioBroker podczas uruchamiania adaptera",
+				"uk": "Оновлює наявні метадані об'єктів ioBroker під час запуску адаптера",
+				"zh-cn": "在适配器启动期间刷新现有 ioBroker 对象元数据"
+			},
 			"0.1.3": {
 				"en": "Fixed ioBroker object role metadata for command buttons and the water level state",
 				"de": "ioBroker-Objektrollen für Befehlstasten und den Wasserstand-State korrigiert",

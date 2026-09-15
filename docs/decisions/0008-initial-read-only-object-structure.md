@@ -102,6 +102,11 @@ All states are read-only and are written by the adapter with `ack=true`.
 Raw map objects, positions, raw events, and full upstream JSON remain out of
 scope. Writable command buttons are now defined separately by ADR 0013.
 
+On adapter startup, the adapter creates missing public objects and refreshes the
+defined public object metadata for existing objects. This allows role, type,
+unit, `read`, and `write` corrections to reach already installed test systems
+without deleting state values or requiring a manual object-tree reset.
+
 ## Consequences
 
 The adapter can already validate a realistic object tree and project live

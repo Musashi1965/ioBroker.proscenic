@@ -71,6 +71,11 @@ Security policy and contribution requirements are documented in
 
 ## Changelog
 
+### 0.1.4 (2026-09-15)
+
+- Refresh existing ioBroker object metadata during adapter startup so role,
+  read, and write corrections also reach already installed instances.
+
 ### 0.1.3 (2026-09-14)
 
 - Fixed ioBroker object role metadata for command buttons and the water level

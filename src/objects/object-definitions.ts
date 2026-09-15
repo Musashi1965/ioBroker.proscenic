@@ -132,10 +132,12 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 export async function extendAdapterObjects(adapter: ioBroker.Adapter): Promise<void> {
 	for (const definition of CHANNEL_DEFINITIONS) {
 		await adapter.setObjectNotExistsAsync(definition.id, definition.object);
+		await adapter.extendObjectAsync(definition.id, definition.object);
 	}
 
 	for (const definition of STATE_DEFINITIONS) {
 		await adapter.setObjectNotExistsAsync(definition.id, definition.object);
+		await adapter.extendObjectAsync(definition.id, definition.object);
 	}
 }
 

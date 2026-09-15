@@ -1,7 +1,31 @@
 import { expect } from "chai";
-import { STATE_DEFINITIONS } from "./object-definitions";
+import { CHANNEL_DEFINITIONS, STATE_DEFINITIONS, extendAdapterObjects } from "./object-definitions";
 
 describe("initial object definitions", () => {
+	it("creates missing objects and updates existing public object metadata", async () => {
+		const created: string[] = [];
+		const extended: string[] = [];
+		const adapter = {
+			setObjectNotExistsAsync: (id: string) => {
+				created.push(id);
+				return Promise.resolve();
+			},
+			extendObjectAsync: (id: string) => {
+				extended.push(id);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+		const expectedIds = [
+			...CHANNEL_DEFINITIONS.map(definition => definition.id),
+			...STATE_DEFINITIONS.map(definition => definition.id),
+		];
+
+		await extendAdapterObjects(adapter);
+
+		expect(created).to.deep.equal(expectedIds);
+		expect(extended).to.deep.equal(expectedIds);
+	});
+
 	it("keeps non-command states read-only", () => {
 		for (const definition of STATE_DEFINITIONS) {
 			if (!definition.id.startsWith("commands.") || definition.id.startsWith("commands.last")) {
