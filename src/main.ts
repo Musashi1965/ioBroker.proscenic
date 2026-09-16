@@ -9,7 +9,9 @@ import { normalizeConsumables21015, type ConsumableStates } from "./domain/consu
 import {
 	buildCommandRequest,
 	commandForStateId,
+	isStatusConfirmationForCommand,
 	normalizeCommandButtonValue,
+	supportsStatusConfirmation,
 	type RobotCommand,
 } from "./domain/commands";
 import {
@@ -66,6 +68,10 @@ const GATEWAY_IDLE_TIMEOUT_MS = 90_000;
 const GATEWAY_IDLE_CHECK_INTERVAL_MS = 30_000;
 const GATEWAY_STABLE_CONNECTION_MS = 5 * 60_000;
 const GATEWAY_SOCKET_RECONNECT_DELAY_MS = 5_000;
+const COMMAND_SESSION_WAIT_MS = 15_000;
+const COMMAND_CONFIRMATION_TIMEOUT_MS = 20_000;
+const COMMAND_SESSION_POLL_MS = 250;
+const MAX_QUEUED_COMMANDS = 5;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
 
@@ -75,13 +81,29 @@ interface PendingConsumableRead {
 	reject: (error: Error) => void;
 }
 
+interface CommandSession {
+	client: ProscenicRestClient;
+	token: string;
+	serial: string;
+	username: string;
+}
+
+interface PendingCommandConfirmation {
+	command: RobotCommand;
+	acceptedAt: number;
+	timer: ioBroker.Timeout | undefined;
+	resolve: (latencyMs: number | undefined) => void;
+}
+
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
 	private reconnectTimer: ioBroker.Timeout | undefined;
 	private gatewayIdleTimer: ReturnType<ioBroker.Adapter["setInterval"]> | undefined;
 	private reconnectAttempt = 0;
 	private reconnectInProgress = false;
-	private commandInProgress = false;
+	private commandExecutionChain: Promise<void> = Promise.resolve();
+	private queuedCommandCount = 0;
+	private pendingCommandConfirmation: PendingCommandConfirmation | undefined;
 	private commandEnabled = false;
 	private commandClient: ProscenicRestClient | undefined;
 	private commandToken: string | undefined;
@@ -136,6 +158,7 @@ class Proscenic extends utils.Adapter {
 		await setDeviceListDiagnostics(this, 0, "pending");
 		await this.setStateAsync("connection.lastGatewayEvent", { val: "", ack: true });
 		await this.setStateAsync("connection.gatewayIdleReconnectCount", { val: 0, ack: true });
+		await this.setStateAsync("commands.queueDepth", { val: 0, ack: true });
 		await setInitialCapabilityStates(this);
 		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
@@ -163,6 +186,7 @@ class Proscenic extends utils.Adapter {
 			this.clearReconnectTimer();
 			this.clearGatewayIdleTimer();
 			this.rejectPendingConsumableRead(new Error("Adapter unload interrupted consumable read"));
+			this.cancelPendingCommandConfirmation();
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
 			this.clearCommandSession();
@@ -186,8 +210,8 @@ class Proscenic extends utils.Adapter {
 			this.clearCommandSession();
 			await setLastError(this, error);
 			await setDeviceOnlineStale(this, true);
-			await this.setGatewayConnection(false);
 			await this.setCloudConnection(false);
+			await this.setGatewayConnection(false);
 			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
 			this.scheduleFullReconnect("connection failure");
 		} finally {
@@ -430,6 +454,7 @@ class Proscenic extends utils.Adapter {
 		if (infoType === 20001) {
 			const status = normalizeStatus20001(data);
 			if (status) {
+				this.confirmPendingCommand(status);
 				const previousStatus = this.latestRobotStatus;
 				if (status.mode === "sweep" || hasCleaningProgress(status, previousStatus)) {
 					this.cleaningInferredUntilMs = Date.now() + CLEANING_ACTIVITY_HOLD_MS;
@@ -697,7 +722,7 @@ class Proscenic extends utils.Adapter {
 			return;
 		}
 
-		void this.executeCommand(relativeId, command);
+		this.enqueueCommand(relativeId, command);
 	}
 
 	private relativeStateId(id: string): string {
@@ -705,51 +730,169 @@ class Proscenic extends utils.Adapter {
 		return id.startsWith(prefix) ? id.slice(prefix.length) : id;
 	}
 
-	private async executeCommand(stateId: string, command: RobotCommand): Promise<void> {
-		if (this.commandInProgress) {
-			await this.setCommandFailure(
-				stateId,
-				command,
-				new Error("Another Proscenic command is already in progress"),
-			);
+	private enqueueCommand(stateId: string, command: RobotCommand): void {
+		if (this.queuedCommandCount >= MAX_QUEUED_COMMANDS) {
+			void this.setCommandFailure(stateId, command, new Error("Proscenic command queue is full"));
 			return;
 		}
 
-		this.commandInProgress = true;
+		this.queuedCommandCount += 1;
+		void this.setStateAsync(stateId, { val: false, ack: true });
+		void this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		const execution = this.commandExecutionChain
+			.catch(() => undefined)
+			.then(() => this.executeCommand(stateId, command));
+		this.commandExecutionChain = execution.finally(async () => {
+			this.queuedCommandCount = Math.max(0, this.queuedCommandCount - 1);
+			await this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		});
+	}
+
+	private async executeCommand(stateId: string, command: RobotCommand): Promise<void> {
 		await this.setStateAsync("commands.lastCommand", { val: command, ack: true });
-		await this.setStateAsync("commands.lastResult", { val: "running", ack: true });
+		await this.setStateAsync("commands.lastResult", { val: "waiting-for-session", ack: true });
 		await this.setStateAsync("commands.lastError", { val: "", ack: true });
 		await this.setStateAsync("commands.lastExecution", { val: new Date().toISOString(), ack: true });
+		await this.setStateAsync("commands.lastApiLatencyMs", { val: 0, ack: true });
+		await this.setStateAsync("commands.lastConfirmationLatencyMs", { val: 0, ack: true });
 
 		try {
-			if (!this.commandClient || !this.commandToken || !this.commandSerial || !this.config.username) {
-				throw new Error("Proscenic command session is not ready");
-			}
+			const session = await this.waitForCommandSession();
 			if (!this.commandEnabled) {
 				throw new Error("Proscenic commands are not enabled for the selected device");
 			}
-			const idleMs = Date.now() - this.lastGatewayActivityAt;
-			if (this.lastGatewayActivityAt === 0 || idleMs > GATEWAY_IDLE_TIMEOUT_MS) {
-				await this.reconnectIdleGateway(
-					this.lastGatewayActivityAt === 0
-						? "no gateway event has been received yet"
-						: `last gateway event is ${Math.round(idleMs / 1_000)} seconds old`,
-				);
-				throw new Error("Proscenic gateway event stream is stale; reconnect is in progress");
-			}
 
-			const request = buildCommandRequest(command, this.commandSerial, this.config.username);
-			const result = await this.commandClient.sendCommand(this.commandToken, request);
+			await this.setStateAsync("commands.lastResult", { val: "sending", ack: true });
+			const request = buildCommandRequest(command, session.serial, session.username);
+			const apiStartedAt = Date.now();
+			const result = await session.client.sendCommand(session.token, request);
+			const apiLatencyMs = Date.now() - apiStartedAt;
+			const confirmation =
+				result.code === undefined || result.code === 0
+					? this.waitForCommandConfirmation(command)
+					: Promise.resolve(undefined);
+			await this.setStateAsync("commands.lastApiLatencyMs", { val: apiLatencyMs, ack: true });
 			await this.setStateAsync("commands.lastResult", {
 				val: result.code === undefined || result.code === 0 ? "api-accepted" : `api-code-${result.code}`,
 				ack: true,
 			});
-			await this.setStateAsync(stateId, { val: false, ack: true });
+
+			if (result.code === undefined || result.code === 0) {
+				const confirmationLatencyMs = await confirmation;
+				if (confirmationLatencyMs !== undefined) {
+					await this.setStateAsync("commands.lastConfirmationLatencyMs", {
+						val: confirmationLatencyMs,
+						ack: true,
+					});
+					await this.setStateAsync("commands.lastResult", { val: "status-confirmed", ack: true });
+				} else if (supportsStatusConfirmation(command)) {
+					await this.setStateAsync("commands.lastConfirmationLatencyMs", {
+						val: COMMAND_CONFIRMATION_TIMEOUT_MS,
+						ack: true,
+					});
+					await this.setStateAsync("commands.lastResult", { val: "api-accepted-unconfirmed", ack: true });
+				}
+			}
 		} catch (error) {
+			this.cancelPendingCommandConfirmation();
+			this.recoverCommandSessionAfterFailure();
 			await this.setCommandFailure(stateId, command, error);
-		} finally {
-			this.commandInProgress = false;
 		}
+	}
+
+	private currentCommandSession(): CommandSession | undefined {
+		if (!this.commandClient || !this.commandToken || !this.commandSerial || !this.config.username) {
+			return undefined;
+		}
+
+		return {
+			client: this.commandClient,
+			token: this.commandToken,
+			serial: this.commandSerial,
+			username: this.config.username,
+		};
+	}
+
+	private async waitForCommandSession(): Promise<CommandSession> {
+		const current = this.currentCommandSession();
+		if (current) {
+			return current;
+		}
+		if (!this.config.username || !this.config.password) {
+			throw new Error("Proscenic cloud credentials are not configured");
+		}
+
+		this.clearReconnectTimer();
+		void this.connectReadOnlyGateway();
+		const deadline = Date.now() + COMMAND_SESSION_WAIT_MS;
+		while (!this.shuttingDown && Date.now() < deadline) {
+			await this.commandDelay(COMMAND_SESSION_POLL_MS);
+			const session = this.currentCommandSession();
+			if (session) {
+				return session;
+			}
+		}
+
+		throw new Error("Proscenic command session did not recover in time");
+	}
+
+	private commandDelay(delayMs: number): Promise<void> {
+		return new Promise(resolve => this.setTimeout(resolve, delayMs));
+	}
+
+	private waitForCommandConfirmation(command: RobotCommand): Promise<number | undefined> {
+		if (!supportsStatusConfirmation(command)) {
+			return Promise.resolve(undefined);
+		}
+
+		this.cancelPendingCommandConfirmation();
+		return new Promise(resolve => {
+			const acceptedAt = Date.now();
+			const timer = this.setTimeout(() => {
+				if (this.pendingCommandConfirmation?.command === command) {
+					this.pendingCommandConfirmation = undefined;
+				}
+				resolve(undefined);
+			}, COMMAND_CONFIRMATION_TIMEOUT_MS);
+			this.pendingCommandConfirmation = { command, acceptedAt, timer, resolve };
+		});
+	}
+
+	private confirmPendingCommand(status: RobotStatus): void {
+		const pending = this.pendingCommandConfirmation;
+		if (!pending || !isStatusConfirmationForCommand(pending.command, status)) {
+			return;
+		}
+
+		this.pendingCommandConfirmation = undefined;
+		if (pending.timer) {
+			this.clearTimeout(pending.timer);
+		}
+		pending.resolve(Date.now() - pending.acceptedAt);
+	}
+
+	private cancelPendingCommandConfirmation(): void {
+		const pending = this.pendingCommandConfirmation;
+		if (!pending) {
+			return;
+		}
+
+		this.pendingCommandConfirmation = undefined;
+		if (pending.timer) {
+			this.clearTimeout(pending.timer);
+		}
+		pending.resolve(undefined);
+	}
+
+	private recoverCommandSessionAfterFailure(): void {
+		if (this.shuttingDown) {
+			return;
+		}
+
+		this.clearCommandSession();
+		this.clearReconnectTimer();
+		void this.setCloudConnection(false);
+		void this.connectReadOnlyGateway();
 	}
 
 	private async setCommandFailure(stateId: string, command: RobotCommand, error: unknown): Promise<void> {

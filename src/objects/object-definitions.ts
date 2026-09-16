@@ -146,6 +146,12 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("commands.lastResult", "Last command result", "string", "text"),
 	state("commands.lastError", "Last command error", "string", "text"),
 	state("commands.lastExecution", "Last command execution", "string", "date"),
+	state("commands.queueDepth", "Queued command count", "number", "value", { min: 0 }),
+	state("commands.lastApiLatencyMs", "Last command API latency", "number", "value", { unit: "ms", min: 0 }),
+	state("commands.lastConfirmationLatencyMs", "Last command confirmation latency", "number", "value", {
+		unit: "ms",
+		min: 0,
+	}),
 ];
 
 export async function extendAdapterObjects(adapter: ioBroker.Adapter): Promise<void> {

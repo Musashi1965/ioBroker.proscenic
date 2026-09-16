@@ -20,6 +20,11 @@ export interface CommandDefinition {
 	command: RobotCommand;
 }
 
+export interface CommandStatusSnapshot {
+	mode?: string;
+	fanMode?: string;
+}
+
 export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
 	{ id: "commands.start", command: "start" },
 	{ id: "commands.pause", command: "pause" },
@@ -34,6 +39,31 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
 
 export function commandForStateId(id: string): RobotCommand | undefined {
 	return COMMAND_DEFINITIONS.find(definition => definition.id === id)?.command;
+}
+
+export function supportsStatusConfirmation(command: RobotCommand): boolean {
+	return command !== "collectDust";
+}
+
+export function isStatusConfirmationForCommand(command: RobotCommand, status: CommandStatusSnapshot): boolean {
+	switch (command) {
+		case "start":
+		case "continue":
+		case "deepCleaning":
+			return status.mode === "sweep";
+		case "pause":
+			return status.mode === "pause";
+		case "return":
+			return status.mode === "backcharge" || status.mode === "charge" || status.mode === "fullcharge";
+		case "fanQuiet":
+			return status.fanMode === "quiet";
+		case "fanStandard":
+			return status.fanMode === "auto";
+		case "fanStrong":
+			return status.fanMode === "strong";
+		case "collectDust":
+			return false;
+	}
 }
 
 export function normalizeCommandButtonValue(value: ioBroker.StateValue | undefined): boolean | undefined {

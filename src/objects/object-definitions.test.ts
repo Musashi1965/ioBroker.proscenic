@@ -81,6 +81,9 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("commands.fan.strong");
 		expect(ids).to.include("commands.deepCleaning");
 		expect(ids).to.include("commands.collectDust");
+		expect(ids).to.include("commands.queueDepth");
+		expect(ids).to.include("commands.lastApiLatencyMs");
+		expect(ids).to.include("commands.lastConfirmationLatencyMs");
 		expect(writableIds).to.have.members([
 			"commands.start",
 			"commands.pause",

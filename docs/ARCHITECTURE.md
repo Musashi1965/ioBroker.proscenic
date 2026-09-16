@@ -65,13 +65,16 @@ gateway event -> validate/decrypt -> normalize -> project with ack=true
 ```
 
 ```text
-ioBroker write ack=false -> validate -> capability check -> serialize command
-  -> REST execution -> confirmation/result -> states with ack=true
+ioBroker write ack=false -> validate -> bounded FIFO queue -> REST session recovery
+  -> one REST execution -> pushed status confirmation/result -> states with ack=true
 ```
 
 No optimistic success may be reported as confirmed device state. If the
 protocol provides no confirmation, expose an explicit command result and keep
-that limitation documented.
+that limitation documented. Gateway socket freshness is not REST command
+readiness: the vendor routinely closes the pushed-event socket while the
+authenticated REST session remains usable. Ambiguous mutating request failures
+must never be retried automatically.
 
 ## Identity
 

@@ -1,5 +1,11 @@
 import { expect } from "chai";
-import { buildCommandRequest, commandForStateId, normalizeCommandButtonValue } from "./commands";
+import {
+	buildCommandRequest,
+	commandForStateId,
+	isStatusConfirmationForCommand,
+	normalizeCommandButtonValue,
+	supportsStatusConfirmation,
+} from "./commands";
 
 describe("buildCommandRequest", () => {
 	it("builds the first public adapter command requests", () => {
@@ -63,6 +69,26 @@ describe("commandForStateId", () => {
 		expect(commandForStateId("commands.start")).to.equal("start");
 		expect(commandForStateId("commands.fan.standard")).to.equal("fanStandard");
 		expect(commandForStateId("status.mode")).to.equal(undefined);
+	});
+});
+
+describe("command status confirmation", () => {
+	it("matches command-specific status events", () => {
+		expect(isStatusConfirmationForCommand("start", { mode: "sweep" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("pause", { mode: "pause" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("continue", { mode: "sweep" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("return", { mode: "backcharge" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("return", { mode: "charge" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("fanQuiet", { fanMode: "quiet" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("fanStandard", { fanMode: "auto" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("fanStrong", { fanMode: "strong" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("pause", { mode: "sweep" })).to.equal(false);
+	});
+
+	it("does not claim a status confirmation contract for dust collection", () => {
+		expect(supportsStatusConfirmation("pause")).to.equal(true);
+		expect(supportsStatusConfirmation("collectDust")).to.equal(false);
+		expect(isStatusConfirmationForCommand("collectDust", { mode: "backcharge" })).to.equal(false);
 	});
 });
 

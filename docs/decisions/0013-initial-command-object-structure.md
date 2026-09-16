@@ -18,17 +18,17 @@ that a physical target state has already been reached.
 
 Expose the confirmed command candidates as boolean ioBroker button states:
 
-| State ID | Command |
-| --- | --- |
-| `commands.start` | start cleaning |
-| `commands.pause` | pause cleaning |
-| `commands.continue` | continue cleaning |
-| `commands.return` | return to station |
-| `commands.fan.quiet` | quiet fan mode |
+| State ID                | Command           |
+| ----------------------- | ----------------- |
+| `commands.start`        | start cleaning    |
+| `commands.pause`        | pause cleaning    |
+| `commands.continue`     | continue cleaning |
+| `commands.return`       | return to station |
+| `commands.fan.quiet`    | quiet fan mode    |
 | `commands.fan.standard` | standard fan mode |
-| `commands.fan.strong` | strong fan mode |
-| `commands.deepCleaning` | deep cleaning |
-| `commands.collectDust` | dust collection |
+| `commands.fan.strong`   | strong fan mode   |
+| `commands.deepCleaning` | deep cleaning     |
+| `commands.collectDust`  | dust collection   |
 
 An external write of a trigger value with `ack=false` sends exactly one command.
 The adapter accepts the boolean value `true`, numeric `1`, and the strings
@@ -60,16 +60,21 @@ are serialized so that only one command is in flight at a time.
 
 `commands.lastResult=api-accepted` means only that the legacy cloud API accepted
 the request without an HTTP/API error. It is not a confirmation that the robot
-changed physical state. If the gateway event stream is stale, the adapter fails
-the command locally, starts gateway recovery, and records a redacted error
-instead of sending a command into a known stale session.
+changed physical state.
+
+ADR 0019 supersedes the initial coupling between command submission and gateway
+event-stream freshness. The gateway uses routinely short-lived sockets, while
+commands use an independent REST session. The adapter therefore queues commands
+during bounded REST-session recovery and uses later gateway status events only
+for explicit confirmation and latency measurement.
 
 ## Consequences
 
 The test host can now validate commands from normal ioBroker state writes. This
 does not yet mean the command contract is release-ready: final failure
 semantics, user-facing names, result enums, and command confirmation behavior
-still need real-device adapter validation.
+still need continued real-device adapter validation. ADR 0019 defines the first
+bounded delivery and confirmation contract used for that validation.
 
 The status tree remains read-only. Command result states describe request
 handling only; actual robot movement or fan state must still come from

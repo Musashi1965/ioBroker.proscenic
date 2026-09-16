@@ -163,7 +163,8 @@ private, redacted evidence for:
 5. authentication and gateway failure behavior with redacted errors;
 6. maintenance and warning conditions such as a full dust bag, without
    exposing raw vendor error payloads;
-7. adapter-level command acknowledgement and failure semantics.
+7. continued adapter-level validation of the bounded delivery, acknowledgement,
+   and status-confirmation semantics defined by ADR 0019.
 
 Only after the candidate status fields are interpreted should the project
 freeze the first public ioBroker status contract in a new ADR.

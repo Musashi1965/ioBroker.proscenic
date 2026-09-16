@@ -33,10 +33,12 @@ Current decisions:
 - [ADR 0017](0017-consumables-and-message-history-objects.md): consumables and
   message history objects
 - [ADR 0018](0018-single-publication-mandate.md): single publication mandate
+- [ADR 0019](0019-reliable-command-delivery-and-confirmation.md): reliable
+  command delivery and status confirmation
 
 Required future decisions include accepting the first public object contract,
-stable device identity, token renewal, command confirmation behavior, public
-command failure semantics, and raw map rendering/storage.
+stable device identity, token renewal, final public command failure semantics,
+and raw map rendering/storage.
 
 ## Template
 
