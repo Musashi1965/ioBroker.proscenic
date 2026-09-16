@@ -54,6 +54,10 @@ import type { DeviceRecord, GatewayData, GatewayEndpoint } from "./protocol/type
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const CONSUMABLE_GATEWAY_TIMEOUT_MS = 35_000;
+const AUXILIARY_READ_INTERVAL_MS = 15 * 60_000;
+const GATEWAY_IDLE_TIMEOUT_MS = 90_000;
+const GATEWAY_IDLE_CHECK_INTERVAL_MS = 30_000;
+const GATEWAY_STABLE_CONNECTION_MS = 5 * 60_000;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
 
@@ -66,6 +70,7 @@ interface PendingConsumableRead {
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
 	private reconnectTimer: ioBroker.Timeout | undefined;
+	private gatewayIdleTimer: ReturnType<ioBroker.Adapter["setInterval"]> | undefined;
 	private reconnectAttempt = 0;
 	private reconnectInProgress = false;
 	private commandInProgress = false;
@@ -84,6 +89,10 @@ class Proscenic extends utils.Adapter {
 	private lastPoseUpdated: string | undefined;
 	private maintenanceEventCount = 0;
 	private auxiliaryReadInProgress = false;
+	private lastAuxiliaryReadAt = 0;
+	private gatewayConnectedAt = 0;
+	private lastGatewayActivityAt = 0;
+	private gatewayIdleReconnectCount = 0;
 	private pendingConsumableRead: PendingConsumableRead | undefined;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
@@ -111,6 +120,8 @@ class Proscenic extends utils.Adapter {
 		await this.setStateAsync("device.onlineUpdated", { val: "", ack: true });
 		await setDeviceOnlineStale(this, true);
 		await setDeviceListDiagnostics(this, 0, "pending");
+		await this.setStateAsync("connection.lastGatewayEvent", { val: "", ack: true });
+		await this.setStateAsync("connection.gatewayIdleReconnectCount", { val: 0, ack: true });
 		await setInitialCapabilityStates(this);
 		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
@@ -136,6 +147,7 @@ class Proscenic extends utils.Adapter {
 		try {
 			this.shuttingDown = true;
 			this.clearReconnectTimer();
+			this.clearGatewayIdleTimer();
 			this.rejectPendingConsumableRead(new Error("Adapter unload interrupted consumable read"));
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
@@ -206,6 +218,7 @@ class Proscenic extends utils.Adapter {
 		const endpoint = selectGatewayEndpoint(gateway);
 
 		this.gatewayClient?.destroy();
+		this.clearGatewayIdleTimer();
 		this.gatewayClient = new ProscenicGatewayClient({
 			endpoint,
 			token,
@@ -213,18 +226,24 @@ class Proscenic extends utils.Adapter {
 			timeoutMs: DEFAULT_TIMEOUT_MS,
 			maxBufferBytes: MAX_GATEWAY_BUFFER_BYTES,
 			onConnect: () => {
-				this.reconnectAttempt = 0;
+				const now = Date.now();
+				this.gatewayConnectedAt = now;
+				this.lastGatewayActivityAt = now;
 				void setConnectionState(this, "gateway", true);
 				this.log.info("Connected to the Proscenic gateway.");
-				void this.refreshVerifiedReadPaths();
+				this.scheduleGatewayIdleCheck();
+				void this.refreshVerifiedReadPathsIfDue();
 			},
 			onEvent: event => {
+				this.recordGatewayEventActivity();
 				void this.handleGatewayEvent(event.infoType, event.data);
 			},
 			onClose: () => {
+				this.clearGatewayIdleTimer();
 				void setConnectionState(this, "gateway", false);
 				this.rejectPendingConsumableRead(new Error("Gateway closed before consumable data was received"));
 				if (!this.shuttingDown) {
+					this.resetReconnectAttemptAfterStableConnection();
 					this.log.warn("Proscenic gateway connection closed.");
 					this.scheduleReconnect("gateway close");
 				}
@@ -259,6 +278,68 @@ class Proscenic extends utils.Adapter {
 		if (this.reconnectTimer) {
 			this.clearTimeout(this.reconnectTimer);
 			this.reconnectTimer = undefined;
+		}
+	}
+
+	private scheduleGatewayIdleCheck(): void {
+		this.clearGatewayIdleTimer();
+		this.gatewayIdleTimer = this.setInterval(() => {
+			void this.checkGatewayIdle();
+		}, GATEWAY_IDLE_CHECK_INTERVAL_MS);
+	}
+
+	private clearGatewayIdleTimer(): void {
+		if (this.gatewayIdleTimer) {
+			this.clearInterval(this.gatewayIdleTimer);
+			this.gatewayIdleTimer = undefined;
+		}
+	}
+
+	private recordGatewayEventActivity(): void {
+		this.lastGatewayActivityAt = Date.now();
+		void this.setStateAsync("connection.lastGatewayEvent", { val: new Date().toISOString(), ack: true });
+	}
+
+	private async checkGatewayIdle(): Promise<void> {
+		if (this.shuttingDown || !this.gatewayClient || this.lastGatewayActivityAt === 0) {
+			return;
+		}
+
+		const idleMs = Date.now() - this.lastGatewayActivityAt;
+		if (idleMs <= GATEWAY_IDLE_TIMEOUT_MS) {
+			return;
+		}
+
+		await this.reconnectIdleGateway(`no gateway event received for ${Math.round(idleMs / 1_000)} seconds`);
+	}
+
+	private async reconnectIdleGateway(reason: string): Promise<void> {
+		if (this.shuttingDown || !this.gatewayClient) {
+			return;
+		}
+
+		this.gatewayIdleReconnectCount += 1;
+		this.log.warn(`Reconnecting stale Proscenic gateway: ${reason}.`);
+		await this.setStateAsync("connection.gatewayIdleReconnectCount", {
+			val: this.gatewayIdleReconnectCount,
+			ack: true,
+		});
+		await setLastError(this, new Error(`Gateway idle watchdog: ${reason}`));
+		await setConnectionState(this, "gateway", false);
+		this.rejectPendingConsumableRead(new Error(`Gateway idle watchdog: ${reason}`));
+		this.clearGatewayIdleTimer();
+		this.gatewayClient.destroy();
+		this.gatewayClient = undefined;
+		this.clearCommandSession();
+		this.scheduleReconnect("gateway idle watchdog");
+	}
+
+	private resetReconnectAttemptAfterStableConnection(): void {
+		if (this.gatewayConnectedAt === 0) {
+			return;
+		}
+		if (Date.now() - this.gatewayConnectedAt >= GATEWAY_STABLE_CONNECTION_MS) {
+			this.reconnectAttempt = 0;
 		}
 	}
 
@@ -333,7 +414,7 @@ class Proscenic extends utils.Adapter {
 		}
 	}
 
-	private async refreshVerifiedReadPaths(): Promise<void> {
+	private async refreshVerifiedReadPathsIfDue(): Promise<void> {
 		if (this.auxiliaryReadInProgress || this.shuttingDown) {
 			return;
 		}
@@ -343,7 +424,12 @@ class Proscenic extends utils.Adapter {
 		if (!this.commandClient || !this.commandToken || !this.commandSerial) {
 			return;
 		}
+		const now = Date.now();
+		if (this.lastAuxiliaryReadAt !== 0 && now - this.lastAuxiliaryReadAt < AUXILIARY_READ_INTERVAL_MS) {
+			return;
+		}
 
+		this.lastAuxiliaryReadAt = now;
 		this.auxiliaryReadInProgress = true;
 		try {
 			await Promise.all([this.refreshMaintenanceHistory(), this.refreshConsumables()]);
@@ -562,11 +648,20 @@ class Proscenic extends utils.Adapter {
 			if (!this.commandEnabled) {
 				throw new Error("Proscenic commands are not enabled for the selected device");
 			}
+			const idleMs = Date.now() - this.lastGatewayActivityAt;
+			if (this.lastGatewayActivityAt === 0 || idleMs > GATEWAY_IDLE_TIMEOUT_MS) {
+				await this.reconnectIdleGateway(
+					this.lastGatewayActivityAt === 0
+						? "no gateway event has been received yet"
+						: `last gateway event is ${Math.round(idleMs / 1_000)} seconds old`,
+				);
+				throw new Error("Proscenic gateway event stream is stale; reconnect is in progress");
+			}
 
 			const request = buildCommandRequest(command, this.commandSerial, this.config.username);
 			const result = await this.commandClient.sendCommand(this.commandToken, request);
 			await this.setStateAsync("commands.lastResult", {
-				val: result.code === undefined || result.code === 0 ? "sent" : `api-code-${result.code}`,
+				val: result.code === undefined || result.code === 0 ? "api-accepted" : `api-code-${result.code}`,
 				ack: true,
 			});
 			await this.setStateAsync(stateId, { val: false, ack: true });

@@ -6,7 +6,7 @@ export interface ReconnectDelayOptions {
 
 export const DEFAULT_RECONNECT_DELAY_OPTIONS: ReconnectDelayOptions = {
 	initialDelayMs: 5_000,
-	maxDelayMs: 60_000,
+	maxDelayMs: 300_000,
 	factor: 2,
 };
 

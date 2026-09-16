@@ -23,8 +23,17 @@ Add a small adapter-owned reconnect policy for the legacy gateway path:
 - startup connection failure marks cloud and gateway offline and records a
   redacted error;
 - reconnects are scheduled with bounded exponential backoff starting at five
-  seconds and capped at sixty seconds;
-- a successful gateway connection resets the backoff;
+  seconds and capped at five minutes;
+- a successful short-lived gateway connection does not reset the backoff; only
+  a connection that remains established for at least five minutes resets the
+  reconnect attempt counter;
+- the adapter records `connection.lastGatewayEvent` for the last received
+  gateway event and keeps `connection.gatewayIdleReconnectCount` as a bounded
+  diagnostic counter;
+- if the gateway socket remains technically connected but no gateway event is
+  received for 90 seconds, the adapter treats the stream as stale, marks the
+  gateway disconnected, closes the socket, clears the command session, and
+  schedules a reconnect through the same backoff path;
 - only one reconnect timer or connection attempt may be active at a time;
 - unload clears the reconnect timer and destroys the socket without scheduling
   recovery;
@@ -33,7 +42,9 @@ Add a small adapter-owned reconnect policy for the legacy gateway path:
 
 The reconnect reuses the existing login, device selection, gateway discovery,
 and socket setup path. This deliberately reauthenticates and rediscovers the
-gateway instead of assuming that a stale token or endpoint is still valid.
+gateway instead of assuming that a stale token or endpoint is still valid. The
+backoff and idle watchdog prevent short-lived gateway sessions from becoming a
+tight cloud login loop.
 
 ## Consequences
 

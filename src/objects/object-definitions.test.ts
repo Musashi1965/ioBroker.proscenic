@@ -100,6 +100,8 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("connection.lastDeviceListResult");
 		expect(ids).to.include("connection.lastDeviceListCount");
 		expect(ids).to.include("connection.lastDeviceListUpdate");
+		expect(ids).to.include("connection.lastGatewayEvent");
+		expect(ids).to.include("connection.gatewayIdleReconnectCount");
 		for (const definition of STATE_DEFINITIONS) {
 			if (
 				definition.id === "map.live.backgroundColor" ||

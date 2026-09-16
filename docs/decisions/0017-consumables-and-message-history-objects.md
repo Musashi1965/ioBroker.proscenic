@@ -81,11 +81,13 @@ The adapter also exposes:
 - `capabilities.consumables`;
 - `capabilities.maintenanceMessages`.
 
-After a gateway connection is established, the adapter triggers both verified
-read paths once per connection attempt. The consumable REST acknowledgement is
-not treated as data; the adapter waits for a bounded `21015` gateway event and
-keeps the previous values when the event is not received. The message-history
-request is bounded to the first page of ten items for now.
+After a gateway connection is established, the adapter may trigger both verified
+read paths, but no more often than once every 15 minutes. The consumable REST
+acknowledgement is not treated as data; the adapter waits for a bounded `21015`
+gateway event and keeps the previous values when the event is not received. The
+message-history request is bounded to the first page of ten items for now. This
+throttle prevents short-lived gateway reconnect loops from repeatedly hitting
+the legacy cloud with auxiliary read requests.
 
 Historical messages do not by themselves set or clear
 `status.maintenance.hasWarning`. Active warning semantics remain a separate

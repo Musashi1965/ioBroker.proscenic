@@ -58,6 +58,12 @@ The adapter may set `capabilities.commands` to `true` only after selecting a
 device whose product code and model match the verified M7 Pro target. Commands
 are serialized so that only one command is in flight at a time.
 
+`commands.lastResult=api-accepted` means only that the legacy cloud API accepted
+the request without an HTTP/API error. It is not a confirmation that the robot
+changed physical state. If the gateway event stream is stale, the adapter fails
+the command locally, starts gateway recovery, and records a redacted error
+instead of sending a command into a known stale session.
+
 ## Consequences
 
 The test host can now validate commands from normal ioBroker state writes. This

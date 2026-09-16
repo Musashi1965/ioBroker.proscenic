@@ -51,6 +51,8 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("connection.lastDeviceListResult", "Last device list result", "string", "text"),
 	state("connection.lastDeviceListCount", "Last device list count", "number", "value", { min: 0 }),
 	state("connection.lastDeviceListUpdate", "Last device list update", "string", "date"),
+	state("connection.lastGatewayEvent", "Last gateway event", "string", "date"),
+	state("connection.gatewayIdleReconnectCount", "Gateway idle reconnect count", "number", "value", { min: 0 }),
 	state("connection.lastStatusEvent", "Last status event", "string", "date"),
 	state("capabilities.statusRead", "Read status", "boolean", "indicator"),
 	state("capabilities.commands", "Commands exposed", "boolean", "indicator"),
