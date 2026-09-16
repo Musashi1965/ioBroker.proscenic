@@ -22,11 +22,18 @@ Add a small adapter-owned reconnect policy for the legacy gateway path:
 - unexpected gateway close marks `connection.gateway=false`;
 - startup connection failure marks cloud and gateway offline and records a
   redacted error;
-- reconnects are scheduled with bounded exponential backoff starting at five
-  seconds and capped at five minutes;
+- normal gateway socket closes are first recovered by reopening only the gateway
+  socket with the current token, serial, and gateway endpoint after five
+  seconds; this avoids a cloud login/device-list/gateway-discovery loop when
+  the gateway closes short-lived sockets after sending events;
+- full cloud reconnects are scheduled with bounded exponential backoff starting
+  at five seconds and capped at five minutes;
 - a successful short-lived gateway connection does not reset the backoff; only
   a connection that remains established for at least five minutes resets the
   reconnect attempt counter;
+- if a gateway socket closes before any event was received, or if cached session
+  material is missing, the adapter clears the command session and falls back to
+  a full cloud reconnect;
 - the adapter records `connection.lastGatewayEvent` for the last received
   gateway event and keeps `connection.gatewayIdleReconnectCount` as a bounded
   diagnostic counter;
@@ -40,11 +47,13 @@ Add a small adapter-owned reconnect policy for the legacy gateway path:
 - no gateway endpoint, token, serial number, raw event, or private payload is
   logged or stored.
 
-The reconnect reuses the existing login, device selection, gateway discovery,
-and socket setup path. This deliberately reauthenticates and rediscovers the
-gateway instead of assuming that a stale token or endpoint is still valid. The
-backoff and idle watchdog prevent short-lived gateway sessions from becoming a
-tight cloud login loop.
+The full reconnect reuses the existing login, device selection, gateway
+discovery, and socket setup path. The preferred recovery for ordinary gateway
+closure is a socket-only reconnect, because live validation showed repeated
+short-lived gateway sessions that still delivered useful status/map events. The
+full reconnect remains the fallback when the current token/endpoint appears
+unusable. The backoff and idle watchdog prevent short-lived gateway sessions
+from becoming a tight cloud login loop.
 
 ## Consequences
 
@@ -64,9 +73,10 @@ permanent credential failures.
 Keep the current single-shot gateway connection and require manual restarts.
 Rejected because live validation showed stale status after socket closure.
 
-Reconnect only the TCP socket using the previous token and endpoint. Rejected
-for this milestone because token/endpoint lifetime is undocumented; the safer
-small path is to re-run the bounded discovery sequence.
+Reconnect only the TCP socket using the previous token and endpoint. Initially
+rejected because token/endpoint lifetime is undocumented. Later live validation
+accepted it as the first recovery step for gateway closes that already delivered
+events, with full cloud reconnect retained as fallback.
 
 Poll status over the cloud instead of reconnecting the gateway. Rejected for now
 because pushed gateway events are already proven and polling semantics are not

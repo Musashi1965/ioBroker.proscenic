@@ -58,6 +58,7 @@ const AUXILIARY_READ_INTERVAL_MS = 15 * 60_000;
 const GATEWAY_IDLE_TIMEOUT_MS = 90_000;
 const GATEWAY_IDLE_CHECK_INTERVAL_MS = 30_000;
 const GATEWAY_STABLE_CONNECTION_MS = 5 * 60_000;
+const GATEWAY_SOCKET_RECONNECT_DELAY_MS = 5_000;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
 
@@ -78,6 +79,7 @@ class Proscenic extends utils.Adapter {
 	private commandClient: ProscenicRestClient | undefined;
 	private commandToken: string | undefined;
 	private commandSerial: string | undefined;
+	private commandGatewayEndpoint: GatewayEndpoint | undefined;
 	private shuttingDown = false;
 	private recentRobotPoses: RobotPose[] = [];
 	private latestMapData: unknown;
@@ -92,6 +94,7 @@ class Proscenic extends utils.Adapter {
 	private lastAuxiliaryReadAt = 0;
 	private gatewayConnectedAt = 0;
 	private lastGatewayActivityAt = 0;
+	private gatewayReceivedEventSinceConnect = false;
 	private gatewayIdleReconnectCount = 0;
 	private pendingConsumableRead: PendingConsumableRead | undefined;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
@@ -175,7 +178,7 @@ class Proscenic extends utils.Adapter {
 			await setConnectionState(this, "cloud", false);
 			await setConnectionState(this, "gateway", false);
 			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
-			this.scheduleReconnect("connection failure");
+			this.scheduleFullReconnect("connection failure");
 		} finally {
 			this.reconnectInProgress = false;
 		}
@@ -216,13 +219,20 @@ class Proscenic extends utils.Adapter {
 
 		const gateway = await client.getGateway(token, device.sn);
 		const endpoint = selectGatewayEndpoint(gateway);
+		this.commandGatewayEndpoint = endpoint;
+		this.reconnectAttempt = 0;
 
+		this.connectGatewaySocket(endpoint, token, device.sn);
+	}
+
+	private connectGatewaySocket(endpoint: GatewayEndpoint, token: string, serial: string): void {
 		this.gatewayClient?.destroy();
 		this.clearGatewayIdleTimer();
+		this.gatewayReceivedEventSinceConnect = false;
 		this.gatewayClient = new ProscenicGatewayClient({
 			endpoint,
 			token,
-			serial: device.sn,
+			serial,
 			timeoutMs: DEFAULT_TIMEOUT_MS,
 			maxBufferBytes: MAX_GATEWAY_BUFFER_BYTES,
 			onConnect: () => {
@@ -235,6 +245,7 @@ class Proscenic extends utils.Adapter {
 				void this.refreshVerifiedReadPathsIfDue();
 			},
 			onEvent: event => {
+				this.gatewayReceivedEventSinceConnect = true;
 				this.recordGatewayEventActivity();
 				void this.handleGatewayEvent(event.infoType, event.data);
 			},
@@ -245,7 +256,7 @@ class Proscenic extends utils.Adapter {
 				if (!this.shuttingDown) {
 					this.resetReconnectAttemptAfterStableConnection();
 					this.log.warn("Proscenic gateway connection closed.");
-					this.scheduleReconnect("gateway close");
+					this.scheduleGatewaySocketReconnect("gateway close");
 				}
 			},
 			onError: error => {
@@ -258,7 +269,7 @@ class Proscenic extends utils.Adapter {
 		this.gatewayClient.connect();
 	}
 
-	private scheduleReconnect(reason: string): void {
+	private scheduleFullReconnect(reason: string): void {
 		if (this.shuttingDown || this.reconnectTimer) {
 			return;
 		}
@@ -266,12 +277,42 @@ class Proscenic extends utils.Adapter {
 		this.reconnectAttempt += 1;
 		const delayMs = reconnectDelayMs(this.reconnectAttempt);
 		this.log.info(
-			`Scheduling Proscenic gateway reconnect in ${Math.round(delayMs / 1_000)} seconds after ${reason}.`,
+			`Scheduling full Proscenic cloud reconnect in ${Math.round(delayMs / 1_000)} seconds after ${reason}.`,
 		);
 		this.reconnectTimer = this.setTimeout(() => {
 			this.reconnectTimer = undefined;
 			void this.connectReadOnlyGateway();
 		}, delayMs);
+	}
+
+	private scheduleGatewaySocketReconnect(reason: string): void {
+		if (this.shuttingDown || this.reconnectTimer) {
+			return;
+		}
+
+		if (!this.commandGatewayEndpoint || !this.commandToken || !this.commandSerial) {
+			this.clearCommandSession();
+			this.scheduleFullReconnect(`${reason}; missing gateway session material`);
+			return;
+		}
+
+		if (!this.gatewayReceivedEventSinceConnect) {
+			this.clearCommandSession();
+			this.scheduleFullReconnect(`${reason}; gateway closed before any event`);
+			return;
+		}
+
+		const delaySeconds = Math.round(GATEWAY_SOCKET_RECONNECT_DELAY_MS / 1_000);
+		this.log.info(`Scheduling Proscenic gateway socket reconnect in ${delaySeconds} seconds after ${reason}.`);
+		this.reconnectTimer = this.setTimeout(() => {
+			this.reconnectTimer = undefined;
+			if (!this.commandGatewayEndpoint || !this.commandToken || !this.commandSerial) {
+				this.clearCommandSession();
+				void this.connectReadOnlyGateway();
+				return;
+			}
+			this.connectGatewaySocket(this.commandGatewayEndpoint, this.commandToken, this.commandSerial);
+		}, GATEWAY_SOCKET_RECONNECT_DELAY_MS);
 	}
 
 	private clearReconnectTimer(): void {
@@ -330,8 +371,7 @@ class Proscenic extends utils.Adapter {
 		this.clearGatewayIdleTimer();
 		this.gatewayClient.destroy();
 		this.gatewayClient = undefined;
-		this.clearCommandSession();
-		this.scheduleReconnect("gateway idle watchdog");
+		this.scheduleGatewaySocketReconnect("gateway idle watchdog");
 	}
 
 	private resetReconnectAttemptAfterStableConnection(): void {
@@ -687,6 +727,7 @@ class Proscenic extends utils.Adapter {
 		this.commandClient = undefined;
 		this.commandToken = undefined;
 		this.commandSerial = undefined;
+		this.commandGatewayEndpoint = undefined;
 	}
 
 	private async initializeLiveMapColors(): Promise<void> {
