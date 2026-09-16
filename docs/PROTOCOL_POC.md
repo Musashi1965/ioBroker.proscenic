@@ -76,10 +76,12 @@ and `30000`. Observed mode values include `sweep`, `pause`, `backcharge`, and
 robot is moving and may close the socket after sending a smaller idle/docked
 event set.
 
-Later adapter observation found `status.mode` reporting `dormant` even while
-the robot was doing other visible work. Therefore `mode` must be treated as a
-raw upstream mode candidate and not as a reliable public activity state until
-the project identifies the correct app-equivalent state derivation.
+Later adapter observation found `status.mode` reporting `dormant` or a docked
+value even while the robot was doing other visible work. Therefore `mode` must
+be treated as a raw upstream mode candidate and not as a reliable public
+activity state. The adapter exposes `status.activity` as a derived display
+state that combines gateway availability, raw mode values, and short-term
+cleaning progress inference.
 
 The Proscenic app also reported a maintenance warning equivalent to "dust bag
 full, please replace". The project has not yet identified which safe upstream

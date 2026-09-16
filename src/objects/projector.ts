@@ -4,7 +4,7 @@ import type { ConsumableStates } from "../domain/consumables";
 import type { MaintenanceHistory, MaintenanceMessage } from "../domain/maintenance-message";
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
-import type { RobotStatus } from "../domain/status";
+import type { RobotActivity, RobotStatus } from "../domain/status";
 import type { DeviceRecord } from "../protocol/types";
 
 export interface LiveMapProjectionDiagnostics {
@@ -59,6 +59,10 @@ export async function projectStatus(adapter: ioBroker.Adapter, status: RobotStat
 	await setIfDefined(adapter, "status.features.autoBoost", status.autoBoost);
 	await setIfDefined(adapter, "status.features.cleanComponents", status.cleanComponents);
 	await adapter.setStateAsync("connection.lastStatusEvent", { val: new Date().toISOString(), ack: true });
+}
+
+export async function projectRobotActivity(adapter: ioBroker.Adapter, activity: RobotActivity): Promise<void> {
+	await adapter.setStateAsync("status.activity", { val: activity, ack: true });
 }
 
 export async function projectMaintenanceMessage(

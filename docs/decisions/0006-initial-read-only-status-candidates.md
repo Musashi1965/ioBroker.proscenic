@@ -22,23 +22,23 @@ Use the following observed `infoType` 20001 fields as candidates for the first
 read-only status contract. These IDs are not accepted until this ADR is moved
 from proposed to accepted after value-level real-device verification.
 
-| Upstream field | Candidate state ID | Type | Role | Unit | Confidence | Note |
-| --- | --- | --- | --- | --- | --- | --- |
-| `cleanArea` | `status.clean.area` | number | `value` | `m2` | candidate | Cleaning area; unit needs app comparison. |
-| `cleanTime` | `status.clean.time` | number | `value` | `s` | observed | Current or last cleaning time in seconds. |
-| `allArea` | `status.clean.totalArea` | number | `value` |  | candidate | Likely accumulated area; exact meaning and scale pending. |
-| `allTime` | `status.clean.totalTime` | number | `value` | `s` | candidate | Likely accumulated time in seconds; exact meaning pending. |
-| `elec` | `status.battery.percent` | number | `value.battery` | `%` | candidate | Likely displayed battery percentage. |
-| `elecReal` | `status.battery.rawPercent` | number | `value.battery` | `%` | candidate | Second battery-like value; public value pending. |
-| `mode` | `status.mode` | string | `state` |  | candidate | Observed values include `charge`, `sweep`, `pause`, `backcharge`, and `dormant`; not reliable enough by itself as app-equivalent activity state. |
-| `subMode` | `status.subMode` | string | `state` |  | observed | Observed values: `total`, literal string `null`. |
-| `water` | `status.water.level` | number | `value` |  | candidate | Likely mopping water level; range pending. Uses a read-only compatible role until write semantics are validated. |
-| `mop` | `status.mop.mode` | number | `state` |  | candidate | Mopping-related mode; semantics pending. |
-| `workNoisy` | `status.fan.mode` | string | `state` |  | candidate | Likely suction/fan mode; enum values pending. |
-| `errorState` | `status.error.rawCount` | number | `value` |  | candidate | Expose only derived count, not raw vendor error array. |
-| `errorState` | `status.maintenance.details` | string | `text` |  | diagnostic | Bounded, redacted diagnostic summary for maintenance mapping. |
-| `autoBoost` | `status.features.autoBoost` | boolean | `indicator` |  | observed | Boolean feature/status flag; label pending. |
-| `cleanComponents` | `status.features.cleanComponents` | boolean | `indicator` |  | observed | Boolean feature/status flag; label pending. |
+| Upstream field    | Candidate state ID                | Type    | Role            | Unit | Confidence | Note                                                                                                                                             |
+| ----------------- | --------------------------------- | ------- | --------------- | ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cleanArea`       | `status.clean.area`               | number  | `value`         | `m2` | candidate  | Cleaning area; unit needs app comparison.                                                                                                        |
+| `cleanTime`       | `status.clean.time`               | number  | `value`         | `s`  | observed   | Current or last cleaning time in seconds.                                                                                                        |
+| `allArea`         | `status.clean.totalArea`          | number  | `value`         |      | candidate  | Likely accumulated area; exact meaning and scale pending.                                                                                        |
+| `allTime`         | `status.clean.totalTime`          | number  | `value`         | `s`  | candidate  | Likely accumulated time in seconds; exact meaning pending.                                                                                       |
+| `elec`            | `status.battery.percent`          | number  | `value.battery` | `%`  | candidate  | Likely displayed battery percentage.                                                                                                             |
+| `elecReal`        | `status.battery.rawPercent`       | number  | `value.battery` | `%`  | candidate  | Second battery-like value; public value pending.                                                                                                 |
+| `mode`            | `status.mode`                     | string  | `state`         |      | candidate  | Observed values include `charge`, `sweep`, `pause`, `backcharge`, and `dormant`; not reliable enough by itself as app-equivalent activity state. |
+| `subMode`         | `status.subMode`                  | string  | `state`         |      | observed   | Observed values: `total`, literal string `null`.                                                                                                 |
+| `water`           | `status.water.level`              | number  | `value`         |      | candidate  | Likely mopping water level; range pending. Uses a read-only compatible role until write semantics are validated.                                 |
+| `mop`             | `status.mop.mode`                 | number  | `state`         |      | candidate  | Mopping-related mode; semantics pending.                                                                                                         |
+| `workNoisy`       | `status.fan.mode`                 | string  | `state`         |      | candidate  | Likely suction/fan mode; enum values pending.                                                                                                    |
+| `errorState`      | `status.error.rawCount`           | number  | `value`         |      | candidate  | Expose only derived count, not raw vendor error array.                                                                                           |
+| `errorState`      | `status.maintenance.details`      | string  | `text`          |      | diagnostic | Bounded, redacted diagnostic summary for maintenance mapping.                                                                                    |
+| `autoBoost`       | `status.features.autoBoost`       | boolean | `indicator`     |      | observed   | Boolean feature/status flag; label pending.                                                                                                      |
+| `cleanComponents` | `status.features.cleanComponents` | boolean | `indicator`     |      | observed   | Boolean feature/status flag; label pending.                                                                                                      |
 
 Do not expose position arrays, timestamps, vendor counters, forbidden-mode
 internals, workstation details, or undocumented raw JSON in the first public
@@ -76,6 +76,14 @@ content into a concrete user-facing warning before the mapping is proven.
 
 All accepted states will be read-only and published with `ack=true`. Commands
 remain out of scope for this ADR.
+
+Later adapter validation adds `status.activity` as a separate adapter-derived
+display state rather than treating raw `status.mode` as the user-facing robot
+status. The derived state uses connection health plus observed mode/progress
+signals and may report `cleaning` while the raw upstream mode reports a docked
+value if cleaning counters continue to advance. This keeps the raw protocol
+value available for reverse engineering while giving VIS and dashboards a
+single practical status object.
 
 ## Consequences
 

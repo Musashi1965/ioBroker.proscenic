@@ -33,79 +33,80 @@ Top-level object groups:
 
 Initial states:
 
-| State ID | Type | Role | Unit | Source |
-| --- | --- | --- | --- | --- |
-| `device.code` | string | `info.name` |  | selected cloud device code with `PROSCENIC` display prefix |
-| `device.model` | string | `info.name` |  | selected cloud device |
-| `device.online` | boolean | `indicator.reachable` |  | selected cloud device |
-| `device.onlineUpdated` | string | `date` |  | latest successful device-list projection |
-| `device.onlineFresh` | boolean | `indicator` |  | true when `device.online` was freshly confirmed |
-| `device.onlineStale` | boolean | `indicator` |  | true when `device.online` is only a retained last-known value |
-| `device.image` | string | `text` |  | bundled product image for verified M7 Pro |
-| `connection.cloud` | boolean | `indicator.connected` |  | login/device discovery |
-| `connection.gateway` | boolean | `indicator.connected` |  | gateway socket |
-| `connection.lastError` | string | `text` |  | redacted adapter error |
-| `connection.lastDeviceListResult` | string | `text` |  | `pending`, `ok`, `empty`, `not-configured`, or `failed` |
-| `connection.lastDeviceListCount` | number | `value` |  | last cloud device-list count |
-| `connection.lastDeviceListUpdate` | string | `date` |  | last device-list diagnostic update |
-| `connection.lastStatusEvent` | string | `date` |  | last accepted status event |
-| `capabilities.statusRead` | boolean | `indicator` |  | implementation capability |
-| `capabilities.commands` | boolean | `indicator` |  | implementation capability |
-| `capabilities.maps` | boolean | `indicator` |  | implementation capability |
-| `capabilities.consumables` | boolean | `indicator` |  | verified `21015` read capability |
-| `capabilities.maintenanceMessages` | boolean | `indicator` |  | verified REST `20003` history capability |
-| `consumables.<component>.usedSeconds` | number | `value` | `s` | `infoType` 21015 |
-| `consumables.<component>.intervalHours` | number | `value` | `h` | verified app interval |
-| `consumables.<component>.remainingPercent` | number | `value` | `%` | derived from used seconds |
-| `consumables.<component>.overdueHours` | number | `value` | `h` | derived from used seconds |
-| `consumables.updated` | string | `date` |  | latest accepted `infoType` 21015 event |
-| `consumables.lastReadResult` | string | `text` |  | `21015` refresh result |
-| `consumables.lastError` | string | `text` |  | redacted `21015` refresh error |
-| `status.mode` | string | `state` |  | `infoType` 20001 |
-| `status.subMode` | string | `state` |  | `infoType` 20001 |
-| `status.clean.area` | number | `value` | `m²` | `infoType` 20001 |
-| `status.clean.time` | number | `value` | `s` | `infoType` 20001 |
-| `status.clean.totalArea` | number | `value` |  | `infoType` 20001 |
-| `status.clean.totalTime` | number | `value` | `s` | `infoType` 20001 |
-| `status.battery.percent` | number | `value.battery` | `%` | `infoType` 20001 |
-| `status.battery.rawPercent` | number | `value.battery` | `%` | `infoType` 20001 |
-| `status.water.level` | number | `value` |  | `infoType` 20001 |
-| `status.mop.mode` | number | `state` |  | `infoType` 20001 |
-| `status.fan.mode` | string | `state` |  | `infoType` 20001 |
-| `status.error.rawCount` | number | `value` |  | derived from `errorState` |
-| `status.features.autoBoost` | boolean | `indicator` |  | `infoType` 20001 |
-| `status.features.cleanComponents` | boolean | `indicator` |  | `infoType` 20001 |
-| `status.maintenance.hasWarning` | boolean | `indicator` |  | derived from `errorState` |
-| `status.maintenance.warningCount` | number | `value` |  | derived from `errorState` |
-| `status.maintenance.code` | number | `value` |  | latest `infoType` 20003 event code |
-| `status.maintenance.level` | number | `value` |  | latest `infoType` 20003 event level |
-| `status.maintenance.message` | string | `text` |  | generic maintenance warning or latest `infoType` 20003 message |
-| `status.maintenance.details` | string | `text` |  | redacted diagnostic summary |
-| `status.maintenance.eventCount` | number | `value` |  | accepted `infoType` 20003 event count since adapter start |
-| `status.maintenance.updated` | string | `date` |  | latest accepted `infoType` 20003 event |
-| `status.maintenance.history.items` | string | `json` |  | bounded REST `20003` history |
-| `status.maintenance.history.count` | number | `value` |  | safe history entries stored |
-| `status.maintenance.history.totalCount` | number | `value` |  | backend-reported total when present |
-| `status.maintenance.history.latestCode` | number | `value` |  | latest safe history entry code |
-| `status.maintenance.history.latestLevel` | number | `value` |  | latest safe history entry level |
-| `status.maintenance.history.latestMessage` | string | `text` |  | latest safe history entry message |
-| `status.maintenance.history.latestEventTime` | string | `date` |  | latest safe history entry time |
-| `status.maintenance.history.updated` | string | `date` |  | latest history read |
-| `status.maintenance.history.lastReadResult` | string | `text` |  | history read result |
-| `status.maintenance.history.lastError` | string | `text` |  | redacted history read error |
-| `map.available` | boolean | `indicator` |  | derived from `infoType` 20002 |
-| `map.id` | number | `value` |  | `infoType` 20002 metadata |
-| `map.pathId` | number | `value` |  | `infoType` 20002 metadata |
-| `map.width` | number | `value` |  | `infoType` 20002 metadata |
-| `map.height` | number | `value` |  | `infoType` 20002 metadata |
-| `map.resolution` | number | `value` |  | `infoType` 20002 metadata |
-| `map.areaCount` | number | `value` |  | derived from `infoType` 20002 `area` length |
-| `map.compressedBytes` | number | `value` | `B` | `infoType` 20002 metadata |
-| `map.encodedBytes` | number | `value` | `B` | derived from encoded map length |
-| `map.updated` | string | `date` |  | last safe map metadata update |
-| `map.live.canvasBackgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for white canvas/background map cells |
-| `map.live.mapBackgroundColor` | string | `level.color.rgb` |  | writable local VIS tuning color for light-blue map-area cells |
-| `map.live.backgroundColor` | string | `level.color.rgb` |  | legacy writable alias for `map.live.mapBackgroundColor` |
+| State ID                                     | Type    | Role                  | Unit | Source                                                                                                                          |
+| -------------------------------------------- | ------- | --------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `device.code`                                | string  | `info.name`           |      | selected cloud device code with `PROSCENIC` display prefix                                                                      |
+| `device.model`                               | string  | `info.name`           |      | selected cloud device                                                                                                           |
+| `device.online`                              | boolean | `indicator.reachable` |      | selected cloud device                                                                                                           |
+| `device.onlineUpdated`                       | string  | `date`                |      | latest successful device-list projection                                                                                        |
+| `device.onlineFresh`                         | boolean | `indicator`           |      | true when `device.online` was freshly confirmed                                                                                 |
+| `device.onlineStale`                         | boolean | `indicator`           |      | true when `device.online` is only a retained last-known value                                                                   |
+| `device.image`                               | string  | `text`                |      | bundled product image for verified M7 Pro                                                                                       |
+| `connection.cloud`                           | boolean | `indicator.connected` |      | login/device discovery                                                                                                          |
+| `connection.gateway`                         | boolean | `indicator.connected` |      | gateway socket                                                                                                                  |
+| `connection.lastError`                       | string  | `text`                |      | redacted adapter error                                                                                                          |
+| `connection.lastDeviceListResult`            | string  | `text`                |      | `pending`, `ok`, `empty`, `not-configured`, or `failed`                                                                         |
+| `connection.lastDeviceListCount`             | number  | `value`               |      | last cloud device-list count                                                                                                    |
+| `connection.lastDeviceListUpdate`            | string  | `date`                |      | last device-list diagnostic update                                                                                              |
+| `connection.lastStatusEvent`                 | string  | `date`                |      | last accepted status event                                                                                                      |
+| `capabilities.statusRead`                    | boolean | `indicator`           |      | implementation capability                                                                                                       |
+| `capabilities.commands`                      | boolean | `indicator`           |      | implementation capability                                                                                                       |
+| `capabilities.maps`                          | boolean | `indicator`           |      | implementation capability                                                                                                       |
+| `capabilities.consumables`                   | boolean | `indicator`           |      | verified `21015` read capability                                                                                                |
+| `capabilities.maintenanceMessages`           | boolean | `indicator`           |      | verified REST `20003` history capability                                                                                        |
+| `consumables.<component>.usedSeconds`        | number  | `value`               | `s`  | `infoType` 21015                                                                                                                |
+| `consumables.<component>.intervalHours`      | number  | `value`               | `h`  | verified app interval                                                                                                           |
+| `consumables.<component>.remainingPercent`   | number  | `value`               | `%`  | derived from used seconds                                                                                                       |
+| `consumables.<component>.overdueHours`       | number  | `value`               | `h`  | derived from used seconds                                                                                                       |
+| `consumables.updated`                        | string  | `date`                |      | latest accepted `infoType` 21015 event                                                                                          |
+| `consumables.lastReadResult`                 | string  | `text`                |      | `21015` refresh result                                                                                                          |
+| `consumables.lastError`                      | string  | `text`                |      | redacted `21015` refresh error                                                                                                  |
+| `status.activity`                            | string  | `state`               |      | adapter-derived display status: `offline`, `reconnecting`, `online`, `cleaning`, `paused`, `returning`, `charging`, or `docked` |
+| `status.mode`                                | string  | `state`               |      | `infoType` 20001                                                                                                                |
+| `status.subMode`                             | string  | `state`               |      | `infoType` 20001                                                                                                                |
+| `status.clean.area`                          | number  | `value`               | `m²` | `infoType` 20001                                                                                                                |
+| `status.clean.time`                          | number  | `value`               | `s`  | `infoType` 20001                                                                                                                |
+| `status.clean.totalArea`                     | number  | `value`               |      | `infoType` 20001                                                                                                                |
+| `status.clean.totalTime`                     | number  | `value`               | `s`  | `infoType` 20001                                                                                                                |
+| `status.battery.percent`                     | number  | `value.battery`       | `%`  | `infoType` 20001                                                                                                                |
+| `status.battery.rawPercent`                  | number  | `value.battery`       | `%`  | `infoType` 20001                                                                                                                |
+| `status.water.level`                         | number  | `value`               |      | `infoType` 20001                                                                                                                |
+| `status.mop.mode`                            | number  | `state`               |      | `infoType` 20001                                                                                                                |
+| `status.fan.mode`                            | string  | `state`               |      | `infoType` 20001                                                                                                                |
+| `status.error.rawCount`                      | number  | `value`               |      | derived from `errorState`                                                                                                       |
+| `status.features.autoBoost`                  | boolean | `indicator`           |      | `infoType` 20001                                                                                                                |
+| `status.features.cleanComponents`            | boolean | `indicator`           |      | `infoType` 20001                                                                                                                |
+| `status.maintenance.hasWarning`              | boolean | `indicator`           |      | derived from `errorState`                                                                                                       |
+| `status.maintenance.warningCount`            | number  | `value`               |      | derived from `errorState`                                                                                                       |
+| `status.maintenance.code`                    | number  | `value`               |      | latest `infoType` 20003 event code                                                                                              |
+| `status.maintenance.level`                   | number  | `value`               |      | latest `infoType` 20003 event level                                                                                             |
+| `status.maintenance.message`                 | string  | `text`                |      | generic maintenance warning or latest `infoType` 20003 message                                                                  |
+| `status.maintenance.details`                 | string  | `text`                |      | redacted diagnostic summary                                                                                                     |
+| `status.maintenance.eventCount`              | number  | `value`               |      | accepted `infoType` 20003 event count since adapter start                                                                       |
+| `status.maintenance.updated`                 | string  | `date`                |      | latest accepted `infoType` 20003 event                                                                                          |
+| `status.maintenance.history.items`           | string  | `json`                |      | bounded REST `20003` history                                                                                                    |
+| `status.maintenance.history.count`           | number  | `value`               |      | safe history entries stored                                                                                                     |
+| `status.maintenance.history.totalCount`      | number  | `value`               |      | backend-reported total when present                                                                                             |
+| `status.maintenance.history.latestCode`      | number  | `value`               |      | latest safe history entry code                                                                                                  |
+| `status.maintenance.history.latestLevel`     | number  | `value`               |      | latest safe history entry level                                                                                                 |
+| `status.maintenance.history.latestMessage`   | string  | `text`                |      | latest safe history entry message                                                                                               |
+| `status.maintenance.history.latestEventTime` | string  | `date`                |      | latest safe history entry time                                                                                                  |
+| `status.maintenance.history.updated`         | string  | `date`                |      | latest history read                                                                                                             |
+| `status.maintenance.history.lastReadResult`  | string  | `text`                |      | history read result                                                                                                             |
+| `status.maintenance.history.lastError`       | string  | `text`                |      | redacted history read error                                                                                                     |
+| `map.available`                              | boolean | `indicator`           |      | derived from `infoType` 20002                                                                                                   |
+| `map.id`                                     | number  | `value`               |      | `infoType` 20002 metadata                                                                                                       |
+| `map.pathId`                                 | number  | `value`               |      | `infoType` 20002 metadata                                                                                                       |
+| `map.width`                                  | number  | `value`               |      | `infoType` 20002 metadata                                                                                                       |
+| `map.height`                                 | number  | `value`               |      | `infoType` 20002 metadata                                                                                                       |
+| `map.resolution`                             | number  | `value`               |      | `infoType` 20002 metadata                                                                                                       |
+| `map.areaCount`                              | number  | `value`               |      | derived from `infoType` 20002 `area` length                                                                                     |
+| `map.compressedBytes`                        | number  | `value`               | `B`  | `infoType` 20002 metadata                                                                                                       |
+| `map.encodedBytes`                           | number  | `value`               | `B`  | derived from encoded map length                                                                                                 |
+| `map.updated`                                | string  | `date`                |      | last safe map metadata update                                                                                                   |
+| `map.live.canvasBackgroundColor`             | string  | `level.color.rgb`     |      | writable local VIS tuning color for white canvas/background map cells                                                           |
+| `map.live.mapBackgroundColor`                | string  | `level.color.rgb`     |      | writable local VIS tuning color for light-blue map-area cells                                                                   |
+| `map.live.backgroundColor`                   | string  | `level.color.rgb`     |      | legacy writable alias for `map.live.mapBackgroundColor`                                                                         |
 
 All states are read-only and are written by the adapter with `ack=true`, except
 the writable command buttons defined by ADR 0013 and the documented local
@@ -119,6 +120,13 @@ explicitly indicated by `device.onlineUpdated`, `device.onlineFresh`, and
 `device.onlineStale`.
 `info.connection` and `connection.cloud` remain adapter/backend health
 indicators and must not be interpreted as the robot's app-visible availability.
+`status.mode` is the raw upstream mode and has been observed to disagree with
+visible robot activity. Dashboards should use the adapter-derived
+`status.activity` as the primary display status. The derived activity prefers
+the live gateway connection for availability, maps `sweep`, `pause`, and
+`backcharge` to user-visible work states, and keeps a short inferred
+`cleaning` state when cleaning counters continue to advance even if the raw
+mode still reports a docked value.
 
 On adapter startup, the adapter creates missing public objects and refreshes the
 defined public object metadata for existing objects. This allows role, type,

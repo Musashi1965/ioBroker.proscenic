@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { normalizeStatus20001 } from "./status";
+import { deriveRobotActivity, normalizeStatus20001 } from "./status";
 
 describe("normalizeStatus20001", () => {
 	it("projects only the initial read-only status structure", () => {
@@ -68,5 +68,89 @@ describe("normalizeStatus20001", () => {
 		expect(status?.maintenanceDetails).to.equal(
 			'[{"index":0,"keys":["code","message"],"values":{"code":42,"message":"Contact <redacted-email> at <redacted-address>"}}]',
 		);
+	});
+});
+
+describe("deriveRobotActivity", () => {
+	it("uses the gateway connection as the primary availability signal", () => {
+		expect(
+			deriveRobotActivity({
+				cloudConnected: false,
+				gatewayConnected: false,
+			}),
+		).to.equal("offline");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: false,
+			}),
+		).to.equal("reconnecting");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+			}),
+		).to.equal("online");
+	});
+
+	it("maps reliable raw gateway modes to display activity", () => {
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				status: { mode: "sweep" },
+			}),
+		).to.equal("cleaning");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				status: { mode: "pause" },
+			}),
+		).to.equal("paused");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				status: { mode: "backcharge" },
+			}),
+		).to.equal("returning");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				status: { mode: "charge" },
+			}),
+		).to.equal("charging");
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				status: { mode: "fullcharge" },
+			}),
+		).to.equal("docked");
+	});
+
+	it("keeps a moving robot in cleaning activity when the raw mode claims it is docked", () => {
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				previousStatus: { cleanArea: 42, cleanTime: 2_700, mode: "fullcharge" },
+				status: { cleanArea: 43, cleanTime: 2_755, mode: "fullcharge" },
+			}),
+		).to.equal("cleaning");
+	});
+
+	it("holds recent inferred cleaning activity across short stale raw mode reports", () => {
+		expect(
+			deriveRobotActivity({
+				cloudConnected: true,
+				gatewayConnected: true,
+				cleaningInferredUntilMs: 20_000,
+				nowMs: 10_000,
+				status: { mode: "fullcharge" },
+			}),
+		).to.equal("cleaning");
 	});
 });

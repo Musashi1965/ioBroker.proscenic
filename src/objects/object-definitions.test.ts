@@ -63,6 +63,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("consumables.mainBrush.usedSeconds");
 		expect(ids).to.include("consumables.sensors.remainingPercent");
 		expect(ids).to.include("consumables.updated");
+		expect(ids).to.include("status.activity");
 		expect(ids).to.include("status.maintenance.history.items");
 		expect(ids).to.include("status.maintenance.history.count");
 		expect(ids).to.include("status.maintenance.history.totalCount");

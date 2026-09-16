@@ -6,6 +6,7 @@ import {
 	projectMaintenanceHistory,
 	projectMapMetadata,
 	projectMaintenanceMessage,
+	projectRobotActivity,
 	redactedErrorMessage,
 	setConnectionState,
 	setDeviceListDiagnostics,
@@ -38,6 +39,22 @@ describe("setConnectionState", () => {
 		expect(states.get("connection.cloud")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("connection.gateway")).to.deep.equal({ val: false, ack: true });
 		expect(states.get("info.connection")).to.deep.equal({ val: true, ack: true });
+	});
+});
+
+describe("projectRobotActivity", () => {
+	it("publishes the derived activity for VIS and dashboards", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectRobotActivity(adapter, "cleaning");
+
+		expect(states.get("status.activity")).to.deep.equal({ val: "cleaning", ack: true });
 	});
 });
 

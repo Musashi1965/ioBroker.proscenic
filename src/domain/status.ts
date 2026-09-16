@@ -19,6 +19,20 @@ export interface RobotStatus {
 	cleanComponents?: boolean;
 }
 
+export type RobotActivity =
+	"offline" | "reconnecting" | "online" | "cleaning" | "paused" | "returning" | "charging" | "docked";
+
+export interface RobotActivityInput {
+	cloudConnected: boolean;
+	gatewayConnected: boolean;
+	status?: RobotStatus;
+	previousStatus?: RobotStatus;
+	cleaningInferredUntilMs?: number;
+	nowMs?: number;
+}
+
+export const CLEANING_ACTIVITY_HOLD_MS = 2 * 60_000;
+
 export function normalizeStatus20001(data: unknown): RobotStatus | undefined {
 	if (data === null || typeof data !== "object" || Array.isArray(data)) {
 		return undefined;
@@ -50,6 +64,50 @@ export function normalizeStatus20001(data: unknown): RobotStatus | undefined {
 	}
 
 	return Object.keys(status).length > 0 ? status : undefined;
+}
+
+export function deriveRobotActivity(input: RobotActivityInput): RobotActivity {
+	if (!input.gatewayConnected) {
+		return input.cloudConnected ? "reconnecting" : "offline";
+	}
+
+	const mode = input.status?.mode;
+	if (mode === "pause") {
+		return "paused";
+	}
+	if (mode === "backcharge") {
+		return "returning";
+	}
+	if (
+		mode === "sweep" ||
+		hasCleaningProgress(input.status, input.previousStatus) ||
+		(input.cleaningInferredUntilMs ?? 0) > (input.nowMs ?? Date.now())
+	) {
+		return "cleaning";
+	}
+	if (mode === "charge") {
+		return "charging";
+	}
+	if (mode === "fullcharge") {
+		return "docked";
+	}
+
+	return "online";
+}
+
+export function hasCleaningProgress(status: RobotStatus | undefined, previousStatus: RobotStatus | undefined): boolean {
+	if (!status || !previousStatus) {
+		return false;
+	}
+
+	return (
+		hasIncreased(status.cleanArea, previousStatus.cleanArea) ||
+		hasIncreased(status.cleanTime, previousStatus.cleanTime)
+	);
+}
+
+function hasIncreased(value: number | undefined, previous: number | undefined): boolean {
+	return value !== undefined && previous !== undefined && value > previous;
 }
 
 function summarizeErrorState(errorState: unknown[]): string {

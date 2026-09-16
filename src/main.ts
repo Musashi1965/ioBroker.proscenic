@@ -29,7 +29,13 @@ import {
 import { normalizeMaintenanceHistory20003, normalizeMaintenanceMessage20003 } from "./domain/maintenance-message";
 import { normalizeMap20002 } from "./domain/map";
 import { reconnectDelayMs } from "./domain/reconnect-policy";
-import { normalizeStatus20001, type RobotStatus } from "./domain/status";
+import {
+	CLEANING_ACTIVITY_HOLD_MS,
+	deriveRobotActivity,
+	hasCleaningProgress,
+	normalizeStatus20001,
+	type RobotStatus,
+} from "./domain/status";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
@@ -38,6 +44,7 @@ import {
 	projectMapMetadata,
 	projectMaintenanceHistory,
 	projectMaintenanceMessage,
+	projectRobotActivity,
 	projectStatus,
 	redactedErrorMessage,
 	setConsumablesReadFailure,
@@ -96,6 +103,10 @@ class Proscenic extends utils.Adapter {
 	private lastGatewayActivityAt = 0;
 	private gatewayReceivedEventSinceConnect = false;
 	private gatewayIdleReconnectCount = 0;
+	private cloudConnected = false;
+	private gatewayConnected = false;
+	private latestRobotStatus: RobotStatus | undefined;
+	private cleaningInferredUntilMs = 0;
 	private pendingConsumableRead: PendingConsumableRead | undefined;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
@@ -118,8 +129,8 @@ class Proscenic extends utils.Adapter {
 	private async onReady(): Promise<void> {
 		await extendAdapterObjects(this);
 		await this.setState("info.connection", false, true);
-		await setConnectionState(this, "cloud", false);
-		await setConnectionState(this, "gateway", false);
+		await this.setCloudConnection(false);
+		await this.setGatewayConnection(false);
 		await this.setStateAsync("device.onlineUpdated", { val: "", ack: true });
 		await setDeviceOnlineStale(this, true);
 		await setDeviceListDiagnostics(this, 0, "pending");
@@ -175,8 +186,8 @@ class Proscenic extends utils.Adapter {
 			this.clearCommandSession();
 			await setLastError(this, error);
 			await setDeviceOnlineStale(this, true);
-			await setConnectionState(this, "cloud", false);
-			await setConnectionState(this, "gateway", false);
+			await this.setGatewayConnection(false);
+			await this.setCloudConnection(false);
 			this.log.warn(`Could not start Proscenic read-only connection: ${redactedErrorMessage(error)}`);
 			this.scheduleFullReconnect("connection failure");
 		} finally {
@@ -208,7 +219,7 @@ class Proscenic extends utils.Adapter {
 		await setDeviceListDiagnostics(this, devices.length, devices.length === 0 ? "empty" : "ok");
 		const device = selectDevice(devices, this.config.deviceCode);
 		await projectDevice(this, device);
-		await setConnectionState(this, "cloud", true);
+		await this.setCloudConnection(true);
 
 		if (!device.sn) {
 			throw new Error("Selected device cannot be used because its protocol serial is missing");
@@ -239,7 +250,7 @@ class Proscenic extends utils.Adapter {
 				const now = Date.now();
 				this.gatewayConnectedAt = now;
 				this.lastGatewayActivityAt = now;
-				void setConnectionState(this, "gateway", true);
+				void this.setGatewayConnection(true);
 				this.log.info("Connected to the Proscenic gateway.");
 				this.scheduleGatewayIdleCheck();
 				void this.refreshVerifiedReadPathsIfDue();
@@ -251,7 +262,7 @@ class Proscenic extends utils.Adapter {
 			},
 			onClose: () => {
 				this.clearGatewayIdleTimer();
-				void setConnectionState(this, "gateway", false);
+				void this.setGatewayConnection(false);
 				this.rejectPendingConsumableRead(new Error("Gateway closed before consumable data was received"));
 				if (!this.shuttingDown) {
 					this.resetReconnectAttemptAfterStableConnection();
@@ -366,12 +377,35 @@ class Proscenic extends utils.Adapter {
 			ack: true,
 		});
 		await setLastError(this, new Error(`Gateway idle watchdog: ${reason}`));
-		await setConnectionState(this, "gateway", false);
+		await this.setGatewayConnection(false);
 		this.rejectPendingConsumableRead(new Error(`Gateway idle watchdog: ${reason}`));
 		this.clearGatewayIdleTimer();
 		this.gatewayClient.destroy();
 		this.gatewayClient = undefined;
 		this.scheduleGatewaySocketReconnect("gateway idle watchdog");
+	}
+
+	private async setCloudConnection(connected: boolean): Promise<void> {
+		this.cloudConnected = connected;
+		await setConnectionState(this, "cloud", connected);
+		await this.projectDerivedRobotActivity();
+	}
+
+	private async setGatewayConnection(connected: boolean): Promise<void> {
+		this.gatewayConnected = connected;
+		await setConnectionState(this, "gateway", connected);
+		await this.projectDerivedRobotActivity();
+	}
+
+	private async projectDerivedRobotActivity(previousStatus?: RobotStatus): Promise<void> {
+		const activity = deriveRobotActivity({
+			cloudConnected: this.cloudConnected,
+			gatewayConnected: this.gatewayConnected,
+			status: this.latestRobotStatus,
+			previousStatus,
+			cleaningInferredUntilMs: this.cleaningInferredUntilMs,
+		});
+		await projectRobotActivity(this, activity);
 	}
 
 	private resetReconnectAttemptAfterStableConnection(): void {
@@ -396,8 +430,14 @@ class Proscenic extends utils.Adapter {
 		if (infoType === 20001) {
 			const status = normalizeStatus20001(data);
 			if (status) {
+				const previousStatus = this.latestRobotStatus;
+				if (status.mode === "sweep" || hasCleaningProgress(status, previousStatus)) {
+					this.cleaningInferredUntilMs = Date.now() + CLEANING_ACTIVITY_HOLD_MS;
+				}
+				this.latestRobotStatus = status;
 				this.updateLiveMapTaskState(status);
 				await projectStatus(this, status);
+				await this.projectDerivedRobotActivity(previousStatus);
 			}
 
 			const pose = extractRobotPose20001(data);

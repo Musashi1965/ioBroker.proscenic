@@ -66,6 +66,7 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("consumables.updated", "Last consumables update", "string", "date"),
 	state("consumables.lastReadResult", "Last consumables read result", "string", "text"),
 	state("consumables.lastError", "Last consumables read error", "string", "text"),
+	state("status.activity", "Activity", "string", "state"),
 	state("status.mode", "Mode", "string", "state"),
 	state("status.subMode", "Sub mode", "string", "state"),
 	state("status.clean.area", "Cleaning area", "number", "value", { unit: "m²", min: 0 }),
