@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.1.4",
+		"version": "0.2.0",
 		"news": {
+			"0.2.0": {
+				"en": "Added live-map color controls, preserved cleaning trails across room changes, and clarified availability diagnostics",
+				"de": "Live-Karten-Farbsteuerung hinzugefügt, Fahrspuren über Raumwechsel erhalten und Verfügbarkeitsdiagnosen präzisiert",
+				"ru": "Добавлены настройки цветов карты, сохранение пути уборки между комнатами и уточнена диагностика доступности",
+				"pt": "Adicionados controles de cor do mapa ao vivo, preservação do trajeto entre cômodos e diagnósticos de disponibilidade mais claros",
+				"nl": "Livekaart-kleurinstellingen toegevoegd, schoonmaakspoor tussen kamers behouden en beschikbaarheidsdiagnose verduidelijkt",
+				"fr": "Ajout des réglages de couleur de la carte, conservation du trajet entre pièces et diagnostics de disponibilité clarifiés",
+				"it": "Aggiunti controlli colore della mappa, mantenuta la traccia tra stanze e chiarita la diagnostica di disponibilità",
+				"es": "Añadidos controles de color del mapa, conservación de la ruta entre habitaciones y diagnósticos de disponibilidad aclarados",
+				"pl": "Dodano sterowanie kolorami mapy, zachowanie ścieżki między pokojami i doprecyzowano diagnostykę dostępności",
+				"uk": "Додано керування кольорами карти, збереження маршруту між кімнатами та уточнено діагностику доступності",
+				"zh-cn": "新增实时地图颜色控制，跨房间保留清扫轨迹，并明确可用性诊断"
+			},
 			"0.1.4": {
 				"en": "Refreshes existing ioBroker object metadata during adapter startup",
 				"de": "Aktualisiert bestehende ioBroker-Objektmetadaten beim Adapterstart",

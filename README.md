@@ -71,6 +71,15 @@ Security policy and contribution requirements are documented in
 
 ## Changelog
 
+### 0.2.0 (2026-09-16)
+
+- Added writable live-map color controls for the white background and blue map
+  area used by the rendered PNG.
+- Preserved the live-map cleaning trail across room-to-room path changes during
+  the same cleaning task.
+- Clarified device availability diagnostics and the distinction between cloud,
+  gateway, and last-known robot online states.
+
 ### 0.1.4 (2026-09-15)
 
 - Refresh existing ioBroker object metadata during adapter startup so role,
