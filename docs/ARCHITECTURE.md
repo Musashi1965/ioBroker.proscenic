@@ -43,8 +43,9 @@ HTTP or socket functions directly.
 - `security`: redaction and credential/session boundaries.
 - `maps`: optional bounded decoding/rendering isolated from core status. The
   ADR 0016/0020 implementation publishes an animated SVG data URL with a static
-  PNG fallback under the local-development `map.live.*` tree for VIS debugging,
-  not a finalized public release contract.
+  PNG fallback and a stable same-origin web-adapter viewer URL under the
+  local-development `map.live.*` tree for VIS debugging, not a finalized public
+  release contract.
 
 ## Lifecycle
 

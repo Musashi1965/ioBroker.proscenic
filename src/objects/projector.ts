@@ -25,6 +25,15 @@ export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Pro
 	await adapter.setStateAsync("capabilities.maintenanceMessages", { val: false, ack: true });
 }
 
+export function liveMapViewerUrl(instance: number | undefined): string {
+	const safeInstance = typeof instance === "number" && Number.isSafeInteger(instance) && instance >= 0 ? instance : 0;
+	return `/proscenic/map-viewer/?instance=${safeInstance}`;
+}
+
+export async function projectLiveMapViewerUrl(adapter: ioBroker.Adapter): Promise<void> {
+	await adapter.setStateAsync("map.live.viewerUrl", { val: liveMapViewerUrl(adapter.instance), ack: true });
+}
+
 export async function projectDevice(adapter: ioBroker.Adapter, device: DeviceRecord): Promise<void> {
 	await setIfDefined(adapter, "device.code", displayDeviceCode(device.code));
 	await setIfDefined(adapter, "device.model", device.model);

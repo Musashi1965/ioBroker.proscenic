@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1"
+		/>
+		<title>Proscenic live map</title>
+		<link
+			rel="stylesheet"
+			href="./viewer.css"
+		/>
+		<script src="/lib/js/socket.io.js"></script>
+	</head>
+	<body>
+		<main class="viewer-shell">
+			<header class="viewer-header">
+				<strong>Proscenic live map</strong>
+				<span id="connectionStatus">Connecting…</span>
+			</header>
+			<section
+				id="viewport"
+				aria-label="Proscenic live map"
+			>
+				<img
+					id="mapImage"
+					alt="Proscenic live map"
+					draggable="false"
+				/>
+				<p id="empty">Waiting for map data…</p>
+				<div
+					class="viewer-controls"
+					aria-label="Map controls"
+				>
+					<button
+						type="button"
+						data-zoom="in"
+						aria-label="Zoom in"
+					>
+						+
+					</button>
+					<button
+						type="button"
+						data-zoom="out"
+						aria-label="Zoom out"
+					>
+						−
+					</button>
+					<button
+						type="button"
+						data-zoom="reset"
+						aria-label="Reset map view"
+					>
+						⌂
+					</button>
+				</div>
+			</section>
+		</main>
+		<script src="./viewer.js"></script>
+	</body>
+</html>

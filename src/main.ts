@@ -43,6 +43,7 @@ import {
 	projectDevice,
 	projectConsumables,
 	projectLiveMapImage,
+	projectLiveMapViewerUrl,
 	projectMapMetadata,
 	projectMaintenanceHistory,
 	projectMaintenanceMessage,
@@ -162,6 +163,7 @@ class Proscenic extends utils.Adapter {
 		await this.setStateAsync("connection.gatewayIdleReconnectCount", { val: 0, ack: true });
 		await this.setStateAsync("commands.queueDepth", { val: 0, ack: true });
 		await setInitialCapabilityStates(this);
+		await projectLiveMapViewerUrl(this);
 		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
 		this.subscribeStates("map.live.backgroundColor");

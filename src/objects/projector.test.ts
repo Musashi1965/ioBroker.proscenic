@@ -3,6 +3,7 @@ import {
 	projectConsumables,
 	projectDevice,
 	projectLiveMapImage,
+	projectLiveMapViewerUrl,
 	projectMaintenanceHistory,
 	projectMapMetadata,
 	projectMaintenanceMessage,
@@ -321,6 +322,24 @@ describe("projectConsumables", () => {
 });
 
 describe("projectLiveMapImage", () => {
+	it("publishes the stable same-origin live map viewer URL for the adapter instance", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			instance: 2,
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectLiveMapViewerUrl(adapter);
+
+		expect(states.get("map.live.viewerUrl")).to.deep.equal({
+			val: "/proscenic/map-viewer/?instance=2",
+			ack: true,
+		});
+	});
+
 	it("publishes the experimental rendered map image and render diagnostics", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
 		const adapter = {

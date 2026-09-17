@@ -30,7 +30,8 @@ Verified on Proscenic M7 Pro so far:
 - local-development live-map rendering for VIS, including
   app-oriented map colors, no-go areas, room-zone candidates, charger marker,
   a task-scoped pose trail, and SVG animation between gateway positions. A
-  static PNG fallback remains available for consumers without SVG animation.
+  static PNG fallback and a same-origin iframe viewer URL remain available for
+  other visualization modes.
 
 The adapter is an early public beta. The supported hardware claim is limited to
 the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
@@ -74,6 +75,8 @@ Security policy and contribution requirements are documented in
   retaining an explicit static PNG fallback.
 - Prevented transient charging status reports during active cleaning from
   erasing the current task's accumulated pose trail.
+- Added `map.live.viewerUrl` with an interactive, same-origin live-map viewer
+  that updates without reloading its iframe.
 
 ### 0.2.0 (2026-09-16)
 

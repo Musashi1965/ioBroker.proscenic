@@ -118,6 +118,7 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("map.live.svgDataUri", "Animated live map SVG data URI", "string", "text"),
 	state("map.live.pngDataUri", "Static live map PNG data URI", "string", "text"),
 	state("map.live.format", "Primary live map image format", "string", "state"),
+	state("map.live.viewerUrl", "Live map viewer URL", "string", "text.url"),
 	state("map.live.areas", "Experimental live map areas", "string", "json"),
 	state("map.live.updated", "Last live map image update", "string", "date"),
 	state("map.live.orientation", "Live map orientation", "string", "state"),

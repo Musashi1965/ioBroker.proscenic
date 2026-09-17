@@ -25,6 +25,7 @@ Expose an explicit experimental live-map image under:
 - `map.live.svgDataUri`;
 - `map.live.pngDataUri`;
 - `map.live.format`;
+- `map.live.viewerUrl`;
 - `map.live.areas`;
 - `map.live.updated`;
 - `map.live.orientation`;
@@ -68,6 +69,10 @@ valid writes with `ack=true` and restores the previous value for invalid
 writes. The adapter-owned pose trail uses a dedicated light-green overlay color
 instead of reusing the background, room, or wall colors. The pose trail is
 rendered wider than one pixel for VIS readability.
+
+`map.live.viewerUrl` contains the stable same-origin web-adapter path for the
+interactive viewer defined by ADR 0020. It is a URL only and contains neither
+map data nor installation-specific network coordinates.
 
 `map.live.areas` contains a small JSON summary derived from the same coordinate
 metadata used for rendering. Each entry may include the stable area key, the
