@@ -7,6 +7,9 @@ export interface RobotPose {
 
 export interface LiveMapImage {
 	dataUrl: string;
+	svgDataUrl: string;
+	pngDataUrl: string;
+	format: "svg";
 	width: number;
 	height: number;
 	areas: LiveMapRenderedArea[];
@@ -24,6 +27,18 @@ export interface LiveMapRenderOptions {
 	canvasBackgroundColor?: string;
 	mapBackgroundColor?: string;
 	backgroundColor?: string;
+	animateRobot?: boolean;
+}
+
+export interface LiveMapTaskState {
+	dockedSinceLastCleaning: boolean;
+	returningToDock: boolean;
+	cleaningTaskActive: boolean;
+}
+
+export interface LiveMapTaskTransition {
+	state: LiveMapTaskState;
+	resetTrail: boolean;
 }
 
 export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
@@ -98,6 +113,20 @@ const MAX_PATH_SEGMENT_DISTANCE_SQUARED = 90 ** 2;
 const ROUTED_PATH_PADDING_PIXELS = 24;
 const MAX_ROUTED_PATH_CELLS = 20_000;
 const PATH_LINE_RADIUS = 1;
+const ROBOT_GLIDE_DURATION_MS = 1_600;
+
+interface ProjectedRobotPose {
+	point: [number, number];
+	phi: number | undefined;
+}
+
+interface RobotRuntimeRenderResult {
+	projectedPoseCount: number;
+	pathLineSegments: number;
+	skippedPathSegments: number;
+	latest?: ProjectedRobotPose;
+	latestMotionPath?: Array<[number, number]>;
+}
 
 export function extractRobotPose20001(data: unknown): RobotPose | undefined {
 	const record = getRecord(data);
@@ -120,11 +149,39 @@ export function normalizeLiveMapBackgroundColor(value: unknown): string | undefi
 	return /^#[0-9a-f]{6}$/iu.test(trimmed) ? trimmed.toLowerCase() : undefined;
 }
 
-export function shouldResetLiveMapPoseTrailAfterPathChange(
-	dockedSinceLastCleaning: boolean,
-	poseCount: number,
-): boolean {
-	return dockedSinceLastCleaning && poseCount > 0;
+export function transitionLiveMapTaskState(
+	state: LiveMapTaskState,
+	mode: string | undefined,
+	cleaningActivityActive: boolean,
+): LiveMapTaskTransition {
+	if (mode === "sweep") {
+		return {
+			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			resetTrail: state.dockedSinceLastCleaning,
+		};
+	}
+
+	if (mode === "backcharge") {
+		return {
+			state: {
+				dockedSinceLastCleaning: state.dockedSinceLastCleaning,
+				returningToDock: true,
+				cleaningTaskActive: state.cleaningTaskActive,
+			},
+			resetTrail: false,
+		};
+	}
+
+	if (mode === "charge" || mode === "fullcharge") {
+		if (state.returningToDock || (!state.cleaningTaskActive && !cleaningActivityActive)) {
+			return {
+				state: { dockedSinceLastCleaning: true, returningToDock: false, cleaningTaskActive: false },
+				resetTrail: false,
+			};
+		}
+	}
+
+	return { state, resetTrail: false };
 }
 
 export function renderLiveMapImage20002(
@@ -145,18 +202,36 @@ export function renderLiveMapImage20002(
 
 	const mapBackgroundColor = colorFromHex(options.mapBackgroundColor ?? options.backgroundColor) ?? COLOR_UNKNOWN;
 	const canvasBackgroundColor = colorFromHex(options.canvasBackgroundColor) ?? COLOR_CANVAS_BACKGROUND;
-	const pixels = renderOccupancy(sample.width, sample.height, occupancy, mapBackgroundColor, canvasBackgroundColor);
-	const coordinateMetadata = drawCoordinateMetadata(sample, pixels);
-	const runtime = drawRobotRuntime(sample, occupancy, pixels, poses);
-
-	const png = encodeRgbPng(sample.width, sample.height, pixels);
-	const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
-	if (Buffer.byteLength(dataUrl, "utf8") > MAX_LIVE_MAP_DATA_URL_BYTES) {
+	const basePixels = renderOccupancy(
+		sample.width,
+		sample.height,
+		occupancy,
+		mapBackgroundColor,
+		canvasBackgroundColor,
+	);
+	const coordinateMetadata = drawCoordinateMetadata(sample, basePixels);
+	const runtime = drawRobotRuntime(sample, occupancy, basePixels, poses);
+	const basePng = encodeRgbPng(sample.width, sample.height, basePixels);
+	const fallbackPixels = Buffer.from(basePixels);
+	if (runtime.latest) {
+		drawRobotMarker(fallbackPixels, sample.width, sample.height, runtime.latest);
+	}
+	const fallbackPng = encodeRgbPng(sample.width, sample.height, fallbackPixels);
+	const pngDataUrl = `data:image/png;base64,${fallbackPng.toString("base64")}`;
+	const svg = renderLiveMapSvg(sample.width, sample.height, basePng, runtime, options.animateRobot !== false);
+	const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
+	if (
+		Buffer.byteLength(svgDataUrl, "utf8") > MAX_LIVE_MAP_DATA_URL_BYTES ||
+		Buffer.byteLength(pngDataUrl, "utf8") > MAX_LIVE_MAP_DATA_URL_BYTES
+	) {
 		return undefined;
 	}
 
 	return {
-		dataUrl,
+		dataUrl: svgDataUrl,
+		svgDataUrl,
+		pngDataUrl,
+		format: "svg",
 		width: sample.width,
 		height: sample.height,
 		areas: summarizeRenderedAreas(sample),
@@ -348,7 +423,7 @@ function drawRobotRuntime(
 	occupancy: Buffer,
 	pixels: Buffer,
 	poses: readonly RobotPose[],
-): { projectedPoseCount: number; pathLineSegments: number; skippedPathSegments: number } {
+): RobotRuntimeRenderResult {
 	const projected = poses
 		.map(pose => ({
 			point: projectRobotCoordinate(sample, pose.pos),
@@ -358,6 +433,7 @@ function drawRobotRuntime(
 
 	let pathLineSegments = 0;
 	let skippedPathSegments = 0;
+	let latestMotionPath: Array<[number, number]> | undefined;
 
 	for (let index = 1; index < projected.length; index++) {
 		const previous = projected[index - 1].point;
@@ -371,6 +447,9 @@ function drawRobotRuntime(
 			if (routedPath) {
 				drawAdaptivePathPolyline(sample, occupancy, pixels, sample.width, sample.height, routedPath);
 				pathLineSegments += 1;
+				if (index === projected.length - 1) {
+					latestMotionPath = routedPath;
+				}
 			} else {
 				skippedPathSegments += 1;
 			}
@@ -388,20 +467,64 @@ function drawRobotRuntime(
 		};
 	}
 
-	plotMarker(pixels, sample.width, sample.height, latest.point[0], latest.point[1], 5, COLOR_ROBOT);
-	if (latest.phi !== undefined) {
-		const angle = latest.phi / 1000;
-		const headingLength = 10;
-		const endX = Math.round(latest.point[0] + Math.cos(angle) * headingLength);
-		const endY = Math.round(latest.point[1] - Math.sin(angle) * headingLength);
-		drawLine(pixels, sample.width, sample.height, latest.point[0], latest.point[1], endX, endY, COLOR_HEADING);
-	}
-
 	return {
 		projectedPoseCount: projected.length,
 		pathLineSegments,
 		skippedPathSegments,
+		latest,
+		latestMotionPath,
 	};
+}
+
+function drawRobotMarker(pixels: Buffer, width: number, height: number, pose: ProjectedRobotPose): void {
+	plotMarker(pixels, width, height, pose.point[0], pose.point[1], 5, COLOR_ROBOT);
+	if (pose.phi === undefined) {
+		return;
+	}
+	const angle = pose.phi / 1000;
+	const headingLength = 10;
+	const endX = Math.round(pose.point[0] + Math.cos(angle) * headingLength);
+	const endY = Math.round(pose.point[1] - Math.sin(angle) * headingLength);
+	drawLine(pixels, width, height, pose.point[0], pose.point[1], endX, endY, COLOR_HEADING);
+}
+
+function renderLiveMapSvg(
+	width: number,
+	height: number,
+	basePng: Buffer,
+	runtime: RobotRuntimeRenderResult,
+	animateRobot: boolean,
+): string {
+	const marker = runtime.latest ? renderSvgRobotMarker(runtime.latest, runtime.latestMotionPath, animateRobot) : "";
+	const embeddedPng = `data:image/png;base64,${basePng.toString("base64")}`;
+	return [
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`,
+		`<image href="${embeddedPng}" width="${width}" height="${height}"/>`,
+		marker,
+		"</svg>",
+	].join("");
+}
+
+function renderSvgRobotMarker(
+	latest: ProjectedRobotPose,
+	motionPath: readonly [number, number][] | undefined,
+	animateRobot: boolean,
+): string {
+	const path = animateRobot && motionPath && motionPath.length > 1 ? motionPath : [latest.point];
+	const finalRotation = latest.phi === undefined ? 0 : (-latest.phi / 1000 / Math.PI) * 180;
+	const marker = [
+		`<circle cx="0" cy="0" r="5" fill="#278b3d" stroke="#145f2b" stroke-width="1"/>`,
+		`<line x1="0" y1="0" x2="10" y2="0" stroke="#141414" stroke-width="2" stroke-linecap="round" transform="rotate(${roundSvgNumber(finalRotation)})"/>`,
+	].join("");
+	if (path.length === 1) {
+		return `<g transform="translate(${path[0][0]} ${path[0][1]})">${marker}</g>`;
+	}
+	const svgPath = path.map((point, index) => `${index === 0 ? "M" : "L"}${point[0]} ${point[1]}`).join(" ");
+	return `<g>${marker}<animateMotion dur="${ROBOT_GLIDE_DURATION_MS}ms" path="${svgPath}" calcMode="paced" fill="freeze"/></g>`;
+}
+
+function roundSvgNumber(value: number): number {
+	return Math.round(value * 100) / 100;
 }
 
 function drawAdaptivePathLine(

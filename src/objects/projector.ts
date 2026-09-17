@@ -157,6 +157,9 @@ export async function projectLiveMapImage(
 	diagnostics: LiveMapProjectionDiagnostics,
 ): Promise<void> {
 	await adapter.setStateAsync("map.live.image", { val: image.dataUrl, ack: true });
+	await adapter.setStateAsync("map.live.svgDataUri", { val: image.svgDataUrl, ack: true });
+	await adapter.setStateAsync("map.live.pngDataUri", { val: image.pngDataUrl, ack: true });
+	await adapter.setStateAsync("map.live.format", { val: image.format, ack: true });
 	await adapter.setStateAsync("map.live.areas", { val: JSON.stringify(image.areas), ack: true });
 	await adapter.setStateAsync("map.live.updated", { val: new Date().toISOString(), ack: true });
 	await adapter.setStateAsync("map.live.orientation", { val: image.orientation, ack: true });

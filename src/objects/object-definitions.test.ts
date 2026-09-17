@@ -148,6 +148,9 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.encodedBytes");
 		expect(ids).to.include("map.updated");
 		expect(ids).to.include("map.live.image");
+		expect(ids).to.include("map.live.svgDataUri");
+		expect(ids).to.include("map.live.pngDataUri");
+		expect(ids).to.include("map.live.format");
 		expect(ids).to.include("map.live.areas");
 		expect(ids).to.include("map.live.updated");
 		expect(ids).to.include("map.live.orientation");

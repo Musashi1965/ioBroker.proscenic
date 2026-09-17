@@ -9,11 +9,11 @@ import {
 	mergeLiveMapCoordinateMetadata20002,
 	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
-	shouldResetLiveMapPoseTrailAfterPathChange,
+	transitionLiveMapTaskState,
 } from "./live-map";
 
 describe("live map rendering", () => {
-	it("renders a flip-y PNG data URL from a self-contained 20002 occupancy grid", () => {
+	it("renders a flip-y animated SVG with a static PNG fallback", () => {
 		const grid = Buffer.from([0, 127, 255, 255, 127, 0]);
 		const image = renderLiveMapImage20002({
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
@@ -52,8 +52,11 @@ describe("live map rendering", () => {
 				bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
 			},
 		]);
-		expect(image?.dataUrl.startsWith("data:image/png;base64,")).to.equal(true);
-		expect(decodePngDataUrl(image?.dataUrl)[25]).to.equal(2);
+		expect(image?.format).to.equal("svg");
+		expect(image?.dataUrl).to.equal(image?.svgDataUrl);
+		expect(image?.svgDataUrl.startsWith("data:image/svg+xml;base64,")).to.equal(true);
+		expect(image?.pngDataUrl.startsWith("data:image/png;base64,")).to.equal(true);
+		expect(decodePngDataUrl(image?.pngDataUrl)[25]).to.equal(2);
 	});
 
 	it("extracts private robot positions only for in-memory rendering", () => {
@@ -85,7 +88,7 @@ describe("live map rendering", () => {
 			],
 		});
 
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 5, 5);
 		const center = pixelAt(pixels, 5, 2, 2);
 
 		expect(center).to.not.deep.equal([255, 255, 255]);
@@ -129,7 +132,7 @@ describe("live map rendering", () => {
 		const metadata = extractLiveMapCoordinateMetadata20002(mapWithArea);
 		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithoutArea, metadata);
 		const image = renderLiveMapImage20002(merged);
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 5, 5);
 
 		expect(pixelAt(pixels, 5, 2, 2)).to.not.deep.equal([255, 255, 255]);
 	});
@@ -168,7 +171,7 @@ describe("live map rendering", () => {
 			metadata,
 		);
 		const image = renderLiveMapImage20002(merged);
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 5, 5);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 5, 5);
 
 		expect(pixelAt(pixels, 5, 2, 2)).to.deep.equal([217, 217, 217]);
 	});
@@ -192,7 +195,7 @@ describe("live map rendering", () => {
 			[{ pos: [500, 0] }, { pos: [500, 950] }],
 		);
 
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, width, height);
 
 		expect(pixelAt(pixels, width, 0, 10)).to.deep.equal([184, 204, 216]);
 		expect(pixelAt(pixels, width, 10, 10)).to.deep.equal([126, 216, 96]);
@@ -219,7 +222,7 @@ describe("live map rendering", () => {
 			},
 			[{ pos: [500, 500] }, { pos: [3_500, 500] }],
 		);
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, width, height);
 
 		expect(image?.pathLineSegments).to.equal(1);
 		expect(image?.skippedPathSegments).to.equal(0);
@@ -244,7 +247,7 @@ describe("live map rendering", () => {
 			},
 			[{ pos: [250, 450] }, { pos: [750, 450] }],
 		);
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, width, height);
 
 		expect(image?.pathLineSegments).to.equal(1);
 		expect(image?.skippedPathSegments).to.equal(0);
@@ -312,7 +315,7 @@ describe("live map rendering", () => {
 		const cached = laterMetadata ? mergeLiveMapCoordinateMetadataCache(fullMetadata, laterMetadata) : fullMetadata;
 		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithOnlyNoGo, cached);
 		const image = renderLiveMapImage20002(merged);
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, 10, 10);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 10, 10);
 
 		expect(cached?.area?.map(entry => entry.key)).to.have.members(["id:1001", "id:1002", "id:1003"]);
 		expect(image?.renderedForbiddenAreaCount).to.equal(1);
@@ -361,7 +364,7 @@ describe("live map rendering", () => {
 			{ canvasBackgroundColor: "#dddddd", mapBackgroundColor: "#b8ccd0" },
 		);
 
-		const pixels = decodeRgbPngDataUrl(image?.dataUrl, width, height);
+		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, width, height);
 
 		expect(pixelAt(pixels, width, 0, 0)).to.deep.equal([184, 204, 208]);
 		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([221, 221, 221]);
@@ -376,10 +379,107 @@ describe("live map rendering", () => {
 		expect(normalizeLiveMapBackgroundColor("#ddeeff00")).to.equal(undefined);
 	});
 
-	it("keeps the pose trail across room-to-room path changes during the same cleaning task", () => {
-		expect(shouldResetLiveMapPoseTrailAfterPathChange(false, 42)).to.equal(false);
-		expect(shouldResetLiveMapPoseTrailAfterPathChange(true, 0)).to.equal(false);
-		expect(shouldResetLiveMapPoseTrailAfterPathChange(true, 42)).to.equal(true);
+	it("animates the robot along the newest accepted path segment", () => {
+		const width = 20;
+		const height = 20;
+		const grid = Buffer.alloc(width * height, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width,
+				height,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [250, 250] }, { pos: [750, 250], phi: 1_570 }],
+		);
+
+		const svg = decodeSvgDataUrl(image?.svgDataUrl);
+		expect(svg).to.include("<animateMotion");
+		expect(svg).to.include('dur="1600ms"');
+		expect(svg).to.match(/path="M\d+ \d+(?: L\d+ \d+)+"/);
+	});
+
+	it("can render a stationary SVG marker for non-pose map refreshes", () => {
+		const grid = Buffer.alloc(100, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width: 10,
+				height: 10,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+			},
+			[{ pos: [100, 100] }, { pos: [300, 100] }],
+			{ animateRobot: false },
+		);
+
+		const svg = decodeSvgDataUrl(image?.svgDataUrl);
+		expect(svg).to.not.include("<animateMotion");
+		expect(svg).to.match(/transform="translate\(\d+ \d+\)"/);
+	});
+
+	it("does not treat a spurious charging status as task completion while cleaning remains active", () => {
+		const transition = transitionLiveMapTaskState(
+			{ dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			"charge",
+			true,
+		);
+
+		expect(transition).to.deep.equal({
+			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			resetTrail: false,
+		});
+	});
+
+	it("resets the previous trail only after a confirmed return-to-dock cycle and a new sweep", () => {
+		const returning = transitionLiveMapTaskState(
+			{ dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			"backcharge",
+			false,
+		);
+		const docked = transitionLiveMapTaskState(returning.state, "fullcharge", false);
+		const nextSweep = transitionLiveMapTaskState(docked.state, "sweep", true);
+
+		expect(returning.state.returningToDock).to.equal(true);
+		expect(docked.state).to.deep.equal({
+			dockedSinceLastCleaning: true,
+			returningToDock: false,
+			cleaningTaskActive: false,
+		});
+		expect(nextSweep).to.deep.equal({
+			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			resetTrail: true,
+		});
+	});
+
+	it("keeps an active paused task intact even after the short cleaning-activity hold expires", () => {
+		const transition = transitionLiveMapTaskState(
+			{ dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			"fullcharge",
+			false,
+		);
+
+		expect(transition).to.deep.equal({
+			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
+			resetTrail: false,
+		});
+	});
+
+	it("recognizes an initial docked status before any cleaning task is active", () => {
+		const transition = transitionLiveMapTaskState(
+			{ dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: false },
+			"charge",
+			false,
+		);
+
+		expect(transition.state).to.deep.equal({
+			dockedSinceLastCleaning: true,
+			returningToDock: false,
+			cleaningTaskActive: false,
+		});
 	});
 });
 
@@ -421,6 +521,12 @@ function decodePngDataUrl(dataUrl: string | undefined): Buffer {
 	expect(dataUrl).to.be.a("string");
 	const encoded = dataUrl?.slice("data:image/png;base64,".length) ?? "";
 	return Buffer.from(encoded, "base64");
+}
+
+function decodeSvgDataUrl(dataUrl: string | undefined): string {
+	expect(dataUrl).to.be.a("string");
+	const encoded = dataUrl?.slice("data:image/svg+xml;base64,".length) ?? "";
+	return Buffer.from(encoded, "base64").toString("utf8");
 }
 
 function decodeRgbPngDataUrl(dataUrl: string | undefined, width: number, height: number): Buffer {

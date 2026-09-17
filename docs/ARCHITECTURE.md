@@ -42,8 +42,9 @@ HTTP or socket functions directly.
 - `objects`: versioned ioBroker definitions and idempotent projection.
 - `security`: redaction and credential/session boundaries.
 - `maps`: optional bounded decoding/rendering isolated from core status. The
-  first implementation is the ADR 0016 local-development `map.live.*` PNG data
-  URL for VIS debugging, not a finalized public release contract.
+  ADR 0016/0020 implementation publishes an animated SVG data URL with a static
+  PNG fallback under the local-development `map.live.*` tree for VIS debugging,
+  not a finalized public release contract.
 
 ## Lifecycle
 

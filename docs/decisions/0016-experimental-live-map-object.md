@@ -3,6 +3,10 @@
 - Status: accepted for local development
 - Date: 2026-09-13
 
+The image format and pose-trail lifecycle portions of this decision are amended
+by ADR 0020. The remaining privacy, metadata-cache, color, and diagnostics
+decisions stay in force.
+
 ## Context
 
 Private M7 Pro captures proved that `infoType` 20002 contains a self-contained
@@ -18,6 +22,9 @@ when it is not a raw payload.
 Expose an explicit experimental live-map image under:
 
 - `map.live.image`;
+- `map.live.svgDataUri`;
+- `map.live.pngDataUri`;
+- `map.live.format`;
 - `map.live.areas`;
 - `map.live.updated`;
 - `map.live.orientation`;
@@ -39,8 +46,10 @@ Expose an explicit experimental live-map image under:
 - `map.live.lastPoseUpdated`;
 - `map.live.decompressedBytes`.
 
-`map.live.image` contains a bounded RGB PNG data URL rendered from the latest
-20002 occupancy grid. The adapter uses the currently verified `flip-y`
+`map.live.image` contains the bounded primary image representation rendered
+from the latest 20002 occupancy grid. ADR 0020 changes that primary format from
+PNG to animated SVG and keeps a static RGB PNG fallback in
+`map.live.pngDataUri`. The adapter uses the currently verified `flip-y`
 orientation, an app-oriented color palette, and overlays available coordinate
 metadata plus in-memory robot poses from 20001 events when present. For the
 observed M7 Pro, occupancy value `255` is rendered as the light/medium-blue map

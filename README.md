@@ -2,9 +2,6 @@
 
 <img width="147" height="139" alt="image" src="https://github.com/user-attachments/assets/c5d6a8c4-e6e4-42d6-be61-2c79e37f5a60" />
 
-
-
-
 Development-stage ioBroker adapter for supported Proscenic vacuum robots,
 initially the Proscenic M7 Pro (`M7_PRO`, model `811_LDS`) through the legacy
 Proscenic cloud/gateway path.
@@ -22,7 +19,6 @@ Verified on Proscenic M7 Pro so far:
 
 <img width="1136" height="378" alt="image" src="https://github.com/user-attachments/assets/8a53c100-3ec4-41a0-8254-29cdf28c7000" />
 
-
 - cloud login, token acquisition, device discovery, gateway discovery, framed
   socket reception, decryption, bounded reconnect, and adapter unload cleanup;
 - status projection for battery, cleaning mode, fan, mop/water candidates,
@@ -33,7 +29,8 @@ Verified on Proscenic M7 Pro so far:
 - recent maintenance/message history, including dust-bag messages;
 - local-development live-map rendering for VIS, including
   app-oriented map colors, no-go areas, room-zone candidates, charger marker,
-  and an interpolated pose trail.
+  a task-scoped pose trail, and SVG animation between gateway positions. A
+  static PNG fallback remains available for consumers without SVG animation.
 
 The adapter is an early public beta. The supported hardware claim is limited to
 the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
@@ -70,6 +67,13 @@ Security policy and contribution requirements are documented in
 - [Architecture decisions](docs/decisions/README.md)
 
 ## Changelog
+
+### Unreleased
+
+- Changed the primary experimental live-map image to an animated SVG while
+  retaining an explicit static PNG fallback.
+- Prevented transient charging status reports during active cleaning from
+  erasing the current task's accumulated pose trail.
 
 ### 0.2.0 (2026-09-16)
 

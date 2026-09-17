@@ -24,7 +24,7 @@ import {
 	mergeLiveMapCoordinateMetadata20002,
 	normalizeLiveMapBackgroundColor,
 	renderLiveMapImage20002,
-	shouldResetLiveMapPoseTrailAfterPathChange,
+	transitionLiveMapTaskState,
 	type LiveMapCoordinateMetadata,
 	type RobotPose,
 } from "./domain/live-map";
@@ -117,6 +117,8 @@ class Proscenic extends utils.Adapter {
 	private latestMapCoordinateMetadata: LiveMapCoordinateMetadata | undefined;
 	private liveMapPathResetCount = 0;
 	private liveMapDockedSinceLastCleaning = false;
+	private liveMapReturningToDock = false;
+	private liveMapCleaningTaskActive = false;
 	private lastPoseUpdated: string | undefined;
 	private maintenanceEventCount = 0;
 	private auxiliaryReadInProgress = false;
@@ -484,13 +486,6 @@ class Proscenic extends utils.Adapter {
 				if (map.mapId !== undefined && this.latestMapId !== undefined && map.mapId !== this.latestMapId) {
 					this.latestMapCoordinateMetadata = undefined;
 				}
-				if (
-					map.pathId !== undefined &&
-					this.latestMapPathId !== undefined &&
-					map.pathId !== this.latestMapPathId
-				) {
-					this.resetLiveMapPoseTrailAfterDock();
-				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
 				}
@@ -614,25 +609,24 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private updateLiveMapTaskState(status: RobotStatus): void {
-		if (status.mode === "charge") {
-			this.liveMapDockedSinceLastCleaning = true;
-			return;
+		const transition = transitionLiveMapTaskState(
+			{
+				dockedSinceLastCleaning: this.liveMapDockedSinceLastCleaning,
+				returningToDock: this.liveMapReturningToDock,
+				cleaningTaskActive: this.liveMapCleaningTaskActive,
+			},
+			status.mode,
+			this.cleaningInferredUntilMs > Date.now(),
+		);
+		if (transition.resetTrail) {
+			this.resetLiveMapPoseTrail();
 		}
-		if (status.mode === "sweep") {
-			this.resetLiveMapPoseTrailAfterDock();
-			this.liveMapDockedSinceLastCleaning = false;
-		}
+		this.liveMapDockedSinceLastCleaning = transition.state.dockedSinceLastCleaning;
+		this.liveMapReturningToDock = transition.state.returningToDock;
+		this.liveMapCleaningTaskActive = transition.state.cleaningTaskActive;
 	}
 
-	private resetLiveMapPoseTrailAfterDock(): void {
-		if (
-			!shouldResetLiveMapPoseTrailAfterPathChange(
-				this.liveMapDockedSinceLastCleaning,
-				this.recentRobotPoses.length,
-			)
-		) {
-			return;
-		}
+	private resetLiveMapPoseTrail(): void {
 		this.recentRobotPoses = [];
 		this.liveMapPathResetCount += 1;
 		this.lastPoseUpdated = undefined;
@@ -651,6 +645,7 @@ class Proscenic extends utils.Adapter {
 			const image = renderLiveMapImage20002(renderData, this.recentRobotPoses, {
 				canvasBackgroundColor: this.liveMapCanvasBackgroundColor,
 				mapBackgroundColor: this.liveMapMapBackgroundColor,
+				animateRobot: renderReason === "pose",
 			});
 			if (image) {
 				await projectLiveMapImage(this, image, {

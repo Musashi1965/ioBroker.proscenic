@@ -333,7 +333,10 @@ describe("projectLiveMapImage", () => {
 		await projectLiveMapImage(
 			adapter,
 			{
-				dataUrl: "data:image/png;base64,fixture",
+				dataUrl: "data:image/svg+xml;base64,animated",
+				svgDataUrl: "data:image/svg+xml;base64,animated",
+				pngDataUrl: "data:image/png;base64,fallback",
+				format: "svg",
 				width: 2,
 				height: 2,
 				areas: [
@@ -365,7 +368,19 @@ describe("projectLiveMapImage", () => {
 			},
 		);
 
-		expect(states.get("map.live.image")).to.deep.equal({ val: "data:image/png;base64,fixture", ack: true });
+		expect(states.get("map.live.image")).to.deep.equal({
+			val: "data:image/svg+xml;base64,animated",
+			ack: true,
+		});
+		expect(states.get("map.live.svgDataUri")).to.deep.equal({
+			val: "data:image/svg+xml;base64,animated",
+			ack: true,
+		});
+		expect(states.get("map.live.pngDataUri")).to.deep.equal({
+			val: "data:image/png;base64,fallback",
+			ack: true,
+		});
+		expect(states.get("map.live.format")).to.deep.equal({ val: "svg", ack: true });
 		expect(JSON.parse(states.get("map.live.areas")?.val as string)).to.deep.equal([
 			{
 				key: "id:1001",
@@ -407,7 +422,10 @@ describe("projectLiveMapImage", () => {
 		await projectLiveMapImage(
 			adapter,
 			{
-				dataUrl: "data:image/png;base64,fixture",
+				dataUrl: "data:image/svg+xml;base64,animated",
+				svgDataUrl: "data:image/svg+xml;base64,animated",
+				pngDataUrl: "data:image/png;base64,fallback",
+				format: "svg",
 				width: 2,
 				height: 2,
 				areas: [],

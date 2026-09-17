@@ -35,6 +35,8 @@ Current decisions:
 - [ADR 0018](0018-single-publication-mandate.md): single publication mandate
 - [ADR 0019](0019-reliable-command-delivery-and-confirmation.md): reliable
   command delivery and status confirmation
+- [ADR 0020](0020-animated-live-map-and-task-scoped-trail.md): animated SVG
+  live map and task-scoped trail lifecycle
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, final public command failure semantics,
