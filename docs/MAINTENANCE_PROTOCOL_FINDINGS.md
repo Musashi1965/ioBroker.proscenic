@@ -18,15 +18,15 @@ reset or movement request was sent.
 
 ## Consumable read request
 
-| Item | Verified contract |
-| --- | --- |
-| HTTP method/path | `POST /instructions/cmd21015/{sn}` |
-| Header | `token` from the authenticated session |
-| Encoding | `application/x-www-form-urlencoded` |
-| Form | `username` |
-| HTTP result | 200, envelope `code=0`, `data=null` |
-| Actual values | asynchronous gateway event `infoType=21015` |
-| Observed fields | `filter`, `mainBrush`, `sideBrush`, `sensors`, `battery` |
+| Item             | Verified contract                                        |
+| ---------------- | -------------------------------------------------------- |
+| HTTP method/path | `POST /instructions/cmd21015/{sn}`                       |
+| Header           | `token` from the authenticated session                   |
+| Encoding         | `application/x-www-form-urlencoded`                      |
+| Form             | `username`                                               |
+| HTTP result      | 200, envelope `code=0`, `data=null`                      |
+| Actual values    | asynchronous gateway event `infoType=21015`              |
+| Observed fields  | `filter`, `mainBrush`, `sideBrush`, `sensors`, `battery` |
 
 Two successful gateway captures returned identical consumable counters. This
 proves that the read request works on the real device. An initial connection
@@ -36,12 +36,12 @@ the counters, and `data=null` is not a failed consumable read.
 
 The four consumables carry **used seconds**, not remaining percentages:
 
-| Field | Component | App maintenance interval |
-| --- | --- | --- |
-| `filter` | Filter | 150 hours |
-| `sideBrush` | Side brush | 200 hours |
-| `mainBrush` | Main brush | 300 hours |
-| `sensors` | Sensors | 30 hours |
+| Field       | Component  | App maintenance interval |
+| ----------- | ---------- | ------------------------ |
+| `filter`    | Filter     | 150 hours                |
+| `sideBrush` | Side brush | 200 hours                |
+| `mainBrush` | Main brush | 300 hours                |
+| `sensors`   | Sensors    | 30 hours                 |
 
 Derived remaining percentage is `100 * (1 - usedSeconds / (intervalHours * 3600))`.
 Negative results mean the maintenance interval has been exceeded. Do not lose
@@ -54,20 +54,45 @@ rounding across applications. Counter values and nominal intervals are the
 stable evidence. The additional `battery` field's meaning remains unverified;
 it must not be mapped to battery charge or remaining battery life.
 
-The application also identifies `21016` as the counter-reset operation. It was
-not sent and is deliberately absent from the read scanner. Robot ownership of
-the counters is strongly supported by the request/response flow and firmware
-field names; persistence and exact reset semantics remain untested.
+The application identifies `21016` as the counter-reset operation and supplies
+the complete legacy REST contract:
+
+| Item                  | Statically recovered contract                                                |
+| --------------------- | ---------------------------------------------------------------------------- |
+| HTTP method/path      | `POST /instructions/cmd21016/{sn}`                                           |
+| Header                | `token` from the authenticated session                                       |
+| Query                 | `username`                                                                   |
+| Encoding              | `application/json;charset=UTF-8`                                             |
+| Body                  | complete current counter object, with only the selected component set to `0` |
+| Expected confirmation | asynchronous gateway event `infoType=21016` containing the updated counters  |
+
+The app does not send a component name alone. It copies the last complete
+counter object, changes only the selected component to zero, and sends the
+whole object. The observed object contains exactly `filter`, `mainBrush`,
+`sideBrush`, `sensors`, and `battery`. The M7 path builds the equivalent direct
+`21016` device message. This makes a read-before-write and an exact
+echoed-counter confirmation mandatory for a safe adapter implementation.
+
+No reset has yet been sent to the owner's robot. The local-development adapter
+therefore implements reset buttons only as a guarded transaction: a complete
+read-before-write, a matching `21016` gateway event, persistence across a
+subsequent `21015` read, and exact equality of all non-selected counters are
+required. A missing or additional field disables the transaction instead of
+being silently discarded. There is no automatic reset retry. This
+implementation must not be
+described as working on the real device until a controlled single-component
+probe records that evidence. Robot ownership of the counters is strongly
+supported by the request/response flow and firmware field names.
 
 ## Message history
 
-| Item | Verified contract |
-| --- | --- |
-| HTTP method/path | `POST /app/cleanRobot/20003/{sn}` |
-| Header | `token` |
-| Encoding | `application/x-www-form-urlencoded` |
-| Form | `username`, `language=EN`, `model=M7`, `page=0`, `size=10` |
-| Result | HTTP 200, envelope `code=0`, paginated `data.content` |
+| Item             | Verified contract                                          |
+| ---------------- | ---------------------------------------------------------- |
+| HTTP method/path | `POST /app/cleanRobot/20003/{sn}`                          |
+| Header           | `token`                                                    |
+| Encoding         | `application/x-www-form-urlencoded`                        |
+| Form             | `username`, `language=EN`, `model=M7`, `page=0`, `size=10` |
+| Result           | HTTP 200, envelope `code=0`, paginated `data.content`      |
 
 The first page returned ten actual events including dust collection and the
 dust-bag warning displayed in the owner's app. Entries include a string `code`,
@@ -108,8 +133,8 @@ adapter now:
 5. keeps historical messages separate from `status.maintenance.hasWarning`.
 
 Open follow-up work remains: active-warning clearing semantics, additional
-history pagination, reset-command proof for `21016`, and real-device verification
-of the adapter-side refresh after deployment.
+history pagination, real-device reset-command proof for `21016`, and
+real-device verification of the guarded reset transaction after deployment.
 
 This research verifies read protocols and records the first adapter integration
 for the verified M7 Pro backend. It does not establish support for other models.

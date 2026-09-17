@@ -37,6 +37,11 @@ describe("initial object definitions", () => {
 				expect(definition.object.common.read, definition.id).to.equal(true);
 				continue;
 			}
+			if (definition.id.startsWith("consumables.") && definition.id.endsWith(".reset")) {
+				expect(definition.object.common.write, definition.id).to.equal(true);
+				expect(definition.object.common.read, definition.id).to.equal(false);
+				continue;
+			}
 			if (!definition.id.startsWith("commands.") || definition.id.startsWith("commands.last")) {
 				expect(definition.object.common.write, definition.id).to.equal(false);
 				expect(definition.object.common.read, definition.id).to.equal(true);
@@ -44,7 +49,7 @@ describe("initial object definitions", () => {
 		}
 	});
 
-	it("exposes only confirmed command buttons", () => {
+	it("exposes only documented writable buttons", () => {
 		const ids = STATE_DEFINITIONS.map(definition => definition.id);
 		const writableIds = STATE_DEFINITIONS.filter(definition => definition.object.common.write).map(
 			definition => definition.id,
@@ -56,6 +61,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("status.maintenance.eventCount");
 		expect(ids).to.include("status.maintenance.updated");
 		expect(ids).to.include("capabilities.consumables");
+		expect(ids).to.include("capabilities.consumableReset");
 		expect(ids).to.include("capabilities.maintenanceMessages");
 		expect(ids).to.include("consumables.filter.usedSeconds");
 		expect(ids).to.include("consumables.filter.remainingPercent");
@@ -63,6 +69,14 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("consumables.mainBrush.usedSeconds");
 		expect(ids).to.include("consumables.sensors.remainingPercent");
 		expect(ids).to.include("consumables.updated");
+		expect(ids).to.include("consumables.filter.reset");
+		expect(ids).to.include("consumables.sideBrush.reset");
+		expect(ids).to.include("consumables.mainBrush.reset");
+		expect(ids).to.include("consumables.sensors.reset");
+		expect(ids).to.include("consumables.reset.lastComponent");
+		expect(ids).to.include("consumables.reset.lastResult");
+		expect(ids).to.include("consumables.reset.lastError");
+		expect(ids).to.include("consumables.reset.lastExecution");
 		expect(ids).to.include("status.activity");
 		expect(ids).to.include("status.maintenance.history.items");
 		expect(ids).to.include("status.maintenance.history.count");
@@ -94,6 +108,10 @@ describe("initial object definitions", () => {
 			"commands.fan.strong",
 			"commands.deepCleaning",
 			"commands.collectDust",
+			"consumables.filter.reset",
+			"consumables.sideBrush.reset",
+			"consumables.mainBrush.reset",
+			"consumables.sensors.reset",
 			"map.live.canvasBackgroundColor",
 			"map.live.mapBackgroundColor",
 			"map.live.backgroundColor",

@@ -7,6 +7,7 @@ describe("live map web viewer", () => {
 
 	it("ships a same-origin ioBroker socket viewer with an embeddable viewport", () => {
 		const html = readFileSync(join(viewerRoot, "index.html"), "utf8");
+		const style = readFileSync(join(viewerRoot, "viewer.css"), "utf8");
 		const script = readFileSync(join(viewerRoot, "viewer.js"), "utf8");
 
 		expect(html).to.include('id="viewport"');
@@ -17,6 +18,8 @@ describe("live map web viewer", () => {
 		expect(script).to.include(".canvasBackgroundColor");
 		expect(script).to.include("new window.Image()");
 		expect(html).to.not.include("viewer-header");
+		expect(style).to.include("grid-template-rows: minmax(0, 1fr)");
+		expect(style).to.include("min-height: 0");
 		expect(script).to.not.match(/https?:\/\//u);
 	});
 });

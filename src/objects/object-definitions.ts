@@ -1,5 +1,7 @@
 import type { CommandDefinition } from "../domain/commands";
 import { COMMAND_DEFINITIONS } from "../domain/commands";
+import type { ConsumableResetDefinition } from "../domain/consumables";
+import { CONSUMABLE_RESET_DEFINITIONS } from "../domain/consumables";
 import { DEFAULT_LIVE_MAP_BACKGROUND_COLOR, DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR } from "../domain/live-map";
 
 export interface StateDefinition {
@@ -21,6 +23,7 @@ export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [
 	channel("consumables.sideBrush", "Side brush"),
 	channel("consumables.mainBrush", "Main brush"),
 	channel("consumables.sensors", "Sensors"),
+	channel("consumables.reset", "Consumable reset transaction"),
 	channel("status", "Status"),
 	channel("status.clean", "Cleaning"),
 	channel("status.battery", "Battery"),
@@ -58,14 +61,20 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("capabilities.commands", "Commands exposed", "boolean", "indicator"),
 	state("capabilities.maps", "Maps exposed", "boolean", "indicator"),
 	state("capabilities.consumables", "Consumables exposed", "boolean", "indicator"),
+	state("capabilities.consumableReset", "Consumable resets available", "boolean", "indicator"),
 	state("capabilities.maintenanceMessages", "Maintenance messages exposed", "boolean", "indicator"),
 	...consumableStates("consumables.filter", "Filter"),
 	...consumableStates("consumables.sideBrush", "Side brush"),
 	...consumableStates("consumables.mainBrush", "Main brush"),
 	...consumableStates("consumables.sensors", "Sensors"),
+	...CONSUMABLE_RESET_DEFINITIONS.map(definition => consumableResetButton(definition)),
 	state("consumables.updated", "Last consumables update", "string", "date"),
 	state("consumables.lastReadResult", "Last consumables read result", "string", "text"),
 	state("consumables.lastError", "Last consumables read error", "string", "text"),
+	state("consumables.reset.lastComponent", "Last reset component", "string", "text"),
+	state("consumables.reset.lastResult", "Last reset result", "string", "text"),
+	state("consumables.reset.lastError", "Last reset error", "string", "text"),
+	state("consumables.reset.lastExecution", "Last reset execution", "string", "date"),
 	state("status.activity", "Activity", "string", "state"),
 	state("status.mode", "Mode", "string", "state"),
 	state("status.subMode", "Sub mode", "string", "state"),
@@ -251,6 +260,25 @@ function commandButton(definition: CommandDefinition): StateDefinition {
 			type: "state",
 			common: {
 				name: definition.command,
+				type: "boolean",
+				role: "button",
+				read: false,
+				write: true,
+				def: false,
+			},
+			native: {},
+		},
+	};
+}
+
+function consumableResetButton(definition: ConsumableResetDefinition): StateDefinition {
+	return {
+		id: definition.id,
+		object: {
+			_id: definition.id,
+			type: "state",
+			common: {
+				name: definition.name,
 				type: "boolean",
 				role: "button",
 				read: false,

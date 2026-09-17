@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import {
 	projectConsumables,
+	projectConsumableResetProgress,
 	projectDevice,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
@@ -10,6 +11,8 @@ import {
 	projectRobotActivity,
 	redactedErrorMessage,
 	setConnectionState,
+	setConsumableResetCapability,
+	setConsumableResetFailure,
 	setDeviceListDiagnostics,
 	setDeviceOnlineStale,
 } from "./projector";
@@ -318,6 +321,35 @@ describe("projectConsumables", () => {
 		expect(states.get("consumables.lastReadResult")).to.deep.equal({ val: "ok", ack: true });
 		expect(states.get("consumables.lastError")).to.deep.equal({ val: "", ack: true });
 		expect(states.get("capabilities.consumables")).to.deep.equal({ val: true, ack: true });
+	});
+});
+
+describe("consumable reset projection", () => {
+	it("publishes capability, progress, and redacted failures", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await setConsumableResetCapability(adapter, true);
+		await projectConsumableResetProgress(adapter, "filter", "reading-before-reset");
+
+		expect(states.get("capabilities.consumableReset")).to.deep.equal({ val: true, ack: true });
+		expect(states.get("consumables.reset.lastComponent")).to.deep.equal({ val: "filter", ack: true });
+		expect(states.get("consumables.reset.lastResult")).to.deep.equal({
+			val: "reading-before-reset",
+			ack: true,
+		});
+
+		await setConsumableResetFailure(adapter, "filter", new Error("user@example.com at 192.0.2.10"));
+		expect(states.get("consumables.reset.lastResult")).to.deep.equal({ val: "failed", ack: true });
+		expect(states.get("consumables.reset.lastError")).to.deep.equal({
+			val: "<redacted-email> at <redacted-address>",
+			ack: true,
+		});
 	});
 });
 

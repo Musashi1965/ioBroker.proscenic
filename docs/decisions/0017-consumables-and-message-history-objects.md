@@ -13,8 +13,9 @@ read paths for the M7 Pro legacy backend:
 - `POST /app/cleanRobot/20003/{sn}` returns the first page of the maintenance
   and device message history.
 
-Both paths are read-only in the implemented adapter flow. The counter-reset
-operation `21016` remains untested and must not be exposed.
+Static application inspection also recovered the `21016` reset request shape.
+No reset has yet been sent to the real device, so the implementation remains a
+local-development candidate and must not be described as real-device verified.
 
 ## Decision
 
@@ -79,7 +80,43 @@ reserved for live gateway `20003` events and status-derived diagnostics.
 The adapter also exposes:
 
 - `capabilities.consumables`;
+- `capabilities.consumableReset`;
 - `capabilities.maintenanceMessages`.
+
+Expose four write-only boolean reset buttons:
+
+- `consumables.filter.reset`;
+- `consumables.sideBrush.reset`;
+- `consumables.mainBrush.reset`;
+- `consumables.sensors.reset`.
+
+Expose transaction diagnostics under `consumables.reset.*`:
+
+- `lastComponent`;
+- `lastResult`;
+- `lastError`;
+- `lastExecution`.
+
+A reset is never a direct fire-and-forget write. It is serialized with normal
+robot commands and performs one complete transaction:
+
+1. request a fresh `21015` snapshot;
+2. require the complete observed integer field set `filter`, `mainBrush`,
+   `sideBrush`, `sensors`, and `battery`;
+3. copy the snapshot and set only the selected component to zero;
+4. send JSON to `POST /instructions/cmd21016/{sn}?username=...`;
+5. require an asynchronous `21016` event in which the selected counter is zero
+   and every non-selected counter is unchanged;
+6. request another `21015` snapshot and require exact equality with the
+   confirmed reset result.
+
+The adapter rejects snapshots with missing or additional fields instead of
+reflecting unknown data into the write request, and does not automatically
+retry a reset. If the selected counter is already zero, the fresh read
+completes the transaction with `already-zero` without sending `21016`.
+`capabilities.consumableReset` becomes true only after a complete, safe
+snapshot has been observed for the verified M7 Pro target and is cleared when
+the command session is discarded.
 
 After a gateway connection is established, the adapter may trigger both verified
 read paths, but no more often than once every 15 minutes. The consumable REST
@@ -101,6 +138,13 @@ overdue hours, and recent device messages without private raw protocol data.
 The values update after a successful connection and after any future received
 `21015` event.
 
+The reset buttons provide an auditable result instead of treating HTTP success
+as physical confirmation. Until a controlled single-component real-device test
+has confirmed the `21016` echo and `21015` persistence read, they remain a
+development candidate rather than a released support claim. Adding the states
+is backward-compatible; rollback removes the new button, capability, and
+diagnostic objects without changing the existing counter states.
+
 The object tree now contains more owner-specific operational data. It is safe
 for the local development adapter but must be described carefully before public
 release.
@@ -120,7 +164,10 @@ events share the same observed level.
 
 ## Validation
 
-Unit tests cover consumable normalization, negative remaining percentages,
+Unit tests cover consumable normalization, complete reset snapshots, request
+construction, unchanged-counter validation, negative remaining percentages,
 message-history redaction, object definitions, projection, and read-failure
 states. Full adapter checks are required because this changes runtime protocol
-behavior and public objects.
+behavior and public objects. Real-device acceptance requires one selected
+counter to reset to zero, all other counters to remain unchanged, and the same
+values to persist in a subsequent `21015` read.

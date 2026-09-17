@@ -78,6 +78,9 @@ Security policy and contribution requirements are documented in
 - Added `map.live.viewerUrl` with an interactive, same-origin live-map viewer
   that updates without reloading its iframe, uses the configured canvas color,
   and presents the centered map without an internal title bar.
+- Added guarded consumable-reset button candidates with a fresh read before the
+  write, `21016` gateway confirmation, exact non-target counter validation, and
+  a persistent `21015` readback. Real-device reset validation is still pending.
 
 ### 0.2.0 (2026-09-16)
 

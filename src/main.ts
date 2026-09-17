@@ -5,7 +5,15 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from "@iobroker/adapter-core";
-import { normalizeConsumables21015, type ConsumableStates } from "./domain/consumables";
+import {
+	buildConsumableResetRequest,
+	consumableResetForStateId,
+	normalizeConsumableCounterSnapshot,
+	normalizeConsumables21015,
+	runSafeConsumableReset,
+	type ConsumableComponent,
+	type ConsumableCounterSnapshot,
+} from "./domain/consumables";
 import {
 	buildCommandRequest,
 	commandForStateId,
@@ -41,6 +49,7 @@ import {
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
+	projectConsumableResetProgress,
 	projectConsumables,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
@@ -51,6 +60,8 @@ import {
 	projectStatus,
 	redactedErrorMessage,
 	setConsumablesReadFailure,
+	setConsumableResetCapability,
+	setConsumableResetFailure,
 	setConnectionState,
 	setDeviceListDiagnostics,
 	setDeviceOnlineStale,
@@ -76,9 +87,10 @@ const MAX_QUEUED_COMMANDS = 5;
 const MAX_GATEWAY_BUFFER_BYTES = 512 * 1024;
 const MAX_LIVE_MAP_POSES = 1_000;
 
-interface PendingConsumableRead {
+interface PendingConsumableEvent {
+	expectedInfoType: 21015 | 21016;
 	timer: ioBroker.Timeout;
-	resolve: (consumables: ConsumableStates) => void;
+	resolve: (snapshot: ConsumableCounterSnapshot) => void;
 	reject: (error: Error) => void;
 }
 
@@ -103,6 +115,7 @@ class Proscenic extends utils.Adapter {
 	private reconnectAttempt = 0;
 	private reconnectInProgress = false;
 	private commandExecutionChain: Promise<void> = Promise.resolve();
+	private consumableOperationChain: Promise<void> = Promise.resolve();
 	private queuedCommandCount = 0;
 	private pendingCommandConfirmation: PendingCommandConfirmation | undefined;
 	private commandEnabled = false;
@@ -132,7 +145,7 @@ class Proscenic extends utils.Adapter {
 	private gatewayConnected = false;
 	private latestRobotStatus: RobotStatus | undefined;
 	private cleaningInferredUntilMs = 0;
-	private pendingConsumableRead: PendingConsumableRead | undefined;
+	private pendingConsumableEvent: PendingConsumableEvent | undefined;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
 
@@ -166,6 +179,7 @@ class Proscenic extends utils.Adapter {
 		await projectLiveMapViewerUrl(this);
 		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
+		this.subscribeStates("consumables.*.reset");
 		this.subscribeStates("map.live.backgroundColor");
 		this.subscribeStates("map.live.canvasBackgroundColor");
 		this.subscribeStates("map.live.mapBackgroundColor");
@@ -189,7 +203,7 @@ class Proscenic extends utils.Adapter {
 			this.shuttingDown = true;
 			this.clearReconnectTimer();
 			this.clearGatewayIdleTimer();
-			this.rejectPendingConsumableRead(new Error("Adapter unload interrupted consumable read"));
+			this.rejectPendingConsumableEvent(new Error("Adapter unload interrupted consumable operation"));
 			this.cancelPendingCommandConfirmation();
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
@@ -291,7 +305,7 @@ class Proscenic extends utils.Adapter {
 			onClose: () => {
 				this.clearGatewayIdleTimer();
 				void this.setGatewayConnection(false);
-				this.rejectPendingConsumableRead(new Error("Gateway closed before consumable data was received"));
+				this.rejectPendingConsumableEvent(new Error("Gateway closed before consumable data was received"));
 				if (!this.shuttingDown) {
 					this.resetReconnectAttemptAfterStableConnection();
 					this.log.warn("Proscenic gateway connection closed.");
@@ -406,7 +420,7 @@ class Proscenic extends utils.Adapter {
 		});
 		await setLastError(this, new Error(`Gateway idle watchdog: ${reason}`));
 		await this.setGatewayConnection(false);
-		this.rejectPendingConsumableRead(new Error(`Gateway idle watchdog: ${reason}`));
+		this.rejectPendingConsumableEvent(new Error(`Gateway idle watchdog: ${reason}`));
 		this.clearGatewayIdleTimer();
 		this.gatewayClient.destroy();
 		this.gatewayClient = undefined;
@@ -446,11 +460,17 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private async handleGatewayEvent(infoType: unknown, data: unknown): Promise<void> {
-		if (infoType === 21015) {
+		if (infoType === 21015 || infoType === 21016) {
+			const snapshot = normalizeConsumableCounterSnapshot(data);
 			const consumables = normalizeConsumables21015(data);
 			if (consumables) {
 				await projectConsumables(this, consumables);
-				this.resolvePendingConsumableRead(consumables);
+			}
+			if (snapshot) {
+				if (infoType === 21015 && this.commandEnabled) {
+					await setConsumableResetCapability(this, true);
+				}
+				this.resolvePendingConsumableEvent(infoType, snapshot);
 			}
 			return;
 		}
@@ -559,55 +579,81 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private async refreshConsumables(): Promise<void> {
-		if (!this.commandClient || !this.commandToken || !this.commandSerial) {
+		const session = this.currentCommandSession();
+		if (!session) {
 			return;
 		}
 
-		let consumableRead: Promise<ConsumableStates> | undefined;
 		try {
-			consumableRead = this.awaitNextConsumables();
-			await this.commandClient.requestConsumables(this.commandToken, this.commandSerial);
-			await consumableRead;
+			await this.runConsumableOperation(() => this.requestConsumableSnapshot(session));
 		} catch (error) {
-			void consumableRead?.catch(() => undefined);
-			this.rejectPendingConsumableRead(error instanceof Error ? error : new Error(String(error)));
 			await setConsumablesReadFailure(this, error);
 			this.log.debug(`Could not refresh Proscenic consumables: ${redactedErrorMessage(error)}`);
 		}
 	}
 
-	private awaitNextConsumables(): Promise<ConsumableStates> {
-		this.rejectPendingConsumableRead(new Error("Superseded by a newer consumable read"));
+	private runConsumableOperation<T>(operation: () => Promise<T>): Promise<T> {
+		const execution = this.consumableOperationChain.catch(() => undefined).then(operation);
+		this.consumableOperationChain = execution.then(
+			() => undefined,
+			() => undefined,
+		);
+		return execution;
+	}
 
-		return new Promise<ConsumableStates>((resolve, reject) => {
+	private async requestConsumableSnapshot(session: CommandSession): Promise<ConsumableCounterSnapshot> {
+		const event = this.awaitNextConsumableEvent(21015);
+		try {
+			const result = await session.client.requestConsumables(session.token, session.serial);
+			if (result.code !== undefined && result.code !== 0) {
+				throw new Error(`Consumable read was rejected with API code ${result.code}`);
+			}
+			return await event;
+		} catch (error) {
+			void event.catch(() => undefined);
+			this.rejectPendingConsumableEvent(error instanceof Error ? error : new Error(String(error)));
+			throw error;
+		}
+	}
+
+	private awaitNextConsumableEvent(expectedInfoType: 21015 | 21016): Promise<ConsumableCounterSnapshot> {
+		if (this.pendingConsumableEvent) {
+			throw new Error("Another consumable gateway operation is already pending");
+		}
+
+		return new Promise<ConsumableCounterSnapshot>((resolve, reject) => {
 			const timer = this.setTimeout(() => {
-				this.pendingConsumableRead = undefined;
-				reject(new Error(`No consumable gateway event received within ${CONSUMABLE_GATEWAY_TIMEOUT_MS} ms`));
+				this.pendingConsumableEvent = undefined;
+				reject(
+					new Error(
+						`No consumable ${expectedInfoType} gateway event received within ${CONSUMABLE_GATEWAY_TIMEOUT_MS} ms`,
+					),
+				);
 			}, CONSUMABLE_GATEWAY_TIMEOUT_MS);
 			if (timer === undefined) {
 				reject(new Error("Could not schedule consumable gateway timeout"));
 				return;
 			}
-			this.pendingConsumableRead = { timer, resolve, reject };
+			this.pendingConsumableEvent = { expectedInfoType, timer, resolve, reject };
 		});
 	}
 
-	private resolvePendingConsumableRead(consumables: ConsumableStates): void {
-		if (!this.pendingConsumableRead) {
+	private resolvePendingConsumableEvent(infoType: 21015 | 21016, snapshot: ConsumableCounterSnapshot): void {
+		if (!this.pendingConsumableEvent || this.pendingConsumableEvent.expectedInfoType !== infoType) {
 			return;
 		}
-		this.clearTimeout(this.pendingConsumableRead.timer);
-		this.pendingConsumableRead.resolve(consumables);
-		this.pendingConsumableRead = undefined;
+		this.clearTimeout(this.pendingConsumableEvent.timer);
+		this.pendingConsumableEvent.resolve(snapshot);
+		this.pendingConsumableEvent = undefined;
 	}
 
-	private rejectPendingConsumableRead(error: Error): void {
-		if (!this.pendingConsumableRead) {
+	private rejectPendingConsumableEvent(error: Error): void {
+		if (!this.pendingConsumableEvent) {
 			return;
 		}
-		this.clearTimeout(this.pendingConsumableRead.timer);
-		this.pendingConsumableRead.reject(error);
-		this.pendingConsumableRead = undefined;
+		this.clearTimeout(this.pendingConsumableEvent.timer);
+		this.pendingConsumableEvent.reject(error);
+		this.pendingConsumableEvent = undefined;
 	}
 
 	private updateLiveMapTaskState(status: RobotStatus): void {
@@ -703,6 +749,21 @@ class Proscenic extends utils.Adapter {
 			return;
 		}
 
+		const consumableReset = consumableResetForStateId(relativeId);
+		if (consumableReset) {
+			const trigger = normalizeCommandButtonValue(state.val);
+			if (trigger === false) {
+				void this.setStateAsync(relativeId, { val: false, ack: true });
+				return;
+			}
+			if (trigger === undefined) {
+				this.log.debug(`Ignoring unsupported consumable reset button value for ${relativeId}.`);
+				return;
+			}
+			this.enqueueConsumableReset(relativeId, consumableReset);
+			return;
+		}
+
 		const command = commandForStateId(relativeId);
 		if (!command) {
 			this.log.debug(`Ignoring unsupported state command for ${relativeId}.`);
@@ -743,6 +804,69 @@ class Proscenic extends utils.Adapter {
 			this.queuedCommandCount = Math.max(0, this.queuedCommandCount - 1);
 			await this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
 		});
+	}
+
+	private enqueueConsumableReset(stateId: string, component: ConsumableComponent): void {
+		if (this.queuedCommandCount >= MAX_QUEUED_COMMANDS) {
+			void this.setConsumableResetFailure(stateId, component, new Error("Proscenic command queue is full"));
+			return;
+		}
+
+		this.queuedCommandCount += 1;
+		void this.setStateAsync(stateId, { val: false, ack: true });
+		void this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		const execution = this.commandExecutionChain
+			.catch(() => undefined)
+			.then(() => this.executeConsumableReset(stateId, component));
+		this.commandExecutionChain = execution.finally(async () => {
+			this.queuedCommandCount = Math.max(0, this.queuedCommandCount - 1);
+			await this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		});
+	}
+
+	private async executeConsumableReset(stateId: string, component: ConsumableComponent): Promise<void> {
+		await projectConsumableResetProgress(this, component, "waiting-for-session");
+
+		try {
+			const session = await this.waitForCommandSession();
+			if (!this.commandEnabled) {
+				throw new Error("Consumable resets are not enabled for the selected device");
+			}
+
+			await this.runConsumableOperation(async () => {
+				await runSafeConsumableReset(component, {
+					readSnapshot: async () => {
+						const snapshot = await this.requestConsumableSnapshot(session);
+						await setConsumableResetCapability(this, true);
+						return snapshot;
+					},
+					sendReset: before => this.sendConsumableReset(session, component, before),
+					onProgress: result => projectConsumableResetProgress(this, component, result),
+				});
+			});
+		} catch (error) {
+			await this.setConsumableResetFailure(stateId, component, error);
+		}
+	}
+
+	private async sendConsumableReset(
+		session: CommandSession,
+		component: ConsumableComponent,
+		before: ConsumableCounterSnapshot,
+	): Promise<ConsumableCounterSnapshot> {
+		const request = buildConsumableResetRequest(component, before, session.serial, session.username);
+		const echoEvent = this.awaitNextConsumableEvent(21016);
+		try {
+			const result = await session.client.sendCommand(session.token, request);
+			if (result.code !== undefined && result.code !== 0) {
+				throw new Error(`Consumable reset was rejected with API code ${result.code}`);
+			}
+			return await echoEvent;
+		} catch (error) {
+			void echoEvent.catch(() => undefined);
+			this.rejectPendingConsumableEvent(error instanceof Error ? error : new Error(String(error)));
+			throw error;
+		}
 	}
 
 	private async executeCommand(stateId: string, command: RobotCommand): Promise<void> {
@@ -902,8 +1026,20 @@ class Proscenic extends utils.Adapter {
 		this.log.warn(`Proscenic command ${command} failed: ${message}`);
 	}
 
+	private async setConsumableResetFailure(
+		stateId: string,
+		component: ConsumableComponent,
+		error: unknown,
+	): Promise<void> {
+		const message = redactedErrorMessage(error);
+		await setConsumableResetFailure(this, component, error);
+		await this.setStateAsync(stateId, { val: false, ack: true });
+		this.log.warn(`Proscenic consumable reset for ${component} failed: ${message}`);
+	}
+
 	private clearCommandSession(): void {
 		this.commandEnabled = false;
+		void setConsumableResetCapability(this, false);
 		this.commandClient = undefined;
 		this.commandToken = undefined;
 		this.commandSerial = undefined;

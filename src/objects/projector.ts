@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ConsumableStates } from "../domain/consumables";
+import type { ConsumableComponent, ConsumableStates } from "../domain/consumables";
 import type { MaintenanceHistory, MaintenanceMessage } from "../domain/maintenance-message";
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
@@ -22,6 +22,7 @@ export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Pro
 	await adapter.setStateAsync("capabilities.commands", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.consumables", { val: false, ack: true });
+	await adapter.setStateAsync("capabilities.consumableReset", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.maintenanceMessages", { val: false, ack: true });
 }
 
@@ -126,6 +127,32 @@ export async function projectConsumables(adapter: ioBroker.Adapter, consumables:
 export async function setConsumablesReadFailure(adapter: ioBroker.Adapter, error: unknown): Promise<void> {
 	await adapter.setStateAsync("consumables.lastReadResult", { val: "failed", ack: true });
 	await adapter.setStateAsync("consumables.lastError", { val: redactedErrorMessage(error), ack: true });
+}
+
+export async function setConsumableResetCapability(adapter: ioBroker.Adapter, available: boolean): Promise<void> {
+	await adapter.setStateAsync("capabilities.consumableReset", { val: available, ack: true });
+}
+
+export async function projectConsumableResetProgress(
+	adapter: ioBroker.Adapter,
+	component: ConsumableComponent,
+	result: string,
+): Promise<void> {
+	await adapter.setStateAsync("consumables.reset.lastComponent", { val: component, ack: true });
+	await adapter.setStateAsync("consumables.reset.lastResult", { val: result, ack: true });
+	await adapter.setStateAsync("consumables.reset.lastError", { val: "", ack: true });
+	await adapter.setStateAsync("consumables.reset.lastExecution", { val: new Date().toISOString(), ack: true });
+}
+
+export async function setConsumableResetFailure(
+	adapter: ioBroker.Adapter,
+	component: ConsumableComponent,
+	error: unknown,
+): Promise<void> {
+	await adapter.setStateAsync("consumables.reset.lastComponent", { val: component, ack: true });
+	await adapter.setStateAsync("consumables.reset.lastResult", { val: "failed", ack: true });
+	await adapter.setStateAsync("consumables.reset.lastError", { val: redactedErrorMessage(error), ack: true });
+	await adapter.setStateAsync("consumables.reset.lastExecution", { val: new Date().toISOString(), ack: true });
 }
 
 export async function setMaintenanceHistoryReadFailure(adapter: ioBroker.Adapter, error: unknown): Promise<void> {
