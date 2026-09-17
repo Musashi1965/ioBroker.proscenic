@@ -76,7 +76,8 @@ Security policy and contribution requirements are documented in
 - Prevented transient charging status reports during active cleaning from
   erasing the current task's accumulated pose trail.
 - Added `map.live.viewerUrl` with an interactive, same-origin live-map viewer
-  that updates without reloading its iframe.
+  that updates without reloading its iframe, uses the configured canvas color,
+  and presents the centered map without an internal title bar.
 
 ### 0.2.0 (2026-09-16)
 

@@ -14,7 +14,9 @@ describe("live map web viewer", () => {
 		expect(script).to.include("proscenic.${instance}.map.live");
 		expect(script).to.include(".svgDataUri");
 		expect(script).to.include(".pngDataUri");
+		expect(script).to.include(".canvasBackgroundColor");
 		expect(script).to.include("new window.Image()");
+		expect(html).to.not.include("viewer-header");
 		expect(script).to.not.match(/https?:\/\//u);
 	});
 });

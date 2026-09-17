@@ -10,10 +10,11 @@
 	const instance = Number.isSafeInteger(requestedInstance) && requestedInstance >= 0 ? requestedInstance : 0;
 	const statePrefix = `proscenic.${instance}.map.live`;
 	const imageStateIds = [`${statePrefix}.svgDataUri`, `${statePrefix}.pngDataUri`];
+	const backgroundColorStateId = `${statePrefix}.canvasBackgroundColor`;
+	const subscribedStateIds = [...imageStateIds, backgroundColorStateId];
 	const viewport = document.getElementById("viewport");
 	const image = document.getElementById("mapImage");
 	const empty = document.getElementById("empty");
-	const connectionStatus = document.getElementById("connectionStatus");
 	const view = { scale: 1, x: 0, y: 0 };
 	let socket;
 	let connected = false;
@@ -21,10 +22,6 @@
 	let currentSource = "";
 	let pendingSource = "";
 	let pointer;
-
-	if (params.get("embed") === "1") {
-		document.body.classList.add("is-embedded");
-	}
 
 	function socketRequest(event, ...args) {
 		return new Promise((resolve, reject) => {
@@ -61,6 +58,20 @@
 			return state.val;
 		}
 		return state;
+	}
+
+	function safeBackgroundColor(value) {
+		const color = String(value ?? "")
+			.trim()
+			.toLowerCase();
+		return /^#[0-9a-f]{6}$/u.test(color) ? color : "";
+	}
+
+	function applyBackgroundColor(value) {
+		const color = safeBackgroundColor(value);
+		if (color) {
+			document.documentElement.style.setProperty("--viewer-background", color);
+		}
 	}
 
 	async function readState(id) {
@@ -126,18 +137,17 @@
 		}
 		loading = true;
 		try {
+			applyBackgroundColor(stateValue(await readState(backgroundColorStateId)));
 			for (const id of imageStateIds) {
 				const source = safeImageSource(stateValue(await readState(id)));
 				if (source) {
 					setSource(source);
-					connectionStatus.textContent = connected ? "Live" : "Polling";
 					return;
 				}
 			}
 			empty.textContent = "Waiting for map data…";
 			empty.hidden = false;
 		} catch {
-			connectionStatus.textContent = "Disconnected";
 			if (!currentSource) {
 				empty.textContent = "Live map is currently unavailable.";
 				empty.hidden = false;
@@ -181,6 +191,9 @@
 	viewport.addEventListener(
 		"wheel",
 		event => {
+			if (!event.ctrlKey && !event.metaKey) {
+				return;
+			}
 			event.preventDefault();
 			zoom(event.deltaY < 0 ? 1.18 : 1 / 1.18);
 		},
@@ -223,19 +236,20 @@
 		socket = window.io({ path: "/socket.io/" });
 		socket.on("connect", async () => {
 			connected = true;
-			connectionStatus.textContent = "Connected";
-			socket.emit("subscribe", imageStateIds);
+			socket.emit("subscribe", subscribedStateIds);
 			await refreshMap();
 		});
 		socket.on("disconnect", () => {
 			connected = false;
-			connectionStatus.textContent = "Disconnected";
 		});
 		socket.on("connect_error", () => {
 			connected = false;
-			connectionStatus.textContent = "Polling";
 		});
 		socket.on("stateChange", (id, state) => {
+			if (id === backgroundColorStateId) {
+				applyBackgroundColor(stateValue(state));
+				return;
+			}
 			if (!imageStateIds.includes(id)) {
 				return;
 			}
@@ -245,7 +259,7 @@
 			}
 		});
 	} catch {
-		connectionStatus.textContent = "Polling";
+		// The polling fallback below remains available without socket.io.
 	}
 
 	window.setInterval(refreshMap, POLL_INTERVAL_MS);

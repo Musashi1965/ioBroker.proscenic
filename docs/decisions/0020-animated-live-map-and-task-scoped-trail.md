@@ -58,8 +58,11 @@ authenticated same-origin ioBroker socket, falls back to the web adapter's
 read-only state endpoint, validates the accepted image data-URI formats, and
 retains its iframe and viewport across updates. New images are decoded before
 they replace the visible image, so updates do not intentionally fade two full
-map frames through one another. The viewer supports bounded zoom and pan and
-honors `embed=1` by hiding its standalone header.
+map frames through one another. The viewer has no redundant internal heading,
+uses the existing writable `map.live.canvasBackgroundColor` for the complete
+viewer surface, and centers the contained map with a fixed margin. It supports
+bounded zoom and pan; wheel zoom requires Ctrl or Command so ordinary dashboard
+scrolling cannot accidentally move the map. Reset restores the centered fit.
 
 ## Consequences
 
