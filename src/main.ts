@@ -877,6 +877,7 @@ class Proscenic extends utils.Adapter {
 				mapBackgroundColor: this.liveMapMapBackgroundColor,
 				animateRobot: renderReason === "pose",
 				showZoneOverlays: this.liveMapShowZoneOverlays,
+				selectedZoneIds: this.selectedZoneIds,
 			});
 			if (image) {
 				await projectLiveMapImage(this, image, {
@@ -1435,6 +1436,7 @@ class Proscenic extends utils.Adapter {
 			val: JSON.stringify(normalized),
 			ack: true,
 		});
+		await this.projectLatestLiveMapImage("zones");
 	}
 
 	private async deleteObsoleteLiveMapRoomColor(): Promise<void> {

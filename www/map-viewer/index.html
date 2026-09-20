@@ -19,12 +19,26 @@
 				id="viewport"
 				aria-label="Proscenic live map"
 			>
-				<img
-					id="mapImage"
-					alt="Proscenic live map"
-					draggable="false"
-				/>
+				<div id="mapStage">
+					<img
+						id="mapImage"
+						alt="Proscenic live map"
+						draggable="false"
+					/>
+				</div>
 				<p id="empty">Waiting for map data…</p>
+				<button
+					id="zoneStart"
+					type="button"
+					hidden
+				>
+					Ausgewählte Zonen reinigen
+				</button>
+				<p
+					id="interactionStatus"
+					role="status"
+					aria-live="polite"
+				></p>
 				<div
 					class="viewer-controls"
 					aria-label="Map controls"

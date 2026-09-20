@@ -437,6 +437,41 @@ describe("live map rendering", () => {
 		expect(image?.renderedForbiddenAreaCount).to.equal(0);
 	});
 
+	it("renders unselected zones white and selected zones light green", () => {
+		const width = 5;
+		const height = 5;
+		const grid = Buffer.alloc(width * height, 127);
+		const data = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			width,
+			height,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				{
+					id: 1005,
+					__proscenicKind: "zone",
+					vertexs: [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					],
+				},
+			],
+		};
+		const unselected = renderLiveMapImage20002(data);
+		const selected = renderLiveMapImage20002(data, [], { selectedZoneIds: [1005] });
+		const unselectedCenter = pixelAt(decodeRgbPngDataUrl(unselected?.pngDataUrl, width, height), width, 2, 2);
+		const selectedCenter = pixelAt(decodeRgbPngDataUrl(selected?.pngDataUrl, width, height), width, 2, 2);
+
+		expect(unselectedCenter[0]).to.equal(unselectedCenter[1]);
+		expect(unselectedCenter[1]).to.equal(unselectedCenter[2]);
+		expect(selectedCenter[1]).to.be.greaterThan(selectedCenter[0]);
+		expect(selectedCenter[1]).to.be.greaterThan(selectedCenter[2]);
+	});
+
 	it("normalizes writable live-map background colors", () => {
 		expect(DEFAULT_LIVE_MAP_BACKGROUND_COLOR).to.equal("#b8ccd8");
 		expect(DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR).to.equal("#d9d9d9");

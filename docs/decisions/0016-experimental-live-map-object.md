@@ -79,8 +79,12 @@ rendered wider than one pixel for VIS readability.
 
 `map.live.showZoneOverlays` controls whether saved selectable zones and
 forbidden-area polygons are drawn into the local image. The default is `true`.
-Turning it off leaves `map.live.areas`, the 21004 catalog, and zone-cleaning
-selection untouched. ADR 0021 defines its writable semantics.
+Unselected selectable zones use a transparent white fill; zone IDs currently
+present in `commands.zones.selectedIds` use a transparent light-green fill.
+Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
+stored zone-cleaning selection untouched. In the interactive viewer it also
+disables click selection and hides the contextual start action. ADR 0021
+defines its writable and interaction semantics.
 
 `map.live.viewerUrl` contains the stable same-origin web-adapter path for the
 interactive viewer defined by ADR 0020. It is a URL only and contains neither

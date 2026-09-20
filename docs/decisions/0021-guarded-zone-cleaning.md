@@ -2,6 +2,7 @@
 
 - Status: accepted for test-host validation
 - Date: 2026-09-20
+- Amended: 2026-09-20
 
 ## Context
 
@@ -51,8 +52,20 @@ command diagnostics report queueing, validation, REST acceptance, failure, and
 the latency to a later `mode=sweep` status confirmation. REST acceptance alone
 does not prove physical execution.
 
-Changing `map.live.showZoneOverlays` re-renders the local image. It does not
-change upstream zones, target selection, map data, or robot behavior.
+Changing `map.live.showZoneOverlays` re-renders the local image. When enabled,
+the same-origin `map.live.viewerUrl` treats the projected bounds of current
+selectable zones as click targets. A click toggles the corresponding ID through
+the existing `commands.zones.selectedIds` contract. Unselected zones render
+with a transparent white fill and selected zones with a transparent light-green
+fill. Forbidden areas remain visible but are never click targets.
+
+The viewer shows its zone-cleaning start action only when overlay selection is
+enabled, `capabilities.zoneCleaning` is true, and at least one selected ID is
+also present in the current `commands.zones.available` list. The action writes
+only to `commands.zones.start`; it does not bypass the adapter's fresh 21004
+validation or command queue. Turning the overlay switch off hides and disables
+the click targets and start action. It does not change upstream zones, map
+data, robot behavior, or silently clear a stored selection.
 
 ## Consequences
 
@@ -61,8 +74,9 @@ vertices. A forbidden area or stale ID cannot be submitted through the normal
 adapter path. Zone names and IDs remain runtime installation data and are not
 logged, committed, or used in public fixtures.
 
-The object contract calls these entries zones rather than rooms. A later UI may
-add friendlier dynamic selectors without changing the guarded command service.
+The object contract calls these entries zones rather than rooms. The interactive
+viewer adds a friendly dynamic selector without changing or bypassing the
+guarded command service.
 
 ## Alternatives Considered
 
@@ -80,7 +94,8 @@ cleaning.
 ## Validation
 
 Automated tests cover selection parsing, forbidden/stale-zone rejection, exact
-30000 request construction, object metadata, overlay hiding, and projection.
+30000 request construction, object metadata, overlay hiding, selected and
+unselected colors, viewer state wiring, and projection.
 The full adapter quality gate and test-host deployment are required. Actual
 30000 execution on the real device remains a separate explicitly triggered
 physical validation step; deployment alone must not start the robot.

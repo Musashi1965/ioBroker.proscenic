@@ -31,8 +31,8 @@ Verified on Proscenic M7 Pro so far:
   app-oriented map colors, saved zones, no-go areas, charger marker,
   a task-scoped pose trail, and SVG animation between gateway positions. A
   static PNG fallback and a same-origin iframe viewer URL remain available for
-  other visualization modes. Saved-zone overlays can be hidden through
-  `map.live.showZoneOverlays` without removing the underlying catalog.
+  other visualization modes. In the iframe viewer, visible saved zones can be
+  selected directly on the map and started with an in-map action button.
 
 The adapter is an early public beta. The supported hardware claim is limited to
 the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
@@ -57,9 +57,14 @@ malformed selections are rejected. REST acceptance is reported through the
 normal `commands.last*` diagnostics and is followed by a bounded status
 confirmation wait.
 
-`map.live.showZoneOverlays` controls whether saved zones and forbidden areas
-are drawn in the local VIS map. It does not modify the saved zones or the
-current cleaning selection.
+`map.live.showZoneOverlays` controls both visibility and interactive selection
+in the `map.live.viewerUrl` iframe. When enabled, unselected zones are shown as
+transparent white overlays and selected zones as transparent light-green
+overlays. Clicking a valid zone toggles its ID in
+`commands.zones.selectedIds`. As soon as at least one valid zone is selected,
+the viewer shows a start button which writes to `commands.zones.start`.
+Turning the switch off hides and disables the interactive overlays without
+modifying upstream saved zones.
 
 ## Project identity
 
@@ -100,7 +105,8 @@ Security policy and contribution requirements are documented in
   a persistent `21015` readback. Real-device reset validation is still pending.
 - Added guarded saved-zone cleaning through `commands.zones.selectedIds` and
   `commands.zones.start`, with a fresh 21004 validation before the 30000
-  request. Added `map.live.showZoneOverlays` for VIS.
+  request. Added `map.live.showZoneOverlays` for VIS and direct click selection
+  plus a contextual start button in the same-origin map viewer.
 
 ### 0.2.0 (2026-09-16)
 

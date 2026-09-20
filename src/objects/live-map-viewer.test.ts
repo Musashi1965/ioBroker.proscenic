@@ -12,14 +12,23 @@ describe("live map web viewer", () => {
 
 		expect(html).to.include('id="viewport"');
 		expect(html).to.include('src="/lib/js/socket.io.js"');
-		expect(script).to.include("proscenic.${instance}.map.live");
+		expect(script).to.include("proscenic.${instance}");
+		expect(script).to.include("${rootPrefix}.map.live");
 		expect(script).to.include(".svgDataUri");
 		expect(script).to.include(".pngDataUri");
 		expect(script).to.include(".canvasBackgroundColor");
+		expect(script).to.include(".showZoneOverlays");
+		expect(script).to.include(".commands.zones.selectedIds");
+		expect(script).to.include(".commands.zones.start");
+		expect(script).to.include('socketRequest("setState"');
+		expect(script).to.include("zoneAtPointer");
 		expect(script).to.include("new window.Image()");
+		expect(html).to.include('id="mapStage"');
+		expect(html).to.include('id="zoneStart"');
 		expect(html).to.not.include("viewer-header");
 		expect(style).to.include("grid-template-rows: minmax(0, 1fr)");
 		expect(style).to.include("min-height: 0");
+		expect(style).to.include("#zoneStart");
 		expect(script).to.not.match(/https?:\/\//u);
 	});
 });

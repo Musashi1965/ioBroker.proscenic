@@ -30,6 +30,7 @@ export interface LiveMapRenderOptions {
 	backgroundColor?: string;
 	animateRobot?: boolean;
 	showZoneOverlays?: boolean;
+	selectedZoneIds?: readonly number[];
 }
 
 export interface LiveMapTaskState {
@@ -103,9 +104,12 @@ const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
 const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
-const COLOR_ZONE_AREA: Color = [112, 125, 236];
-const COLOR_ZONE_AREA_OUTLINE: Color = [68, 84, 210];
+const COLOR_ZONE_AREA: Color = [255, 255, 255];
+const COLOR_ZONE_AREA_OUTLINE: Color = [210, 218, 224];
+const COLOR_SELECTED_ZONE_AREA: Color = [126, 216, 96];
+const COLOR_SELECTED_ZONE_AREA_OUTLINE: Color = [72, 168, 54];
 const ZONE_AREA_ALPHA = 0.3;
+const SELECTED_ZONE_AREA_ALPHA = 0.45;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
 const COLOR_PATH: Color = [126, 216, 96];
@@ -211,7 +215,12 @@ export function renderLiveMapImage20002(
 		mapBackgroundColor,
 		canvasBackgroundColor,
 	);
-	const coordinateMetadata = drawCoordinateMetadata(sample, basePixels, options.showZoneOverlays !== false);
+	const coordinateMetadata = drawCoordinateMetadata(
+		sample,
+		basePixels,
+		options.showZoneOverlays !== false,
+		new Set(options.selectedZoneIds ?? []),
+	);
 	const runtime = drawRobotRuntime(sample, occupancy, basePixels, poses);
 	const basePng = encodeRgbPng(sample.width, sample.height, basePixels);
 	const fallbackPixels = Buffer.from(basePixels);
@@ -420,6 +429,7 @@ function drawCoordinateMetadata(
 	sample: MapSample,
 	pixels: Buffer,
 	showZoneOverlays: boolean,
+	selectedZoneIds: ReadonlySet<number>,
 ): { renderedForbiddenAreaCount: number; renderedZoneAreaCount: number; renderedRoomAreaCount: number } {
 	let renderedForbiddenAreaCount = 0;
 	let renderedZoneAreaCount = 0;
@@ -429,8 +439,22 @@ function drawCoordinateMetadata(
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);
 		if (projected.length >= 3) {
 			if (area.kind === "zone") {
-				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_ZONE_AREA, ZONE_AREA_ALPHA);
-				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_ZONE_AREA_OUTLINE);
+				const selected = typeof area.source.id === "number" && selectedZoneIds.has(area.source.id);
+				fillPolygon(
+					pixels,
+					sample.width,
+					sample.height,
+					projected,
+					selected ? COLOR_SELECTED_ZONE_AREA : COLOR_ZONE_AREA,
+					selected ? SELECTED_ZONE_AREA_ALPHA : ZONE_AREA_ALPHA,
+				);
+				drawPolygon(
+					pixels,
+					sample.width,
+					sample.height,
+					projected,
+					selected ? COLOR_SELECTED_ZONE_AREA_OUTLINE : COLOR_ZONE_AREA_OUTLINE,
+				);
 				renderedZoneAreaCount += 1;
 			} else if (area.kind === "forbidden") {
 				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA, FORBIDDEN_AREA_ALPHA);
