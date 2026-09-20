@@ -25,12 +25,13 @@ import {
 import {
 	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
-	countLiveMapAreas20002,
 	extractLiveMapCoordinateMetadata20002,
+	extractLiveMapZoneCatalog21004,
 	extractRobotPose20001,
 	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
 	normalizeLiveMapBackgroundColor,
+	replaceLiveMapZoneCatalog,
 	renderLiveMapImage20002,
 	transitionLiveMapTaskState,
 	type LiveMapCoordinateMetadata,
@@ -53,6 +54,7 @@ import {
 	projectConsumables,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
+	projectMapZoneCatalogReadSuccess,
 	projectMapMetadata,
 	projectMaintenanceHistory,
 	projectMaintenanceMessage,
@@ -68,6 +70,8 @@ import {
 	setInitialCapabilityStates,
 	setLastError,
 	setMaintenanceHistoryReadFailure,
+	setMapZoneCatalogReadFailure,
+	initializeLiveMapAreaStates,
 } from "./objects/projector";
 import { ProscenicGatewayClient } from "./protocol/gateway-client";
 import { ProscenicRestClient } from "./protocol/rest-client";
@@ -75,6 +79,8 @@ import type { DeviceRecord, GatewayData, GatewayEndpoint } from "./protocol/type
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const CONSUMABLE_GATEWAY_TIMEOUT_MS = 35_000;
+const MAP_ZONE_CATALOG_TIMEOUT_MS = 35_000;
+const MAP_ZONE_CATALOG_RETRY_INTERVAL_MS = 60_000;
 const AUXILIARY_READ_INTERVAL_MS = 15 * 60_000;
 const GATEWAY_IDLE_TIMEOUT_MS = 90_000;
 const GATEWAY_IDLE_CHECK_INTERVAL_MS = 30_000;
@@ -91,6 +97,12 @@ interface PendingConsumableEvent {
 	expectedInfoType: 21015 | 21016;
 	timer: ioBroker.Timeout;
 	resolve: (snapshot: ConsumableCounterSnapshot) => void;
+	reject: (error: Error) => void;
+}
+
+interface PendingMapZoneCatalogRead {
+	timer: ioBroker.Timeout;
+	resolve: (catalog: LiveMapCoordinateMetadata) => void;
 	reject: (error: Error) => void;
 }
 
@@ -146,6 +158,10 @@ class Proscenic extends utils.Adapter {
 	private latestRobotStatus: RobotStatus | undefined;
 	private cleaningInferredUntilMs = 0;
 	private pendingConsumableEvent: PendingConsumableEvent | undefined;
+	private pendingMapZoneCatalogRead: PendingMapZoneCatalogRead | undefined;
+	private latestMapZoneCatalogCount = 0;
+	private hasLoadedMapZoneCatalog = false;
+	private lastMapZoneCatalogRequestAt = 0;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
 
@@ -176,6 +192,7 @@ class Proscenic extends utils.Adapter {
 		await this.setStateAsync("connection.gatewayIdleReconnectCount", { val: 0, ack: true });
 		await this.setStateAsync("commands.queueDepth", { val: 0, ack: true });
 		await setInitialCapabilityStates(this);
+		await initializeLiveMapAreaStates(this);
 		await projectLiveMapViewerUrl(this);
 		await this.initializeLiveMapColors();
 		this.subscribeStates("commands.*");
@@ -204,6 +221,7 @@ class Proscenic extends utils.Adapter {
 			this.clearReconnectTimer();
 			this.clearGatewayIdleTimer();
 			this.rejectPendingConsumableEvent(new Error("Adapter unload interrupted consumable operation"));
+			this.rejectPendingMapZoneCatalogRead(new Error("Adapter unload interrupted map zone catalog read"));
 			this.cancelPendingCommandConfirmation();
 			this.gatewayClient?.destroy();
 			this.gatewayClient = undefined;
@@ -306,6 +324,7 @@ class Proscenic extends utils.Adapter {
 				this.clearGatewayIdleTimer();
 				void this.setGatewayConnection(false);
 				this.rejectPendingConsumableEvent(new Error("Gateway closed before consumable data was received"));
+				this.rejectPendingMapZoneCatalogRead(new Error("Gateway closed before map zones were received"));
 				if (!this.shuttingDown) {
 					this.resetReconnectAttemptAfterStableConnection();
 					this.log.warn("Proscenic gateway connection closed.");
@@ -421,6 +440,7 @@ class Proscenic extends utils.Adapter {
 		await setLastError(this, new Error(`Gateway idle watchdog: ${reason}`));
 		await this.setGatewayConnection(false);
 		this.rejectPendingConsumableEvent(new Error(`Gateway idle watchdog: ${reason}`));
+		this.rejectPendingMapZoneCatalogRead(new Error(`Gateway idle watchdog: ${reason}`));
 		this.clearGatewayIdleTimer();
 		this.gatewayClient.destroy();
 		this.gatewayClient = undefined;
@@ -475,6 +495,30 @@ class Proscenic extends utils.Adapter {
 			return;
 		}
 
+		if (infoType === 21004) {
+			const catalog = extractLiveMapZoneCatalog21004(data);
+			if (!catalog) {
+				const error = new Error("Map zone catalog response was malformed");
+				this.rejectPendingMapZoneCatalogRead(error);
+				await setMapZoneCatalogReadFailure(this, error);
+				return;
+			}
+			if (this.latestMapId !== undefined && catalog.mapId !== this.latestMapId) {
+				const error = new Error("Map zone catalog did not match the active map");
+				this.rejectPendingMapZoneCatalogRead(error);
+				await setMapZoneCatalogReadFailure(this, error);
+				return;
+			}
+
+			this.latestMapCoordinateMetadata = replaceLiveMapZoneCatalog(this.latestMapCoordinateMetadata, catalog);
+			this.latestMapZoneCatalogCount = catalog.area?.length ?? 0;
+			this.hasLoadedMapZoneCatalog = true;
+			this.resolvePendingMapZoneCatalogRead(catalog);
+			await projectMapZoneCatalogReadSuccess(this, this.latestMapZoneCatalogCount);
+			await this.projectLatestLiveMapImage("zones");
+			return;
+		}
+
 		if (infoType === 20001) {
 			const status = normalizeStatus20001(data);
 			if (status) {
@@ -504,9 +548,15 @@ class Proscenic extends utils.Adapter {
 		if (infoType === 20002) {
 			const map = normalizeMap20002(data);
 			const coordinateMetadata = extractLiveMapCoordinateMetadata20002(data);
+			let mapChanged = false;
 			if (map) {
-				if (map.mapId !== undefined && this.latestMapId !== undefined && map.mapId !== this.latestMapId) {
+				const knownMapId = this.latestMapId ?? this.latestMapCoordinateMetadata?.mapId;
+				if (map.mapId !== undefined && knownMapId !== undefined && map.mapId !== knownMapId) {
 					this.latestMapCoordinateMetadata = undefined;
+					this.latestMapZoneCatalogCount = 0;
+					this.hasLoadedMapZoneCatalog = false;
+					mapChanged = true;
+					await initializeLiveMapAreaStates(this);
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
@@ -524,6 +574,9 @@ class Proscenic extends utils.Adapter {
 			}
 			this.latestMapData = data;
 			await this.projectLatestLiveMapImage("map");
+			if (mapChanged || !this.hasLoadedMapZoneCatalog) {
+				void this.refreshMapZoneCatalog(mapChanged);
+			}
 			return;
 		}
 
@@ -554,7 +607,11 @@ class Proscenic extends utils.Adapter {
 		this.lastAuxiliaryReadAt = now;
 		this.auxiliaryReadInProgress = true;
 		try {
-			await Promise.all([this.refreshMaintenanceHistory(), this.refreshConsumables()]);
+			await Promise.all([
+				this.refreshMaintenanceHistory(),
+				this.refreshConsumables(),
+				this.refreshMapZoneCatalog(),
+			]);
 		} finally {
 			this.auxiliaryReadInProgress = false;
 		}
@@ -590,6 +647,65 @@ class Proscenic extends utils.Adapter {
 			await setConsumablesReadFailure(this, error);
 			this.log.debug(`Could not refresh Proscenic consumables: ${redactedErrorMessage(error)}`);
 		}
+	}
+
+	private async refreshMapZoneCatalog(force = false): Promise<void> {
+		const session = this.currentCommandSession();
+		if (!session || this.pendingMapZoneCatalogRead) {
+			return;
+		}
+		const now = Date.now();
+		if (!force && now - this.lastMapZoneCatalogRequestAt < MAP_ZONE_CATALOG_RETRY_INTERVAL_MS) {
+			return;
+		}
+		this.lastMapZoneCatalogRequestAt = now;
+
+		const event = this.awaitNextMapZoneCatalog();
+		try {
+			await session.client.requestMapZoneCatalog(session.token, session.serial);
+			await event;
+		} catch (error) {
+			void event.catch(() => undefined);
+			this.rejectPendingMapZoneCatalogRead(error instanceof Error ? error : new Error(String(error)));
+			await setMapZoneCatalogReadFailure(this, error);
+			this.log.debug(`Could not refresh Proscenic map zones: ${redactedErrorMessage(error)}`);
+		}
+	}
+
+	private awaitNextMapZoneCatalog(): Promise<LiveMapCoordinateMetadata> {
+		if (this.pendingMapZoneCatalogRead) {
+			throw new Error("Another map zone catalog read is already pending");
+		}
+
+		return new Promise<LiveMapCoordinateMetadata>((resolve, reject) => {
+			const timer = this.setTimeout(() => {
+				this.pendingMapZoneCatalogRead = undefined;
+				reject(new Error(`No map zone catalog received within ${MAP_ZONE_CATALOG_TIMEOUT_MS} ms`));
+			}, MAP_ZONE_CATALOG_TIMEOUT_MS);
+			if (timer === undefined) {
+				reject(new Error("Could not schedule map zone catalog timeout"));
+				return;
+			}
+			this.pendingMapZoneCatalogRead = { timer, resolve, reject };
+		});
+	}
+
+	private resolvePendingMapZoneCatalogRead(catalog: LiveMapCoordinateMetadata): void {
+		if (!this.pendingMapZoneCatalogRead) {
+			return;
+		}
+		this.clearTimeout(this.pendingMapZoneCatalogRead.timer);
+		this.pendingMapZoneCatalogRead.resolve(catalog);
+		this.pendingMapZoneCatalogRead = undefined;
+	}
+
+	private rejectPendingMapZoneCatalogRead(error: Error): void {
+		if (!this.pendingMapZoneCatalogRead) {
+			return;
+		}
+		this.clearTimeout(this.pendingMapZoneCatalogRead.timer);
+		this.pendingMapZoneCatalogRead.reject(error);
+		this.pendingMapZoneCatalogRead = undefined;
 	}
 
 	private runConsumableOperation<T>(operation: () => Promise<T>): Promise<T> {
@@ -680,7 +796,7 @@ class Proscenic extends utils.Adapter {
 		this.lastPoseUpdated = undefined;
 	}
 
-	private async projectLatestLiveMapImage(renderReason: "map" | "pose"): Promise<void> {
+	private async projectLatestLiveMapImage(renderReason: "map" | "pose" | "zones"): Promise<void> {
 		if (!this.latestMapData) {
 			return;
 		}
@@ -701,7 +817,7 @@ class Proscenic extends utils.Adapter {
 					lastPathId: this.latestMapPathId,
 					pathResetCount: this.liveMapPathResetCount,
 					lastPoseUpdated: this.lastPoseUpdated,
-					currentAreaCount: countLiveMapAreas20002(this.latestMapData),
+					currentAreaCount: this.latestMapZoneCatalogCount,
 					cachedAreaCount: this.latestMapCoordinateMetadata?.area?.length ?? 0,
 					hasCachedStaticOverlays:
 						(this.latestMapCoordinateMetadata?.area?.length ?? 0) > 0 ||
@@ -1038,6 +1154,7 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private clearCommandSession(): void {
+		this.rejectPendingMapZoneCatalogRead(new Error("Cloud session ended before map zones were received"));
 		this.commandEnabled = false;
 		void setConsumableResetCapability(this, false);
 		this.commandClient = undefined;

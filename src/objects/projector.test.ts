@@ -1,10 +1,12 @@
 import { expect } from "chai";
 import {
+	initializeLiveMapAreaStates,
 	projectConsumables,
 	projectConsumableResetProgress,
 	projectDevice,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
+	projectMapZoneCatalogReadSuccess,
 	projectMaintenanceHistory,
 	projectMapMetadata,
 	projectMaintenanceMessage,
@@ -15,6 +17,7 @@ import {
 	setConsumableResetFailure,
 	setDeviceListDiagnostics,
 	setDeviceOnlineStale,
+	setMapZoneCatalogReadFailure,
 } from "./projector";
 
 describe("redactedErrorMessage", () => {
@@ -354,6 +357,29 @@ describe("consumable reset projection", () => {
 });
 
 describe("projectLiveMapImage", () => {
+	it("initializes and reports the authoritative 21004 zone catalog", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await initializeLiveMapAreaStates(adapter);
+		expect(states.get("map.live.areaSource")).to.deep.equal({ val: "21004", ack: true });
+		expect(states.get("map.live.areas")).to.deep.equal({ val: "[]", ack: true });
+		expect(states.get("map.live.zoneCatalogLastReadResult")).to.deep.equal({ val: "pending", ack: true });
+
+		await projectMapZoneCatalogReadSuccess(adapter, 3);
+		expect(states.get("map.live.currentAreaCount")).to.deep.equal({ val: 3, ack: true });
+		expect(states.get("map.live.zoneCatalogLastReadResult")).to.deep.equal({ val: "ok", ack: true });
+
+		await setMapZoneCatalogReadFailure(adapter, new Error("user@example.invalid at 192.0.2.1"));
+		expect(states.get("map.live.zoneCatalogLastReadResult")).to.deep.equal({ val: "failed", ack: true });
+		expect(states.get("map.live.zoneCatalogLastError")?.val).to.equal("<redacted-email> at <redacted-address>");
+	});
+
 	it("publishes the stable same-origin live map viewer URL for the adapter instance", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
 		const adapter = {
@@ -393,7 +419,7 @@ describe("projectLiveMapImage", () => {
 				areas: [
 					{
 						key: "id:1001",
-						kind: "room",
+						kind: "zone",
 						id: 1001,
 						label: "Office",
 						bounds: { minX: 1, minY: 2, maxX: 3, maxY: 4 },
@@ -404,6 +430,7 @@ describe("projectLiveMapImage", () => {
 				pathLineSegments: 2,
 				skippedPathSegments: 1,
 				renderedForbiddenAreaCount: 1,
+				renderedZoneAreaCount: 2,
 				renderedRoomAreaCount: 2,
 				orientation: "flip-y",
 				decompressedBytes: 4,
@@ -435,7 +462,7 @@ describe("projectLiveMapImage", () => {
 		expect(JSON.parse(states.get("map.live.areas")?.val as string)).to.deep.equal([
 			{
 				key: "id:1001",
-				kind: "room",
+				kind: "zone",
 				id: 1001,
 				label: "Office",
 				bounds: { minX: 1, minY: 2, maxX: 3, maxY: 4 },
@@ -451,6 +478,7 @@ describe("projectLiveMapImage", () => {
 		expect(states.get("map.live.currentAreaCount")).to.deep.equal({ val: 1, ack: true });
 		expect(states.get("map.live.cachedAreaCount")).to.deep.equal({ val: 3, ack: true });
 		expect(states.get("map.live.renderedForbiddenAreaCount")).to.deep.equal({ val: 1, ack: true });
+		expect(states.get("map.live.renderedZoneAreaCount")).to.deep.equal({ val: 2, ack: true });
 		expect(states.get("map.live.renderedRoomAreaCount")).to.deep.equal({ val: 2, ack: true });
 		expect(states.get("map.live.hasCachedStaticOverlays")).to.deep.equal({ val: true, ack: true });
 		expect(states.get("map.live.renderReason")).to.deep.equal({ val: "pose", ack: true });
@@ -485,6 +513,7 @@ describe("projectLiveMapImage", () => {
 				pathLineSegments: 0,
 				skippedPathSegments: 0,
 				renderedForbiddenAreaCount: 0,
+				renderedZoneAreaCount: 0,
 				renderedRoomAreaCount: 0,
 				orientation: "flip-y",
 				decompressedBytes: 4,

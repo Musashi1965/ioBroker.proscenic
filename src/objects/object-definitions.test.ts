@@ -171,6 +171,10 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.format");
 		expect(ids).to.include("map.live.viewerUrl");
 		expect(ids).to.include("map.live.areas");
+		expect(ids).to.include("map.live.areaSource");
+		expect(ids).to.include("map.live.zoneCatalogUpdated");
+		expect(ids).to.include("map.live.zoneCatalogLastReadResult");
+		expect(ids).to.include("map.live.zoneCatalogLastError");
 		expect(ids).to.include("map.live.updated");
 		expect(ids).to.include("map.live.orientation");
 		expect(ids).to.include("map.live.poseCount");
@@ -180,6 +184,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.currentAreaCount");
 		expect(ids).to.include("map.live.cachedAreaCount");
 		expect(ids).to.include("map.live.renderedForbiddenAreaCount");
+		expect(ids).to.include("map.live.renderedZoneAreaCount");
 		expect(ids).to.include("map.live.renderedRoomAreaCount");
 		expect(ids).to.include("map.live.hasCachedStaticOverlays");
 		expect(ids).to.include("map.live.canvasBackgroundColor");

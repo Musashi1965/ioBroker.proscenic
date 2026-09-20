@@ -28,7 +28,7 @@ Verified on Proscenic M7 Pro so far:
 - consumable counters for filter, side brush, main brush, and sensors;
 - recent maintenance/message history, including dust-bag messages;
 - local-development live-map rendering for VIS, including
-  app-oriented map colors, no-go areas, room-zone candidates, charger marker,
+  app-oriented map colors, saved zones, no-go areas, charger marker,
   a task-scoped pose trail, and SVG animation between gateway positions. A
   static PNG fallback and a same-origin iframe viewer URL remain available for
   other visualization modes.
@@ -120,7 +120,7 @@ Security policy and contribution requirements are documented in
   hours.
 - Added bounded maintenance/message history objects for recent device messages.
 - Added experimental local live-map rendering for VIS debugging with app-oriented
-  colors, no-go overlays, room-zone candidates, charger marker, and pose trail.
+  colors, no-go overlays, saved-zone overlays, charger marker, and pose trail.
 - Added the M7 Pro product image and a display-prefixed device code.
 - Improved command value normalization for visualization tools.
 

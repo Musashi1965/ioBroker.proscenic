@@ -23,6 +23,10 @@ export interface ProscenicClientOptions {
 	timeoutMs: number;
 }
 
+export function mapZoneCatalogPath(serial: string, username: string): string {
+	return `/instructions/cmd21004/${encodeURIComponent(serial)}?username=${encodeURIComponent(username)}`;
+}
+
 export class ProscenicRestClient {
 	private readonly baseUrl: URL;
 
@@ -88,6 +92,13 @@ export class ProscenicRestClient {
 	public async requestConsumables(token: string, serial: string): Promise<ProscenicEnvelope> {
 		const path = `/instructions/cmd21015/${encodeURIComponent(serial)}`;
 		return this.postForm(path, { username: this.options.username }, { token });
+	}
+
+	public async requestMapZoneCatalog(token: string, serial: string): Promise<ProscenicEnvelope> {
+		return this.request(mapZoneCatalogPath(serial, this.options.username), "", {
+			"Content-Type": "application/json;charset=UTF-8",
+			token,
+		});
 	}
 
 	public async getMaintenanceHistory(token: string, serial: string): Promise<MaintenanceHistoryData> {

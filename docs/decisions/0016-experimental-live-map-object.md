@@ -2,6 +2,7 @@
 
 - Status: accepted for local development
 - Date: 2026-09-13
+- Amended: 2026-09-20
 
 The image format and pose-trail lifecycle portions of this decision are amended
 by ADR 0020. The remaining privacy, metadata-cache, color, and diagnostics
@@ -27,6 +28,10 @@ Expose an explicit experimental live-map image under:
 - `map.live.format`;
 - `map.live.viewerUrl`;
 - `map.live.areas`;
+- `map.live.areaSource`;
+- `map.live.zoneCatalogUpdated`;
+- `map.live.zoneCatalogLastReadResult`;
+- `map.live.zoneCatalogLastError`;
 - `map.live.updated`;
 - `map.live.orientation`;
 - `map.live.poseCount`;
@@ -36,6 +41,7 @@ Expose an explicit experimental live-map image under:
 - `map.live.currentAreaCount`;
 - `map.live.cachedAreaCount`;
 - `map.live.renderedForbiddenAreaCount`;
+- `map.live.renderedZoneAreaCount`;
 - `map.live.renderedRoomAreaCount`;
 - `map.live.hasCachedStaticOverlays`;
 - `map.live.canvasBackgroundColor`;
@@ -74,32 +80,27 @@ rendered wider than one pixel for VIS readability.
 interactive viewer defined by ADR 0020. It is a URL only and contains neither
 map data nor installation-specific network coordinates.
 
-`map.live.areas` contains a small JSON summary derived from the same coordinate
-metadata used for rendering. Each entry may include the stable area key, the
-heuristic kind (`forbidden`, `room`, or `unknown`), the upstream area ID when
-present, the app-provided label when present, and projected pixel bounds. This
-state is intentionally experimental and read-only. It gives VIS/debug tooling a
-way to inspect discovered room/no-go IDs for later targeted cleaning work
-without exposing the raw 20002 map payload, raw vertices, serial number, or
-gateway data.
+`map.live.areas` contains a bounded JSON summary from the authoritative 21004
+saved-zone catalog. Each entry may include the stable area key, kind
+(`forbidden` or `zone`), upstream area ID, app-provided label, and projected
+pixel bounds. It does not contain raw vertices, the serial number, credentials,
+or gateway data. `active=forbid` identifies forbidden areas; other catalog
+entries are selectable multi-zone-cleaning zones. They are not described as
+rooms because the Proscenic app models user-drawn zones rather than a room
+segmentation layer.
 
-The adapter keeps the last valid coordinate metadata for static overlays and
-the charging station in memory per `mapId`. Observed M7 Pro captures show that
-20002 `area` frames are partial and transient: one frame can contain the
-configured no-go area plus user-created room zones, while later frames for the
-same map can contain only the no-go area. The adapter therefore deduplicates
-areas and merges them into the per-map cache instead of letting the last frame
-win. A `mapId` change drops the cached coordinate metadata.
+The adapter requests the catalog with the verified 21004 instruction path and
+receives its actual content asynchronously as a gateway `infoType=21004`
+event. The `mapId` must match the active 20002 map. A valid response replaces
+the complete previous catalog; this is deliberately not a merge, so deleted or
+changed zones cannot survive in adapter memory. A `mapId` change immediately
+drops the old catalog and requests a fresh one.
 
-Area classification is intentionally heuristic during local development.
-Duplicate area entries in a multi-area frame and single-area frames are treated
-as no-go/forbidden overlays. Other deduplicated entries from a multi-area frame
-are treated as room-zone overlays and rendered in a distinct translucent blue.
-The observed `forbidType` field is not sufficient for classification because
-the same value appeared on both the confirmed no-go area and likely room zones.
-Different app accounts can expose different permissions and metadata; the main
-adapter account is authoritative for this development adapter, while screenshots
-from a shared app account are treated as visual references only.
+`infoType=20002` remains authoritative only for the occupancy grid, coordinate
+system, map/path IDs, and charging position. Its transient `area` member is not
+used for `map.live.areas` or overlay classification. This removes the former
+duplicate-count and single-entry heuristics, which were proven unable to
+distinguish selectable zones from forbidden areas.
 
 The in-memory pose trail is scoped to the active cleaning task, not to every
 observed `pathId`. A `pathId` can change when the robot moves from one room or
@@ -120,8 +121,9 @@ is found, the segment is skipped.
 The diagnostic states explain why the current image changed and how much of
 the in-memory pose trail was rendered:
 
-- `areas` is the current deduplicated experimental area summary used for the
-  live-map render.
+- `areas` is the current 21004 saved-zone summary used for the live-map render.
+- `areaSource` is fixed to `21004`; the catalog timestamp, read result, and
+  redacted error states expose acquisition health.
 - `rawPoseCount` is the number of in-memory 20001 poses available for the
   current render.
 - `poseCount` is the number of those poses that could be projected into the
@@ -129,16 +131,18 @@ the in-memory pose trail was rendered:
 - `pathLineSegments` is the number of accepted pose-to-pose line segments.
 - `skippedPathSegments` is the number of rejected duplicate, too-small, or
   implausibly large pose jumps.
-- `currentAreaCount` is the raw `area` count in the latest 20002 frame.
-- `cachedAreaCount` is the deduplicated per-map overlay count kept in memory.
+- `currentAreaCount` and `cachedAreaCount` are the current validated 21004
+  catalog count.
 - `renderedForbiddenAreaCount` is the number of no-go overlays drawn into the
   latest image.
-- `renderedRoomAreaCount` is the number of room-zone overlays drawn into the
-  latest image.
+- `renderedZoneAreaCount` is the number of selectable zone overlays drawn into
+  the latest image.
+- `renderedRoomAreaCount` remains a deprecated compatibility alias for
+  `renderedZoneAreaCount`; consumers should migrate to the accurate name.
 - `hasCachedStaticOverlays` indicates whether the latest render used cached
   static overlay metadata.
-- `renderReason` is `map` for a new 20002 map snapshot and `pose` for a 20001
-  pose-triggered refresh.
+- `renderReason` is `map` for a new 20002 map snapshot, `pose` for a 20001
+  pose-triggered refresh, and `zones` for a 21004 catalog refresh.
 - `lastPathId` is the latest observed map path identifier.
 - `pathResetCount` counts adapter-side pose trail resets caused by a new
   cleaning task after a confirmed docked/charging state.

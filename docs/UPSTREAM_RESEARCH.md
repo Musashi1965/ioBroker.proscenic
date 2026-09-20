@@ -1,6 +1,6 @@
 # Upstream Research
 
-Status: active reverse-engineering notes, 2026-09-14
+Status: active reverse-engineering notes, 2026-09-20
 
 ## Legacy Proscenic sources
 
@@ -23,6 +23,8 @@ Behavioral map/status findings from these sources and our own probes:
   a candidate source for maintenance warnings.
 - `infoType` 20002 carries map metadata such as map/path IDs, dimensions,
   resolution, area list, compressed length, and an encoded map body.
+- The app's saved multi-zone-cleaning catalog is a separate 21004 contract;
+  20002 is not authoritative for saved zones or their classification.
 - Tuya-based Proscenic 850T references expose consumable remaining-life fields
   for sensor, filter, side brush, and main brush, plus event/exception
   candidates such as `case_info` and `exception_info`. This is only a
@@ -45,6 +47,24 @@ Behavioral map/status findings from these sources and our own probes:
   path/run overlay, not merely a single live position value. The adapter can
   now render the observed M7 Pro occupancy grid in the app-conform `flip-y`
   orientation with cached static overlays and an adapter-side pose trail.
+
+## Saved-zone catalog breakthrough (2026-09-20)
+
+Owner-local static inspection of ProscenicHome 1.5.5 established the app flow
+without copying upstream implementation code:
+
+- the multi-zone-cleaning screen uses 20002 as its base occupancy map;
+- `POST /instructions/cmd21004/{sn}?username=...` requests the saved zone and
+  forbidden-area catalog;
+- the response arrives asynchronously as gateway `infoType=21004` and contains
+  `mapId` plus a complete `value` list;
+- `active=forbid` identifies forbidden areas, while the other entries are
+  selectable user-drawn zones;
+- selected IDs are later passed to the separate 30000 execution command.
+
+The adapter therefore replaces its per-map zone catalog from every valid 21004
+event and does not infer saved-zone semantics from the transient 20002 `area`
+member. Raw vertices and owner-specific labels remain private runtime data.
 
 Independent implementation rule: derive project requirements from observable
 requests/responses, public documentation, independently written tests, and our

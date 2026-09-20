@@ -18,6 +18,7 @@ export interface LiveMapImage {
 	pathLineSegments: number;
 	skippedPathSegments: number;
 	renderedForbiddenAreaCount: number;
+	renderedZoneAreaCount: number;
 	renderedRoomAreaCount: number;
 	orientation: "flip-y";
 	decompressedBytes: number;
@@ -41,7 +42,7 @@ export interface LiveMapTaskTransition {
 	resetTrail: boolean;
 }
 
-export type LiveMapAreaKind = "forbidden" | "room" | "unknown";
+export type LiveMapAreaKind = "forbidden" | "zone" | "unknown";
 
 export interface LiveMapAreaMetadata {
 	key: string;
@@ -101,9 +102,9 @@ const COLOR_OBSTACLE: Color = [82, 82, 82];
 const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
 const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
-const COLOR_ROOM_AREA: Color = [112, 125, 236];
-const COLOR_ROOM_AREA_OUTLINE: Color = [68, 84, 210];
-const ROOM_AREA_ALPHA = 0.3;
+const COLOR_ZONE_AREA: Color = [112, 125, 236];
+const COLOR_ZONE_AREA_OUTLINE: Color = [68, 84, 210];
+const ZONE_AREA_ALPHA = 0.3;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
 const COLOR_PATH: Color = [126, 216, 96];
@@ -240,6 +241,8 @@ export function renderLiveMapImage20002(
 		pathLineSegments: runtime.pathLineSegments,
 		skippedPathSegments: runtime.skippedPathSegments,
 		renderedForbiddenAreaCount: coordinateMetadata.renderedForbiddenAreaCount,
+		renderedZoneAreaCount: coordinateMetadata.renderedZoneAreaCount,
+		// Kept as a compatibility alias while consumers migrate to the accurate zone name.
 		renderedRoomAreaCount: coordinateMetadata.renderedRoomAreaCount,
 		orientation: "flip-y",
 		decompressedBytes: occupancy.length,
@@ -256,11 +259,6 @@ export function extractLiveMapCoordinateMetadata20002(data: unknown): LiveMapCoo
 	if (typeof record.mapId === "number") {
 		metadata.mapId = record.mapId;
 	}
-	const areas = normalizeMapAreaMetadata(record.area);
-	if (areas.length > 0) {
-		metadata.area = areas;
-	}
-
 	const chargeHandlePos = parsePoint(record.chargeHandlePos);
 	if (chargeHandlePos) {
 		metadata.chargeHandlePos = chargeHandlePos;
@@ -269,6 +267,40 @@ export function extractLiveMapCoordinateMetadata20002(data: unknown): LiveMapCoo
 	return metadata.mapId !== undefined || metadata.area !== undefined || metadata.chargeHandlePos !== undefined
 		? metadata
 		: undefined;
+}
+
+export function extractLiveMapZoneCatalog21004(data: unknown): LiveMapCoordinateMetadata | undefined {
+	const record = getRecord(data);
+	if (
+		!record ||
+		!Number.isSafeInteger(record.mapId) ||
+		(record.mapId as number) < 0 ||
+		!Array.isArray(record.value)
+	) {
+		return undefined;
+	}
+
+	const areas = normalizeMapZoneCatalog(record.value);
+	if (areas.length !== record.value.length) {
+		return undefined;
+	}
+
+	return {
+		mapId: record.mapId as number,
+		area: areas,
+	};
+}
+
+export function replaceLiveMapZoneCatalog(
+	previous: LiveMapCoordinateMetadata | undefined,
+	catalog: LiveMapCoordinateMetadata,
+): LiveMapCoordinateMetadata {
+	const sameMap = previous?.mapId === undefined || previous.mapId === catalog.mapId;
+	return {
+		mapId: catalog.mapId,
+		area: catalog.area ?? [],
+		chargeHandlePos: sameMap ? previous?.chargeHandlePos : undefined,
+	};
 }
 
 export function mergeLiveMapCoordinateMetadata20002(
@@ -285,12 +317,10 @@ export function mergeLiveMapCoordinateMetadata20002(
 	}
 
 	const merged = { ...record };
-	if (metadata.area && metadata.area.length > 0) {
-		merged.area = metadata.area.map(area => ({
-			...area.source,
-			__proscenicKind: area.kind,
-		}));
-	}
+	merged.area = (metadata.area ?? []).map(area => ({
+		...area.source,
+		__proscenicKind: area.kind,
+	}));
 	if (metadata.chargeHandlePos && !parsePoint(record.chargeHandlePos)) {
 		merged.chargeHandlePos = metadata.chargeHandlePos;
 	}
@@ -388,19 +418,19 @@ function colorFromHex(value: string | undefined): Color | undefined {
 function drawCoordinateMetadata(
 	sample: MapSample,
 	pixels: Buffer,
-): { renderedForbiddenAreaCount: number; renderedRoomAreaCount: number } {
+): { renderedForbiddenAreaCount: number; renderedZoneAreaCount: number; renderedRoomAreaCount: number } {
 	let renderedForbiddenAreaCount = 0;
-	let renderedRoomAreaCount = 0;
+	let renderedZoneAreaCount = 0;
 	for (const area of sample.areas) {
 		const projected = area.vertices
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);
 		if (projected.length >= 3) {
-			if (area.kind === "room") {
-				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_ROOM_AREA, ROOM_AREA_ALPHA);
-				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_ROOM_AREA_OUTLINE);
-				renderedRoomAreaCount += 1;
-			} else {
+			if (area.kind === "zone") {
+				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_ZONE_AREA, ZONE_AREA_ALPHA);
+				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_ZONE_AREA_OUTLINE);
+				renderedZoneAreaCount += 1;
+			} else if (area.kind === "forbidden") {
 				fillPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_AREA, FORBIDDEN_AREA_ALPHA);
 				drawPolygon(pixels, sample.width, sample.height, projected, COLOR_FORBIDDEN_OUTLINE);
 				renderedForbiddenAreaCount += 1;
@@ -415,7 +445,11 @@ function drawCoordinateMetadata(
 		}
 	}
 
-	return { renderedForbiddenAreaCount, renderedRoomAreaCount };
+	return {
+		renderedForbiddenAreaCount,
+		renderedZoneAreaCount,
+		renderedRoomAreaCount: renderedZoneAreaCount,
+	};
 }
 
 function drawRobotRuntime(
@@ -858,20 +892,9 @@ function normalizeMapAreaMetadata(value: unknown): LiveMapAreaMetadata[] {
 			} => entry !== undefined,
 		);
 
-	const counts = new Map<string, number>();
-	for (const candidate of candidates) {
-		counts.set(candidate.key, (counts.get(candidate.key) ?? 0) + 1);
-	}
-
 	const normalized = new Map<string, LiveMapAreaMetadata>();
 	for (const candidate of candidates) {
-		const kind =
-			candidate.explicitKind ??
-			(counts.get(candidate.key) !== undefined && (counts.get(candidate.key) ?? 0) > 1
-				? "forbidden"
-				: candidates.length === 1
-					? "forbidden"
-					: "room");
+		const kind = candidate.explicitKind ?? "unknown";
 		const existing = normalized.get(candidate.key);
 		const next = {
 			key: candidate.key,
@@ -881,6 +904,41 @@ function normalizeMapAreaMetadata(value: unknown): LiveMapAreaMetadata[] {
 		normalized.set(candidate.key, existing ? mergeAreaMetadataEntry(existing, next) : next);
 	}
 
+	return [...normalized.values()];
+}
+
+function normalizeMapZoneCatalog(value: readonly unknown[]): LiveMapAreaMetadata[] {
+	const normalized = new Map<string, LiveMapAreaMetadata>();
+	for (const entry of value) {
+		const record = getRecord(entry);
+		if (!record) {
+			continue;
+		}
+		const vertices = parseVertices(record.vertexs);
+		if (vertices.length < 3) {
+			continue;
+		}
+		const id = record.id;
+		if (!(typeof id === "string" || (typeof id === "number" && Number.isSafeInteger(id)))) {
+			continue;
+		}
+
+		const source: Record<string, unknown> = {
+			id,
+			vertexs: vertices,
+		};
+		for (const field of ["active", "mode", "name", "tag"] as const) {
+			if (typeof record[field] === "string") {
+				source[field] = record[field];
+			}
+		}
+		const key = mapAreaKey(source, vertices);
+		normalized.set(key, {
+			key,
+			kind: record.active === "forbid" ? "forbidden" : "zone",
+			source,
+		});
+	}
 	return [...normalized.values()];
 }
 
@@ -908,14 +966,17 @@ function strongestAreaKind(left: LiveMapAreaKind, right: LiveMapAreaKind): LiveM
 	if (left === "forbidden" || right === "forbidden") {
 		return "forbidden";
 	}
-	if (left === "room" || right === "room") {
-		return "room";
+	if (left === "zone" || right === "zone") {
+		return "zone";
 	}
 	return "unknown";
 }
 
 function parseAreaKind(value: unknown): LiveMapAreaKind | undefined {
-	return value === "forbidden" || value === "room" || value === "unknown" ? value : undefined;
+	if (value === "room") {
+		return "zone";
+	}
+	return value === "forbidden" || value === "zone" || value === "unknown" ? value : undefined;
 }
 
 function withoutInternalAreaMetadata(record: Record<string, unknown>): Record<string, unknown> {

@@ -108,6 +108,14 @@ map bytes, coordinates, paths, charger positions, serial numbers, or complete
 `map.live.*`: a bounded rendered PNG data URL for VIS debugging. That rendered
 image is private owner data and is not a raw payload or final release contract.
 
+Saved user-drawn zones and forbidden areas use a separate read path. The app
+requests them with `POST /instructions/cmd21004/{sn}?username=...`; the full
+catalog arrives as gateway `infoType=21004` with an associated `mapId`.
+`active=forbid` identifies forbidden entries and all other valid entries are
+selectable multi-zone-cleaning zones. The adapter treats that catalog as
+authoritative and replaces it atomically. The transient 20002 `area` member is
+not used as a saved-zone source.
+
 Private map rendering probes on 2026-09-13 compared a long capture with an
 owner-provided Proscenic app screenshot. The app view shows a large filled
 occupancy-style area with an outline, a no-go zone, and the dock/robot marker.

@@ -4,10 +4,11 @@ import {
 	DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR,
 	extractLiveMapCoordinateMetadata20002,
+	extractLiveMapZoneCatalog21004,
 	extractRobotPose20001,
-	mergeLiveMapCoordinateMetadataCache,
 	mergeLiveMapCoordinateMetadata20002,
 	normalizeLiveMapBackgroundColor,
+	replaceLiveMapZoneCatalog,
 	renderLiveMapImage20002,
 	transitionLiveMapTaskState,
 } from "./live-map";
@@ -25,6 +26,7 @@ describe("live map rendering", () => {
 			chargeHandlePos: [50, 0],
 			area: [
 				{
+					__proscenicKind: "forbidden",
 					vertexs: [
 						[0, 0],
 						[100, 0],
@@ -44,6 +46,7 @@ describe("live map rendering", () => {
 		expect(image?.pathLineSegments).to.equal(0);
 		expect(image?.skippedPathSegments).to.equal(0);
 		expect(image?.renderedForbiddenAreaCount).to.equal(1);
+		expect(image?.renderedZoneAreaCount).to.equal(0);
 		expect(image?.renderedRoomAreaCount).to.equal(0);
 		expect(image?.areas).to.deep.equal([
 			{
@@ -78,6 +81,7 @@ describe("live map rendering", () => {
 			y_min: 0,
 			area: [
 				{
+					__proscenicKind: "forbidden",
 					vertexs: [
 						[50, 50],
 						[150, 50],
@@ -98,7 +102,7 @@ describe("live map rendering", () => {
 		expect(center[2]).to.be.lessThan(255);
 	});
 
-	it("carries forward cached no-go metadata for later map frames with the same map ID", () => {
+	it("carries forward the 21004 zone catalog for later 20002 frames with the same map ID", () => {
 		const grid = Buffer.alloc(25, 127);
 		const mapWithArea = {
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
@@ -108,16 +112,6 @@ describe("live map rendering", () => {
 			resolution: 0.05,
 			x_min: 0,
 			y_min: 0,
-			area: [
-				{
-					vertexs: [
-						[50, 50],
-						[150, 50],
-						[150, 150],
-						[50, 150],
-					],
-				},
-			],
 		};
 		const laterMapWithoutArea = {
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
@@ -129,7 +123,22 @@ describe("live map rendering", () => {
 			y_min: 0,
 		};
 
-		const metadata = extractLiveMapCoordinateMetadata20002(mapWithArea);
+		const baseMetadata = extractLiveMapCoordinateMetadata20002(mapWithArea);
+		const catalog = extractLiveMapZoneCatalog21004({
+			mapId: 42,
+			value: [
+				{
+					...area(1003, [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					]),
+					active: "forbid",
+				},
+			],
+		});
+		const metadata = catalog ? replaceLiveMapZoneCatalog(baseMetadata, catalog) : baseMetadata;
 		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithoutArea, metadata);
 		const image = renderLiveMapImage20002(merged);
 		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 5, 5);
@@ -137,9 +146,9 @@ describe("live map rendering", () => {
 		expect(pixelAt(pixels, 5, 2, 2)).to.not.deep.equal([255, 255, 255]);
 	});
 
-	it("does not carry cached no-go metadata across different map IDs", () => {
+	it("does not carry a 21004 zone catalog across different map IDs", () => {
 		const grid = Buffer.alloc(25, 127);
-		const metadata = extractLiveMapCoordinateMetadata20002({
+		const baseMetadata = extractLiveMapCoordinateMetadata20002({
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
 			mapId: 42,
 			width: 5,
@@ -147,17 +156,22 @@ describe("live map rendering", () => {
 			resolution: 0.05,
 			x_min: 0,
 			y_min: 0,
-			area: [
+		});
+		const catalog = extractLiveMapZoneCatalog21004({
+			mapId: 42,
+			value: [
 				{
-					vertexs: [
+					...area(1003, [
 						[50, 50],
 						[150, 50],
 						[150, 150],
 						[50, 150],
-					],
+					]),
+					active: "forbid",
 				},
 			],
 		});
+		const metadata = catalog ? replaceLiveMapZoneCatalog(baseMetadata, catalog) : baseMetadata;
 		const merged = mergeLiveMapCoordinateMetadata20002(
 			{
 				map: encodeLiteralOnlyLz4(grid).toString("base64"),
@@ -255,9 +269,9 @@ describe("live map rendering", () => {
 		expect(pixelAt(pixels, width, 10, 16)).to.deep.equal([126, 216, 96]);
 	});
 
-	it("keeps deduplicated room zones when later frames only contain the no-go area", () => {
+	it("uses 21004 as the authoritative saved-zone catalog and replaces removed zones", () => {
 		const grid = Buffer.alloc(100, 127);
-		const fullMap = {
+		const baseMap = {
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
 			mapId: 42,
 			width: 10,
@@ -265,64 +279,85 @@ describe("live map rendering", () => {
 			resolution: 0.05,
 			x_min: 0,
 			y_min: 0,
+		};
+		const baseMetadata = extractLiveMapCoordinateMetadata20002({
+			...baseMap,
 			area: [
-				area(1003, [
-					[50, 50],
-					[150, 50],
-					[150, 150],
-					[50, 150],
-				]),
-				area(1001, [
-					[250, 50],
-					[350, 50],
-					[350, 150],
-					[250, 150],
-				]),
-				area(1002, [
-					[250, 250],
-					[350, 250],
-					[350, 350],
-					[250, 350],
-				]),
-				area(1003, [
-					[50, 50],
-					[150, 50],
-					[150, 150],
-					[50, 150],
+				area(9999, [
+					[0, 0],
+					[10, 0],
+					[10, 10],
 				]),
 			],
-		};
-		const laterMapWithOnlyNoGo = {
-			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+		});
+		const firstCatalog = extractLiveMapZoneCatalog21004({
 			mapId: 42,
-			width: 10,
-			height: 10,
-			resolution: 0.05,
-			x_min: 0,
-			y_min: 0,
-			area: [
-				area(1003, [
-					[50, 50],
-					[150, 50],
-					[150, 150],
-					[50, 150],
-				]),
+			value: [
+				{
+					...area(1001, [
+						[250, 50],
+						[350, 50],
+						[350, 150],
+						[250, 150],
+					]),
+					active: "normal",
+				},
+				{
+					...area(1002, [
+						[250, 250],
+						[350, 250],
+						[350, 350],
+						[250, 350],
+					]),
+					active: "normal",
+				},
+				{
+					...area(1003, [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					]),
+					active: "forbid",
+				},
 			],
-		};
-
-		const fullMetadata = extractLiveMapCoordinateMetadata20002(fullMap);
-		const laterMetadata = extractLiveMapCoordinateMetadata20002(laterMapWithOnlyNoGo);
-		const cached = laterMetadata ? mergeLiveMapCoordinateMetadataCache(fullMetadata, laterMetadata) : fullMetadata;
-		const merged = mergeLiveMapCoordinateMetadata20002(laterMapWithOnlyNoGo, cached);
+		});
+		const first = firstCatalog ? replaceLiveMapZoneCatalog(baseMetadata, firstCatalog) : baseMetadata;
+		const replacementCatalog = extractLiveMapZoneCatalog21004({
+			mapId: 42,
+			value: [
+				{
+					...area(1002, [
+						[250, 250],
+						[350, 250],
+						[350, 350],
+						[250, 350],
+					]),
+					active: "normal",
+				},
+				{
+					...area(1003, [
+						[50, 50],
+						[150, 50],
+						[150, 150],
+						[50, 150],
+					]),
+					active: "forbid",
+				},
+			],
+		});
+		const cached = replacementCatalog ? replaceLiveMapZoneCatalog(first, replacementCatalog) : first;
+		const merged = mergeLiveMapCoordinateMetadata20002(baseMap, cached);
 		const image = renderLiveMapImage20002(merged);
 		const pixels = decodeRgbPngDataUrl(image?.pngDataUrl, 10, 10);
 
-		expect(cached?.area?.map(entry => entry.key)).to.have.members(["id:1001", "id:1002", "id:1003"]);
+		expect(baseMetadata?.area).to.equal(undefined);
+		expect(cached?.area?.map(entry => entry.key)).to.have.members(["id:1002", "id:1003"]);
 		expect(image?.renderedForbiddenAreaCount).to.equal(1);
-		expect(image?.renderedRoomAreaCount).to.equal(2);
+		expect(image?.renderedZoneAreaCount).to.equal(1);
+		expect(image?.renderedRoomAreaCount).to.equal(1);
 		expect(image?.areas.map(entry => ({ key: entry.key, kind: entry.kind, id: entry.id }))).to.have.deep.members([
-			{ key: "id:1001", kind: "room", id: 1001 },
-			{ key: "id:1002", kind: "room", id: 1002 },
+			{ key: "id:1002", kind: "zone", id: 1002 },
 			{ key: "id:1003", kind: "forbidden", id: 1003 },
 		]);
 		expect(pixelAt(pixels, 10, 2, 2)).to.not.deep.equal(pixelAt(pixels, 10, 6, 2));

@@ -8,13 +8,43 @@ import type { RobotActivity, RobotStatus } from "../domain/status";
 import type { DeviceRecord } from "../protocol/types";
 
 export interface LiveMapProjectionDiagnostics {
-	renderReason: "map" | "pose";
+	renderReason: "map" | "pose" | "zones";
 	lastPathId?: number;
 	pathResetCount: number;
 	lastPoseUpdated?: string;
 	currentAreaCount: number;
 	cachedAreaCount: number;
 	hasCachedStaticOverlays: boolean;
+}
+
+export async function initializeLiveMapAreaStates(adapter: ioBroker.Adapter): Promise<void> {
+	await adapter.setStateAsync("map.live.areas", { val: "[]", ack: true });
+	await adapter.setStateAsync("map.live.areaSource", { val: "21004", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogUpdated", { val: "", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogLastReadResult", { val: "pending", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogLastError", { val: "", ack: true });
+	await adapter.setStateAsync("map.live.currentAreaCount", { val: 0, ack: true });
+	await adapter.setStateAsync("map.live.cachedAreaCount", { val: 0, ack: true });
+	await adapter.setStateAsync("map.live.renderedForbiddenAreaCount", { val: 0, ack: true });
+	await adapter.setStateAsync("map.live.renderedZoneAreaCount", { val: 0, ack: true });
+	await adapter.setStateAsync("map.live.renderedRoomAreaCount", { val: 0, ack: true });
+}
+
+export async function projectMapZoneCatalogReadSuccess(adapter: ioBroker.Adapter, count: number): Promise<void> {
+	await adapter.setStateAsync("map.live.areaSource", { val: "21004", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogUpdated", { val: new Date().toISOString(), ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogLastReadResult", { val: "ok", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogLastError", { val: "", ack: true });
+	await adapter.setStateAsync("map.live.currentAreaCount", { val: count, ack: true });
+	await adapter.setStateAsync("map.live.cachedAreaCount", { val: count, ack: true });
+}
+
+export async function setMapZoneCatalogReadFailure(adapter: ioBroker.Adapter, error: unknown): Promise<void> {
+	await adapter.setStateAsync("map.live.zoneCatalogLastReadResult", { val: "failed", ack: true });
+	await adapter.setStateAsync("map.live.zoneCatalogLastError", {
+		val: redactedErrorMessage(error),
+		ack: true,
+	});
 }
 
 export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Promise<void> {
@@ -209,6 +239,7 @@ export async function projectLiveMapImage(
 		val: image.renderedForbiddenAreaCount,
 		ack: true,
 	});
+	await adapter.setStateAsync("map.live.renderedZoneAreaCount", { val: image.renderedZoneAreaCount, ack: true });
 	await adapter.setStateAsync("map.live.renderedRoomAreaCount", { val: image.renderedRoomAreaCount, ack: true });
 	await adapter.setStateAsync("map.live.hasCachedStaticOverlays", {
 		val: diagnostics.hasCachedStaticOverlays,
