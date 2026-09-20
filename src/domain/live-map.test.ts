@@ -405,6 +405,38 @@ describe("live map rendering", () => {
 		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([221, 221, 221]);
 	});
 
+	it("can hide zone and forbidden-area overlays without removing their catalog summary", () => {
+		const grid = Buffer.alloc(25, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width: 5,
+				height: 5,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+				area: [
+					{
+						id: 1001,
+						__proscenicKind: "zone",
+						vertexs: [
+							[50, 50],
+							[150, 50],
+							[150, 150],
+							[50, 150],
+						],
+					},
+				],
+			},
+			[],
+			{ showZoneOverlays: false },
+		);
+
+		expect(image?.areas).to.have.length(1);
+		expect(image?.renderedZoneAreaCount).to.equal(0);
+		expect(image?.renderedForbiddenAreaCount).to.equal(0);
+	});
+
 	it("normalizes writable live-map background colors", () => {
 		expect(DEFAULT_LIVE_MAP_BACKGROUND_COLOR).to.equal("#b8ccd8");
 		expect(DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR).to.equal("#d9d9d9");

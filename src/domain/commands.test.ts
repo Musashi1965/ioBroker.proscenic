@@ -77,6 +77,7 @@ describe("command status confirmation", () => {
 		expect(isStatusConfirmationForCommand("start", { mode: "sweep" })).to.equal(true);
 		expect(isStatusConfirmationForCommand("pause", { mode: "pause" })).to.equal(true);
 		expect(isStatusConfirmationForCommand("continue", { mode: "sweep" })).to.equal(true);
+		expect(isStatusConfirmationForCommand("zoneCleaning", { mode: "sweep" })).to.equal(true);
 		expect(isStatusConfirmationForCommand("return", { mode: "backcharge" })).to.equal(true);
 		expect(isStatusConfirmationForCommand("return", { mode: "charge" })).to.equal(true);
 		expect(isStatusConfirmationForCommand("fanQuiet", { fanMode: "quiet" })).to.equal(true);

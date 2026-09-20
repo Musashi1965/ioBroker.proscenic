@@ -29,6 +29,7 @@ export interface LiveMapRenderOptions {
 	mapBackgroundColor?: string;
 	backgroundColor?: string;
 	animateRobot?: boolean;
+	showZoneOverlays?: boolean;
 }
 
 export interface LiveMapTaskState {
@@ -210,7 +211,7 @@ export function renderLiveMapImage20002(
 		mapBackgroundColor,
 		canvasBackgroundColor,
 	);
-	const coordinateMetadata = drawCoordinateMetadata(sample, basePixels);
+	const coordinateMetadata = drawCoordinateMetadata(sample, basePixels, options.showZoneOverlays !== false);
 	const runtime = drawRobotRuntime(sample, occupancy, basePixels, poses);
 	const basePng = encodeRgbPng(sample.width, sample.height, basePixels);
 	const fallbackPixels = Buffer.from(basePixels);
@@ -418,10 +419,11 @@ function colorFromHex(value: string | undefined): Color | undefined {
 function drawCoordinateMetadata(
 	sample: MapSample,
 	pixels: Buffer,
+	showZoneOverlays: boolean,
 ): { renderedForbiddenAreaCount: number; renderedZoneAreaCount: number; renderedRoomAreaCount: number } {
 	let renderedForbiddenAreaCount = 0;
 	let renderedZoneAreaCount = 0;
-	for (const area of sample.areas) {
+	for (const area of showZoneOverlays ? sample.areas : []) {
 		const projected = area.vertices
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);

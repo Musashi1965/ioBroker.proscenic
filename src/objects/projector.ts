@@ -5,6 +5,7 @@ import type { MaintenanceHistory, MaintenanceMessage } from "../domain/maintenan
 import type { MapMetadata } from "../domain/map";
 import type { LiveMapImage } from "../domain/live-map";
 import type { RobotActivity, RobotStatus } from "../domain/status";
+import type { ZoneCleaningOption } from "../domain/zone-cleaning";
 import type { DeviceRecord } from "../protocol/types";
 
 export interface LiveMapProjectionDiagnostics {
@@ -50,10 +51,20 @@ export async function setMapZoneCatalogReadFailure(adapter: ioBroker.Adapter, er
 export async function setInitialCapabilityStates(adapter: ioBroker.Adapter): Promise<void> {
 	await adapter.setStateAsync("capabilities.statusRead", { val: true, ack: true });
 	await adapter.setStateAsync("capabilities.commands", { val: false, ack: true });
+	await adapter.setStateAsync("capabilities.zoneCleaning", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.maps", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.consumables", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.consumableReset", { val: false, ack: true });
 	await adapter.setStateAsync("capabilities.maintenanceMessages", { val: false, ack: true });
+}
+
+export async function projectZoneCleaningCatalog(
+	adapter: ioBroker.Adapter,
+	options: readonly ZoneCleaningOption[],
+	available: boolean,
+): Promise<void> {
+	await adapter.setStateAsync("commands.zones.available", { val: JSON.stringify(options), ack: true });
+	await adapter.setStateAsync("capabilities.zoneCleaning", { val: available, ack: true });
 }
 
 export function liveMapViewerUrl(instance: number | undefined): string {

@@ -24,25 +24,42 @@ Verified on Proscenic M7 Pro so far:
 - status projection for battery, cleaning mode, fan, mop/water candidates,
   features, safe map metadata, and redacted maintenance diagnostics;
 - writable command buttons for start, pause, continue, return to station, fan
-  modes, deep cleaning, and dust collection;
+  modes, deep cleaning, dust collection, and guarded saved-zone cleaning;
 - consumable counters for filter, side brush, main brush, and sensors;
 - recent maintenance/message history, including dust-bag messages;
 - local-development live-map rendering for VIS, including
   app-oriented map colors, saved zones, no-go areas, charger marker,
   a task-scoped pose trail, and SVG animation between gateway positions. A
   static PNG fallback and a same-origin iframe viewer URL remain available for
-  other visualization modes.
+  other visualization modes. Saved-zone overlays can be hidden through
+  `map.live.showZoneOverlays` without removing the underlying catalog.
 
 The adapter is an early public beta. The supported hardware claim is limited to
 the tested M7 Pro (`M7_PRO` / `811_LDS`) and the legacy cloud backend. Other
-models, accounts, regions, firmware versions, Tuya-local control, room-cleaning
-commands, and final map storage/retention policy still require separate
-evidence.
+models, accounts, regions, firmware versions, Tuya-local control, final
+real-device validation of zone cleaning, and map storage/retention policy still
+require separate evidence.
 
 Raw payloads, serial numbers, gateway endpoints, device addresses, credentials,
 packet captures, private maps, and home-layout data are not committed or exposed
 as public fixtures. The current live-map object is explicitly experimental and
 intended for local VIS/debug use.
+
+## Saved-zone cleaning
+
+`commands.zones.available` lists the currently selectable saved zones from the
+authoritative 21004 catalog. Write a JSON array of one or more listed numeric
+IDs to `commands.zones.selectedIds`, then trigger `commands.zones.start`.
+
+The adapter refreshes and validates the catalog and active map before it sends
+one partial-cleaning request. Empty, stale, unknown, duplicate, forbidden, or
+malformed selections are rejected. REST acceptance is reported through the
+normal `commands.last*` diagnostics and is followed by a bounded status
+confirmation wait.
+
+`map.live.showZoneOverlays` controls whether saved zones and forbidden areas
+are drawn in the local VIS map. It does not modify the saved zones or the
+current cleaning selection.
 
 ## Project identity
 
@@ -81,6 +98,9 @@ Security policy and contribution requirements are documented in
 - Added guarded consumable-reset button candidates with a fresh read before the
   write, `21016` gateway confirmation, exact non-target counter validation, and
   a persistent `21015` readback. Real-device reset validation is still pending.
+- Added guarded saved-zone cleaning through `commands.zones.selectedIds` and
+  `commands.zones.start`, with a fresh 21004 validation before the 30000
+  request. Added `map.live.showZoneOverlays` for VIS.
 
 ### 0.2.0 (2026-09-16)
 

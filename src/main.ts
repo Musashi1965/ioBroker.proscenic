@@ -20,6 +20,7 @@ import {
 	isStatusConfirmationForCommand,
 	normalizeCommandButtonValue,
 	supportsStatusConfirmation,
+	type ConfirmableRobotCommand,
 	type RobotCommand,
 } from "./domain/commands";
 import {
@@ -47,6 +48,12 @@ import {
 	normalizeStatus20001,
 	type RobotStatus,
 } from "./domain/status";
+import {
+	buildZoneCleaningRequest,
+	normalizeZoneSelection,
+	validateZoneCleaningSelection,
+	zoneCleaningOptions,
+} from "./domain/zone-cleaning";
 import { extendAdapterObjects } from "./objects/object-definitions";
 import {
 	projectDevice,
@@ -60,6 +67,7 @@ import {
 	projectMaintenanceMessage,
 	projectRobotActivity,
 	projectStatus,
+	projectZoneCleaningCatalog,
 	redactedErrorMessage,
 	setConsumablesReadFailure,
 	setConsumableResetCapability,
@@ -101,6 +109,7 @@ interface PendingConsumableEvent {
 }
 
 interface PendingMapZoneCatalogRead {
+	promise: Promise<LiveMapCoordinateMetadata>;
 	timer: ioBroker.Timeout;
 	resolve: (catalog: LiveMapCoordinateMetadata) => void;
 	reject: (error: Error) => void;
@@ -114,7 +123,7 @@ interface CommandSession {
 }
 
 interface PendingCommandConfirmation {
-	command: RobotCommand;
+	command: ConfirmableRobotCommand;
 	acceptedAt: number;
 	timer: ioBroker.Timeout | undefined;
 	resolve: (latencyMs: number | undefined) => void;
@@ -164,6 +173,8 @@ class Proscenic extends utils.Adapter {
 	private lastMapZoneCatalogRequestAt = 0;
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
+	private liveMapShowZoneOverlays = true;
+	private selectedZoneIds: number[] = [];
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -195,11 +206,13 @@ class Proscenic extends utils.Adapter {
 		await initializeLiveMapAreaStates(this);
 		await projectLiveMapViewerUrl(this);
 		await this.initializeLiveMapColors();
+		await this.initializeZoneCleaningControls();
 		this.subscribeStates("commands.*");
 		this.subscribeStates("consumables.*.reset");
 		this.subscribeStates("map.live.backgroundColor");
 		this.subscribeStates("map.live.canvasBackgroundColor");
 		this.subscribeStates("map.live.mapBackgroundColor");
+		this.subscribeStates("map.live.showZoneOverlays");
 
 		if (!this.config.username || !this.config.password) {
 			await setDeviceListDiagnostics(this, 0, "not-configured");
@@ -287,6 +300,15 @@ class Proscenic extends utils.Adapter {
 		this.commandSerial = device.sn;
 		this.commandEnabled = isM7Pro(device);
 		await this.setStateAsync("capabilities.commands", { val: this.commandEnabled, ack: true });
+		const zoneOptions = zoneCleaningOptions(this.latestMapCoordinateMetadata);
+		await projectZoneCleaningCatalog(
+			this,
+			zoneOptions,
+			this.commandEnabled &&
+				zoneOptions.length > 0 &&
+				this.latestMapId !== undefined &&
+				this.latestMapCoordinateMetadata?.mapId === this.latestMapId,
+		);
 
 		const gateway = await client.getGateway(token, device.sn);
 		const endpoint = selectGatewayEndpoint(gateway);
@@ -501,12 +523,14 @@ class Proscenic extends utils.Adapter {
 				const error = new Error("Map zone catalog response was malformed");
 				this.rejectPendingMapZoneCatalogRead(error);
 				await setMapZoneCatalogReadFailure(this, error);
+				await projectZoneCleaningCatalog(this, zoneCleaningOptions(this.latestMapCoordinateMetadata), false);
 				return;
 			}
 			if (this.latestMapId !== undefined && catalog.mapId !== this.latestMapId) {
 				const error = new Error("Map zone catalog did not match the active map");
 				this.rejectPendingMapZoneCatalogRead(error);
 				await setMapZoneCatalogReadFailure(this, error);
+				await projectZoneCleaningCatalog(this, [], false);
 				return;
 			}
 
@@ -515,6 +539,15 @@ class Proscenic extends utils.Adapter {
 			this.hasLoadedMapZoneCatalog = true;
 			this.resolvePendingMapZoneCatalogRead(catalog);
 			await projectMapZoneCatalogReadSuccess(this, this.latestMapZoneCatalogCount);
+			const options = zoneCleaningOptions(catalog);
+			await projectZoneCleaningCatalog(
+				this,
+				options,
+				this.commandEnabled &&
+					options.length > 0 &&
+					this.latestMapId !== undefined &&
+					catalog.mapId === this.latestMapId,
+			);
 			await this.projectLatestLiveMapImage("zones");
 			return;
 		}
@@ -557,6 +590,7 @@ class Proscenic extends utils.Adapter {
 					this.hasLoadedMapZoneCatalog = false;
 					mapChanged = true;
 					await initializeLiveMapAreaStates(this);
+					await projectZoneCleaningCatalog(this, [], false);
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
@@ -571,6 +605,15 @@ class Proscenic extends utils.Adapter {
 					);
 				}
 				await projectMapMetadata(this, map);
+				const zoneOptions = zoneCleaningOptions(this.latestMapCoordinateMetadata);
+				await projectZoneCleaningCatalog(
+					this,
+					zoneOptions,
+					this.commandEnabled &&
+						this.hasLoadedMapZoneCatalog &&
+						zoneOptions.length > 0 &&
+						this.latestMapCoordinateMetadata?.mapId === this.latestMapId,
+				);
 			}
 			this.latestMapData = data;
 			await this.projectLatestLiveMapImage("map");
@@ -660,15 +703,28 @@ class Proscenic extends utils.Adapter {
 		}
 		this.lastMapZoneCatalogRequestAt = now;
 
+		try {
+			await this.requestMapZoneCatalog(session);
+		} catch (error) {
+			await setMapZoneCatalogReadFailure(this, error);
+			await projectZoneCleaningCatalog(this, zoneCleaningOptions(this.latestMapCoordinateMetadata), false);
+			this.log.debug(`Could not refresh Proscenic map zones: ${redactedErrorMessage(error)}`);
+		}
+	}
+
+	private async requestMapZoneCatalog(session: CommandSession): Promise<LiveMapCoordinateMetadata> {
+		if (this.pendingMapZoneCatalogRead) {
+			return this.pendingMapZoneCatalogRead.promise;
+		}
+		this.lastMapZoneCatalogRequestAt = Date.now();
 		const event = this.awaitNextMapZoneCatalog();
 		try {
 			await session.client.requestMapZoneCatalog(session.token, session.serial);
-			await event;
+			return await event;
 		} catch (error) {
 			void event.catch(() => undefined);
 			this.rejectPendingMapZoneCatalogRead(error instanceof Error ? error : new Error(String(error)));
-			await setMapZoneCatalogReadFailure(this, error);
-			this.log.debug(`Could not refresh Proscenic map zones: ${redactedErrorMessage(error)}`);
+			throw error;
 		}
 	}
 
@@ -677,17 +733,27 @@ class Proscenic extends utils.Adapter {
 			throw new Error("Another map zone catalog read is already pending");
 		}
 
-		return new Promise<LiveMapCoordinateMetadata>((resolve, reject) => {
-			const timer = this.setTimeout(() => {
-				this.pendingMapZoneCatalogRead = undefined;
-				reject(new Error(`No map zone catalog received within ${MAP_ZONE_CATALOG_TIMEOUT_MS} ms`));
-			}, MAP_ZONE_CATALOG_TIMEOUT_MS);
-			if (timer === undefined) {
-				reject(new Error("Could not schedule map zone catalog timeout"));
-				return;
-			}
-			this.pendingMapZoneCatalogRead = { timer, resolve, reject };
+		let resolvePending: (catalog: LiveMapCoordinateMetadata) => void = () => undefined;
+		let rejectPending: (error: Error) => void = () => undefined;
+		const promise = new Promise<LiveMapCoordinateMetadata>((resolve, reject) => {
+			resolvePending = resolve;
+			rejectPending = reject;
 		});
+		const timer = this.setTimeout(() => {
+			this.pendingMapZoneCatalogRead = undefined;
+			rejectPending(new Error(`No map zone catalog received within ${MAP_ZONE_CATALOG_TIMEOUT_MS} ms`));
+		}, MAP_ZONE_CATALOG_TIMEOUT_MS);
+		if (timer === undefined) {
+			rejectPending(new Error("Could not schedule map zone catalog timeout"));
+			return promise;
+		}
+		this.pendingMapZoneCatalogRead = {
+			promise,
+			timer,
+			resolve: resolvePending,
+			reject: rejectPending,
+		};
+		return promise;
 	}
 
 	private resolvePendingMapZoneCatalogRead(catalog: LiveMapCoordinateMetadata): void {
@@ -810,6 +876,7 @@ class Proscenic extends utils.Adapter {
 				canvasBackgroundColor: this.liveMapCanvasBackgroundColor,
 				mapBackgroundColor: this.liveMapMapBackgroundColor,
 				animateRobot: renderReason === "pose",
+				showZoneOverlays: this.liveMapShowZoneOverlays,
 			});
 			if (image) {
 				await projectLiveMapImage(this, image, {
@@ -862,6 +929,27 @@ class Proscenic extends utils.Adapter {
 		}
 		if (relativeId === "map.live.canvasBackgroundColor") {
 			void this.setLiveMapCanvasBackgroundColor(state.val);
+			return;
+		}
+		if (relativeId === "map.live.showZoneOverlays") {
+			void this.setLiveMapShowZoneOverlays(state.val);
+			return;
+		}
+		if (relativeId === "commands.zones.selectedIds") {
+			void this.setSelectedZoneIds(state.val);
+			return;
+		}
+		if (relativeId === "commands.zones.start") {
+			const trigger = normalizeCommandButtonValue(state.val);
+			if (trigger === false) {
+				void this.setStateAsync(relativeId, { val: false, ack: true });
+				return;
+			}
+			if (trigger === undefined) {
+				this.log.debug("Ignoring unsupported zone-cleaning button value.");
+				return;
+			}
+			this.enqueueZoneCleaning(relativeId, this.selectedZoneIds);
 			return;
 		}
 
@@ -922,6 +1010,25 @@ class Proscenic extends utils.Adapter {
 		});
 	}
 
+	private enqueueZoneCleaning(stateId: string, zoneIds: readonly number[]): void {
+		if (this.queuedCommandCount >= MAX_QUEUED_COMMANDS) {
+			void this.setCommandFailure(stateId, "zoneCleaning", new Error("Proscenic command queue is full"));
+			return;
+		}
+
+		this.queuedCommandCount += 1;
+		void this.setStateAsync(stateId, { val: false, ack: true });
+		void this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		const selected = [...zoneIds];
+		const execution = this.commandExecutionChain
+			.catch(() => undefined)
+			.then(() => this.executeZoneCleaning(stateId, selected));
+		this.commandExecutionChain = execution.finally(async () => {
+			this.queuedCommandCount = Math.max(0, this.queuedCommandCount - 1);
+			await this.setStateAsync("commands.queueDepth", { val: this.queuedCommandCount, ack: true });
+		});
+	}
+
 	private enqueueConsumableReset(stateId: string, component: ConsumableComponent): void {
 		if (this.queuedCommandCount >= MAX_QUEUED_COMMANDS) {
 			void this.setConsumableResetFailure(stateId, component, new Error("Proscenic command queue is full"));
@@ -962,6 +1069,69 @@ class Proscenic extends utils.Adapter {
 			});
 		} catch (error) {
 			await this.setConsumableResetFailure(stateId, component, error);
+		}
+	}
+
+	private async executeZoneCleaning(stateId: string, zoneIds: readonly number[]): Promise<void> {
+		await this.setStateAsync("commands.lastCommand", { val: "zoneCleaning", ack: true });
+		await this.setStateAsync("commands.lastResult", { val: "waiting-for-session", ack: true });
+		await this.setStateAsync("commands.lastError", { val: "", ack: true });
+		await this.setStateAsync("commands.lastExecution", { val: new Date().toISOString(), ack: true });
+		await this.setStateAsync("commands.lastApiLatencyMs", { val: 0, ack: true });
+		await this.setStateAsync("commands.lastConfirmationLatencyMs", { val: 0, ack: true });
+
+		let requestAttempted = false;
+		try {
+			const session = await this.waitForCommandSession();
+			if (!this.commandEnabled) {
+				throw new Error("Zone cleaning is not enabled for the selected device");
+			}
+			if (zoneIds.length === 0) {
+				throw new Error("No map zones are selected");
+			}
+
+			await this.setStateAsync("commands.lastResult", { val: "validating-zones", ack: true });
+			const catalog = await this.requestMapZoneCatalog(session);
+			const selection = validateZoneCleaningSelection(zoneIds, this.latestMapId, catalog);
+			const request = buildZoneCleaningRequest(selection, session.serial, session.username);
+
+			await this.setStateAsync("commands.lastResult", { val: "sending", ack: true });
+			const apiStartedAt = Date.now();
+			requestAttempted = true;
+			const result = await session.client.sendCommand(session.token, request);
+			const apiLatencyMs = Date.now() - apiStartedAt;
+			const accepted = result.code === undefined || result.code === 0;
+			const confirmation = accepted
+				? this.waitForCommandConfirmation("zoneCleaning")
+				: Promise.resolve(undefined);
+			await this.setStateAsync("commands.lastApiLatencyMs", { val: apiLatencyMs, ack: true });
+			await this.setStateAsync("commands.lastResult", {
+				val: accepted ? "api-accepted" : `api-code-${result.code}`,
+				ack: true,
+			});
+
+			if (accepted) {
+				const confirmationLatencyMs = await confirmation;
+				if (confirmationLatencyMs !== undefined) {
+					await this.setStateAsync("commands.lastConfirmationLatencyMs", {
+						val: confirmationLatencyMs,
+						ack: true,
+					});
+					await this.setStateAsync("commands.lastResult", { val: "status-confirmed", ack: true });
+				} else {
+					await this.setStateAsync("commands.lastConfirmationLatencyMs", {
+						val: COMMAND_CONFIRMATION_TIMEOUT_MS,
+						ack: true,
+					});
+					await this.setStateAsync("commands.lastResult", { val: "api-accepted-unconfirmed", ack: true });
+				}
+			}
+		} catch (error) {
+			this.cancelPendingCommandConfirmation();
+			if (requestAttempted) {
+				this.recoverCommandSessionAfterFailure();
+			}
+			await this.setCommandFailure(stateId, "zoneCleaning", error);
 		}
 	}
 
@@ -1077,7 +1247,7 @@ class Proscenic extends utils.Adapter {
 		return new Promise(resolve => this.setTimeout(resolve, delayMs));
 	}
 
-	private waitForCommandConfirmation(command: RobotCommand): Promise<number | undefined> {
+	private waitForCommandConfirmation(command: ConfirmableRobotCommand): Promise<number | undefined> {
 		if (!supportsStatusConfirmation(command)) {
 			return Promise.resolve(undefined);
 		}
@@ -1132,7 +1302,7 @@ class Proscenic extends utils.Adapter {
 		void this.connectReadOnlyGateway();
 	}
 
-	private async setCommandFailure(stateId: string, command: RobotCommand, error: unknown): Promise<void> {
+	private async setCommandFailure(stateId: string, command: ConfirmableRobotCommand, error: unknown): Promise<void> {
 		const message = redactedErrorMessage(error);
 		await this.setStateAsync("commands.lastCommand", { val: command, ack: true });
 		await this.setStateAsync("commands.lastResult", { val: "failed", ack: true });
@@ -1157,6 +1327,7 @@ class Proscenic extends utils.Adapter {
 		this.rejectPendingMapZoneCatalogRead(new Error("Cloud session ended before map zones were received"));
 		this.commandEnabled = false;
 		void setConsumableResetCapability(this, false);
+		void this.setStateAsync("capabilities.zoneCleaning", { val: false, ack: true });
 		this.commandClient = undefined;
 		this.commandToken = undefined;
 		this.commandSerial = undefined;
@@ -1181,7 +1352,24 @@ class Proscenic extends utils.Adapter {
 		await this.setStateAsync("map.live.mapBackgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
 		await this.setStateAsync("map.live.backgroundColor", { val: this.liveMapMapBackgroundColor, ack: true });
 
+		const currentShowZoneOverlays = await this.getStateAsync("map.live.showZoneOverlays");
+		const showZoneOverlays = normalizeCommandButtonValue(currentShowZoneOverlays?.val);
+		this.liveMapShowZoneOverlays = showZoneOverlays ?? true;
+		await this.setStateAsync("map.live.showZoneOverlays", { val: this.liveMapShowZoneOverlays, ack: true });
+
 		await this.deleteObsoleteLiveMapRoomColor();
+	}
+
+	private async initializeZoneCleaningControls(): Promise<void> {
+		const current = await this.getStateAsync("commands.zones.selectedIds");
+		const selected = normalizeZoneSelection(current?.val);
+		this.selectedZoneIds = selected ?? [];
+		await this.setStateAsync("commands.zones.selectedIds", {
+			val: JSON.stringify(this.selectedZoneIds),
+			ack: true,
+		});
+		await this.setStateAsync("commands.zones.start", { val: false, ack: true });
+		await projectZoneCleaningCatalog(this, [], false);
 	}
 
 	private async setLiveMapMapBackgroundColor(value: ioBroker.StateValue | undefined): Promise<void> {
@@ -1213,6 +1401,40 @@ class Proscenic extends utils.Adapter {
 		this.liveMapCanvasBackgroundColor = normalized;
 		await this.setStateAsync("map.live.canvasBackgroundColor", { val: normalized, ack: true });
 		await this.projectLatestLiveMapImage("map");
+	}
+
+	private async setLiveMapShowZoneOverlays(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeCommandButtonValue(value);
+		if (normalized === undefined) {
+			await this.setStateAsync("map.live.showZoneOverlays", {
+				val: this.liveMapShowZoneOverlays,
+				ack: true,
+			});
+			this.log.warn("Ignoring invalid live map zone-overlay switch value.");
+			return;
+		}
+
+		this.liveMapShowZoneOverlays = normalized;
+		await this.setStateAsync("map.live.showZoneOverlays", { val: normalized, ack: true });
+		await this.projectLatestLiveMapImage("map");
+	}
+
+	private async setSelectedZoneIds(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeZoneSelection(value);
+		if (!normalized) {
+			await this.setStateAsync("commands.zones.selectedIds", {
+				val: JSON.stringify(this.selectedZoneIds),
+				ack: true,
+			});
+			this.log.warn("Ignoring invalid zone selection. Expected a JSON array or comma-separated numeric IDs.");
+			return;
+		}
+
+		this.selectedZoneIds = normalized;
+		await this.setStateAsync("commands.zones.selectedIds", {
+			val: JSON.stringify(normalized),
+			ack: true,
+		});
 	}
 
 	private async deleteObsoleteLiveMapRoomColor(): Promise<void> {

@@ -31,7 +31,9 @@ describe("initial object definitions", () => {
 			if (
 				definition.id === "map.live.backgroundColor" ||
 				definition.id === "map.live.canvasBackgroundColor" ||
-				definition.id === "map.live.mapBackgroundColor"
+				definition.id === "map.live.mapBackgroundColor" ||
+				definition.id === "map.live.showZoneOverlays" ||
+				definition.id === "commands.zones.selectedIds"
 			) {
 				expect(definition.object.common.write, definition.id).to.equal(true);
 				expect(definition.object.common.read, definition.id).to.equal(true);
@@ -63,6 +65,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("capabilities.consumables");
 		expect(ids).to.include("capabilities.consumableReset");
 		expect(ids).to.include("capabilities.maintenanceMessages");
+		expect(ids).to.include("capabilities.zoneCleaning");
 		expect(ids).to.include("consumables.filter.usedSeconds");
 		expect(ids).to.include("consumables.filter.remainingPercent");
 		expect(ids).to.include("consumables.sideBrush.usedSeconds");
@@ -95,6 +98,9 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("commands.fan.strong");
 		expect(ids).to.include("commands.deepCleaning");
 		expect(ids).to.include("commands.collectDust");
+		expect(ids).to.include("commands.zones.available");
+		expect(ids).to.include("commands.zones.selectedIds");
+		expect(ids).to.include("commands.zones.start");
 		expect(ids).to.include("commands.queueDepth");
 		expect(ids).to.include("commands.lastApiLatencyMs");
 		expect(ids).to.include("commands.lastConfirmationLatencyMs");
@@ -108,6 +114,7 @@ describe("initial object definitions", () => {
 			"commands.fan.strong",
 			"commands.deepCleaning",
 			"commands.collectDust",
+			"commands.zones.start",
 			"consumables.filter.reset",
 			"consumables.sideBrush.reset",
 			"consumables.mainBrush.reset",
@@ -115,6 +122,8 @@ describe("initial object definitions", () => {
 			"map.live.canvasBackgroundColor",
 			"map.live.mapBackgroundColor",
 			"map.live.backgroundColor",
+			"map.live.showZoneOverlays",
+			"commands.zones.selectedIds",
 		]);
 		expect(ids).to.include("device.onlineUpdated");
 		expect(ids).to.include("device.onlineFresh");
@@ -131,6 +140,18 @@ describe("initial object definitions", () => {
 				definition.id === "map.live.mapBackgroundColor"
 			) {
 				expect(definition.object.common.role, definition.id).to.equal("level.color.rgb");
+				expect(definition.object.common.read, definition.id).to.equal(true);
+				expect(definition.object.common.write, definition.id).to.equal(true);
+				continue;
+			}
+			if (definition.id === "map.live.showZoneOverlays") {
+				expect(definition.object.common.role, definition.id).to.equal("switch");
+				expect(definition.object.common.read, definition.id).to.equal(true);
+				expect(definition.object.common.write, definition.id).to.equal(true);
+				continue;
+			}
+			if (definition.id === "commands.zones.selectedIds") {
+				expect(definition.object.common.role, definition.id).to.equal("json");
 				expect(definition.object.common.read, definition.id).to.equal(true);
 				expect(definition.object.common.write, definition.id).to.equal(true);
 				continue;
@@ -190,6 +211,7 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("map.live.canvasBackgroundColor");
 		expect(ids).to.include("map.live.mapBackgroundColor");
 		expect(ids).to.include("map.live.backgroundColor");
+		expect(ids).to.include("map.live.showZoneOverlays");
 		expect(ids).to.include("map.live.renderReason");
 		expect(ids).to.include("map.live.lastPathId");
 		expect(ids).to.include("map.live.pathResetCount");

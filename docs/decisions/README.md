@@ -37,6 +37,8 @@ Current decisions:
   command delivery and status confirmation
 - [ADR 0020](0020-animated-live-map-and-task-scoped-trail.md): animated SVG
   live map and task-scoped trail lifecycle
+- [ADR 0021](0021-guarded-zone-cleaning.md): guarded saved-zone selection,
+  partial-cleaning command, and overlay visibility
 
 Required future decisions include accepting the first public object contract,
 stable device identity, token renewal, final public command failure semantics,

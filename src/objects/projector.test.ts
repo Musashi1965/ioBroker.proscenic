@@ -11,6 +11,7 @@ import {
 	projectMapMetadata,
 	projectMaintenanceMessage,
 	projectRobotActivity,
+	projectZoneCleaningCatalog,
 	redactedErrorMessage,
 	setConnectionState,
 	setConsumableResetCapability,
@@ -357,6 +358,24 @@ describe("consumable reset projection", () => {
 });
 
 describe("projectLiveMapImage", () => {
+	it("publishes selectable zone options and their capability", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectZoneCleaningCatalog(adapter, [{ id: 1001, label: "Zone A" }], true);
+
+		expect(states.get("commands.zones.available")).to.deep.equal({
+			val: '[{"id":1001,"label":"Zone A"}]',
+			ack: true,
+		});
+		expect(states.get("capabilities.zoneCleaning")).to.deep.equal({ val: true, ack: true });
+	});
+
 	it("initializes and reports the authoritative 21004 zone catalog", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
 		const adapter = {

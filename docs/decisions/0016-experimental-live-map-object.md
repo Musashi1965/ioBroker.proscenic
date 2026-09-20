@@ -47,6 +47,7 @@ Expose an explicit experimental live-map image under:
 - `map.live.canvasBackgroundColor`;
 - `map.live.mapBackgroundColor`;
 - `map.live.backgroundColor`;
+- `map.live.showZoneOverlays`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
 - `map.live.pathResetCount`;
@@ -75,6 +76,11 @@ valid writes with `ack=true` and restores the previous value for invalid
 writes. The adapter-owned pose trail uses a dedicated light-green overlay color
 instead of reusing the background, room, or wall colors. The pose trail is
 rendered wider than one pixel for VIS readability.
+
+`map.live.showZoneOverlays` controls whether saved selectable zones and
+forbidden-area polygons are drawn into the local image. The default is `true`.
+Turning it off leaves `map.live.areas`, the 21004 catalog, and zone-cleaning
+selection untouched. ADR 0021 defines its writable semantics.
 
 `map.live.viewerUrl` contains the stable same-origin web-adapter path for the
 interactive viewer defined by ADR 0020. It is a URL only and contains neither

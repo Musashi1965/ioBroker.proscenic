@@ -9,6 +9,8 @@ export type RobotCommand =
 	| "deepCleaning"
 	| "collectDust";
 
+export type ConfirmableRobotCommand = RobotCommand | "zoneCleaning";
+
 export interface CommandRequest {
 	path: string;
 	body: string;
@@ -41,15 +43,19 @@ export function commandForStateId(id: string): RobotCommand | undefined {
 	return COMMAND_DEFINITIONS.find(definition => definition.id === id)?.command;
 }
 
-export function supportsStatusConfirmation(command: RobotCommand): boolean {
+export function supportsStatusConfirmation(command: ConfirmableRobotCommand): boolean {
 	return command !== "collectDust";
 }
 
-export function isStatusConfirmationForCommand(command: RobotCommand, status: CommandStatusSnapshot): boolean {
+export function isStatusConfirmationForCommand(
+	command: ConfirmableRobotCommand,
+	status: CommandStatusSnapshot,
+): boolean {
 	switch (command) {
 		case "start":
 		case "continue":
 		case "deepCleaning":
+		case "zoneCleaning":
 			return status.mode === "sweep";
 		case "pause":
 			return status.mode === "pause";

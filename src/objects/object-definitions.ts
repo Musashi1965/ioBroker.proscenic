@@ -38,6 +38,7 @@ export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [
 	channel("map.live", "Experimental live map"),
 	channel("commands", "Commands"),
 	channel("commands.fan", "Fan commands"),
+	channel("commands.zones", "Zone cleaning"),
 ];
 
 export const STATE_DEFINITIONS: readonly StateDefinition[] = [
@@ -59,6 +60,7 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	state("connection.lastStatusEvent", "Last status event", "string", "date"),
 	state("capabilities.statusRead", "Read status", "boolean", "indicator"),
 	state("capabilities.commands", "Commands exposed", "boolean", "indicator"),
+	state("capabilities.zoneCleaning", "Zone cleaning available", "boolean", "indicator"),
 	state("capabilities.maps", "Maps exposed", "boolean", "indicator"),
 	state("capabilities.consumables", "Consumables exposed", "boolean", "indicator"),
 	state("capabilities.consumableReset", "Consumable resets available", "boolean", "indicator"),
@@ -154,12 +156,16 @@ export const STATE_DEFINITIONS: readonly StateDefinition[] = [
 	writableState("map.live.backgroundColor", "Legacy live map blue area color", "string", "level.color.rgb", {
 		def: DEFAULT_LIVE_MAP_BACKGROUND_COLOR,
 	}),
+	writableState("map.live.showZoneOverlays", "Show saved zone overlays", "boolean", "switch", { def: true }),
 	state("map.live.renderReason", "Last live map render reason", "string", "state"),
 	state("map.live.lastPathId", "Last live map path ID", "number", "value", { min: 0 }),
 	state("map.live.pathResetCount", "Live map path reset count", "number", "value", { min: 0 }),
 	state("map.live.lastPoseUpdated", "Last live map pose update", "string", "date"),
 	state("map.live.decompressedBytes", "Live map decompressed bytes", "number", "value", { unit: "B", min: 0 }),
 	...COMMAND_DEFINITIONS.map(definition => commandButton(definition)),
+	state("commands.zones.available", "Available selectable zones", "string", "json"),
+	writableState("commands.zones.selectedIds", "Selected zone IDs", "string", "json", { def: "[]" }),
+	commandButton({ id: "commands.zones.start", command: "zoneCleaning" }),
 	state("commands.lastCommand", "Last command", "string", "text"),
 	state("commands.lastResult", "Last command result", "string", "text"),
 	state("commands.lastError", "Last command error", "string", "text"),
@@ -257,7 +263,7 @@ function consumableStates(prefix: string, name: string): StateDefinition[] {
 	];
 }
 
-function commandButton(definition: CommandDefinition): StateDefinition {
+function commandButton(definition: CommandDefinition | { id: string; command: "zoneCleaning" }): StateDefinition {
 	return {
 		id: definition.id,
 		object: {
