@@ -438,8 +438,8 @@ describe("live map rendering", () => {
 	});
 
 	it("renders unselected zones white and selected zones light green", () => {
-		const width = 5;
-		const height = 5;
+		const width = 9;
+		const height = 9;
 		const grid = Buffer.alloc(width * height, 127);
 		const data = {
 			map: encodeLiteralOnlyLz4(grid).toString("base64"),
@@ -453,21 +453,25 @@ describe("live map rendering", () => {
 					id: 1005,
 					__proscenicKind: "zone",
 					vertexs: [
-						[50, 50],
-						[150, 50],
-						[150, 150],
-						[50, 150],
+						[100, 100],
+						[300, 100],
+						[300, 300],
+						[100, 300],
 					],
 				},
 			],
 		};
 		const unselected = renderLiveMapImage20002(data);
 		const selected = renderLiveMapImage20002(data, [], { selectedZoneIds: [1005] });
-		const unselectedCenter = pixelAt(decodeRgbPngDataUrl(unselected?.pngDataUrl, width, height), width, 2, 2);
-		const selectedCenter = pixelAt(decodeRgbPngDataUrl(selected?.pngDataUrl, width, height), width, 2, 2);
+		const unselectedPixels = decodeRgbPngDataUrl(unselected?.pngDataUrl, width, height);
+		const selectedPixels = decodeRgbPngDataUrl(selected?.pngDataUrl, width, height);
+		const unselectedCenter = pixelAt(unselectedPixels, width, 4, 4);
+		const selectedCenter = pixelAt(selectedPixels, width, 4, 4);
+		const unselectedBorder = pixelAt(unselectedPixels, width, 2, 4);
 
 		expect(unselectedCenter[0]).to.equal(unselectedCenter[1]);
 		expect(unselectedCenter[1]).to.equal(unselectedCenter[2]);
+		expect(unselectedBorder[2]).to.be.greaterThan(unselectedBorder[0]);
 		expect(selectedCenter[1]).to.be.greaterThan(selectedCenter[0]);
 		expect(selectedCenter[1]).to.be.greaterThan(selectedCenter[2]);
 	});

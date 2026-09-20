@@ -22,6 +22,7 @@ describe("live map web viewer", () => {
 		expect(script).to.include(".commands.zones.start");
 		expect(script).to.include('socketRequest("setState"');
 		expect(script).to.include("zoneAtPointer");
+		expect(script).to.include('"▶ 1 Zone"');
 		expect(script).to.include("new window.Image()");
 		expect(html).to.include('id="mapStage"');
 		expect(html).to.include('id="zoneStart"');
@@ -29,6 +30,7 @@ describe("live map web viewer", () => {
 		expect(style).to.include("grid-template-rows: minmax(0, 1fr)");
 		expect(style).to.include("min-height: 0");
 		expect(style).to.include("#zoneStart");
+		expect(style).to.include("border-radius: 999px");
 		expect(script).to.not.match(/https?:\/\//u);
 	});
 });

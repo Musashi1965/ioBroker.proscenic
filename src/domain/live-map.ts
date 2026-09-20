@@ -105,10 +105,10 @@ const COLOR_FORBIDDEN_AREA: Color = [209, 106, 133];
 const COLOR_FORBIDDEN_OUTLINE: Color = [175, 68, 103];
 const FORBIDDEN_AREA_ALPHA = 0.45;
 const COLOR_ZONE_AREA: Color = [255, 255, 255];
-const COLOR_ZONE_AREA_OUTLINE: Color = [210, 218, 224];
+const COLOR_ZONE_AREA_OUTLINE: Color = [72, 128, 162];
 const COLOR_SELECTED_ZONE_AREA: Color = [126, 216, 96];
 const COLOR_SELECTED_ZONE_AREA_OUTLINE: Color = [72, 168, 54];
-const ZONE_AREA_ALPHA = 0.3;
+const ZONE_AREA_ALPHA = 0.26;
 const SELECTED_ZONE_AREA_ALPHA = 0.45;
 const COLOR_DOCK: Color = [92, 92, 92];
 const COLOR_ROBOT: Color = [39, 139, 61];
@@ -454,6 +454,7 @@ function drawCoordinateMetadata(
 					sample.height,
 					projected,
 					selected ? COLOR_SELECTED_ZONE_AREA_OUTLINE : COLOR_ZONE_AREA_OUTLINE,
+					1,
 				);
 				renderedZoneAreaCount += 1;
 			} else if (area.kind === "forbidden") {
@@ -1146,11 +1147,16 @@ function drawPolygon(
 	height: number,
 	polygon: Array<[number, number]>,
 	color: Color,
+	radius = 0,
 ): void {
 	for (let index = 0; index < polygon.length; index++) {
 		const [x1, y1] = polygon[index];
 		const [x2, y2] = polygon[(index + 1) % polygon.length];
-		drawLine(pixels, width, height, x1, y1, x2, y2, color);
+		for (let offsetY = -radius; offsetY <= radius; offsetY++) {
+			for (let offsetX = -radius; offsetX <= radius; offsetX++) {
+				drawLine(pixels, width, height, x1 + offsetX, y1 + offsetY, x2 + offsetX, y2 + offsetY, color);
+			}
+		}
 	}
 }
 

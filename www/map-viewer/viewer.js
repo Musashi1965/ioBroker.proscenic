@@ -206,8 +206,7 @@
 		viewport.classList.toggle("is-zone-selection", selectionEnabled);
 		zoneStart.hidden = !selectionEnabled || selected.length === 0;
 		zoneStart.disabled = !connected || selectionWritePending || startWritePending;
-		zoneStart.textContent =
-			selected.length === 1 ? "Ausgewählte Zone reinigen" : `${selected.length} ausgewählte Zonen reinigen`;
+		zoneStart.textContent = selected.length === 1 ? "▶ 1 Zone" : `▶ ${selected.length} Zonen`;
 	}
 
 	function fitMapStage() {

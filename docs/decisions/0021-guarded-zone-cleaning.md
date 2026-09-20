@@ -56,13 +56,14 @@ Changing `map.live.showZoneOverlays` re-renders the local image. When enabled,
 the same-origin `map.live.viewerUrl` treats the projected bounds of current
 selectable zones as click targets. A click toggles the corresponding ID through
 the existing `commands.zones.selectedIds` contract. Unselected zones render
-with a transparent white fill and selected zones with a transparent light-green
-fill. Forbidden areas remain visible but are never click targets.
+with a transparent white fill and stronger blue-gray boundary, while selected
+zones use a transparent light-green fill. Forbidden areas remain visible but
+are never click targets.
 
 The viewer shows its zone-cleaning start action only when overlay selection is
 enabled, `capabilities.zoneCleaning` is true, and at least one selected ID is
-also present in the current `commands.zones.available` list. The action writes
-only to `commands.zones.start`; it does not bypass the adapter's fresh 21004
+also present in the current `commands.zones.available` list. The compact action
+writes only to `commands.zones.start`; it does not bypass the adapter's fresh 21004
 validation or command queue. Turning the overlay switch off hides and disables
 the click targets and start action. It does not change upstream zones, map
 data, robot behavior, or silently clear a stored selection.

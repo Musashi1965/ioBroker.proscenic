@@ -59,10 +59,10 @@ confirmation wait.
 
 `map.live.showZoneOverlays` controls both visibility and interactive selection
 in the `map.live.viewerUrl` iframe. When enabled, unselected zones are shown as
-transparent white overlays and selected zones as transparent light-green
-overlays. Clicking a valid zone toggles its ID in
+transparent white overlays with contrasting blue-gray boundaries and selected
+zones as transparent light-green overlays. Clicking a valid zone toggles its ID in
 `commands.zones.selectedIds`. As soon as at least one valid zone is selected,
-the viewer shows a start button which writes to `commands.zones.start`.
+the viewer shows a compact start action which writes to `commands.zones.start`.
 Turning the switch off hides and disables the interactive overlays without
 modifying upstream saved zones.
 
