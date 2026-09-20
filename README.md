@@ -93,6 +93,11 @@ Security policy and contribution requirements are documented in
 
 ### Unreleased
 
+### 0.3.0 (2026-09-20)
+
+- Added a derived robot activity state for dashboards and strengthened command
+  delivery with bounded cloud-session recovery and explicit confirmation
+  diagnostics.
 - Changed the primary experimental live-map image to an animated SVG while
   retaining an explicit static PNG fallback.
 - Prevented transient charging status reports during active cleaning from
@@ -102,11 +107,14 @@ Security policy and contribution requirements are documented in
   and presents the centered map without an internal title bar.
 - Added guarded consumable-reset button candidates with a fresh read before the
   write, `21016` gateway confirmation, exact non-target counter validation, and
-  a persistent `21015` readback. Real-device reset validation is still pending.
+  a persistent `21015` readback. The sensor reset has been validated on the
+  real device; the remaining component resets still need separate validation.
 - Added guarded saved-zone cleaning through `commands.zones.selectedIds` and
   `commands.zones.start`, with a fresh 21004 validation before the 30000
   request. Added `map.live.showZoneOverlays` for VIS and direct click selection
-  plus a contextual start button in the same-origin map viewer.
+  plus a compact contextual start button in the same-origin map viewer. The
+  authoritative 21004 catalog now distinguishes selectable zones from
+  forbidden areas and keeps stale map selections from being executed.
 
 ### 0.2.0 (2026-09-16)
 

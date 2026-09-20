@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.2.0",
+		"version": "0.3.0",
 		"news": {
+			"0.3.0": {
+				"en": "Added interactive saved-zone cleaning, safer consumable resets, an embedded animated live-map viewer, and more resilient command delivery",
+				"de": "Interaktive Reinigung gespeicherter Zonen, sichere Verbrauchsmaterial-Resets, einen eingebetteten animierten Live-Kartenviewer und robustere Befehlsübertragung hinzugefügt",
+				"ru": "Добавлены интерактивная уборка сохранённых зон, безопасный сброс расходных материалов, встроенная анимированная карта и более надёжная передача команд",
+				"pt": "Adicionadas limpeza interativa de zonas salvas, redefinições seguras de consumíveis, visualizador de mapa animado incorporado e entrega de comandos mais robusta",
+				"nl": "Interactieve reiniging van opgeslagen zones, veilige resets van verbruiksartikelen, een ingebouwde geanimeerde kaartviewer en robuustere opdrachtoverdracht toegevoegd",
+				"fr": "Ajout du nettoyage interactif des zones enregistrées, de réinitialisations sécurisées des consommables, d'une carte animée intégrée et d'une transmission des commandes plus robuste",
+				"it": "Aggiunti pulizia interattiva delle zone salvate, reset sicuri dei materiali di consumo, visualizzatore mappa animato integrato e invio dei comandi più affidabile",
+				"es": "Añadidos limpieza interactiva de zonas guardadas, restablecimientos seguros de consumibles, visor de mapa animado integrado y entrega de comandos más robusta",
+				"pl": "Dodano interaktywne sprzątanie zapisanych stref, bezpieczne zerowanie materiałów eksploatacyjnych, osadzony animowany podgląd mapy i bardziej niezawodne wysyłanie poleceń",
+				"uk": "Додано інтерактивне прибирання збережених зон, безпечне скидання витратних матеріалів, вбудовану анімовану карту та надійніше передавання команд",
+				"zh-cn": "新增保存区域的交互式清扫、安全耗材重置、嵌入式动画实时地图查看器以及更可靠的命令传输"
+			},
 			"0.2.0": {
 				"en": "Added live-map color controls, preserved cleaning trails across room changes, and clarified availability diagnostics",
 				"de": "Live-Karten-Farbsteuerung hinzugefügt, Fahrspuren über Raumwechsel erhalten und Verfügbarkeitsdiagnosen präzisiert",
