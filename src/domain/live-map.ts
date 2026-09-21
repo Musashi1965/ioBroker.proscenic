@@ -42,6 +42,7 @@ export interface LiveMapTaskState {
 export interface LiveMapTaskTransition {
 	state: LiveMapTaskState;
 	resetTrail: boolean;
+	completedTask: boolean;
 }
 
 export type LiveMapAreaKind = "forbidden" | "zone" | "unknown";
@@ -164,6 +165,7 @@ export function transitionLiveMapTaskState(
 		return {
 			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
 			resetTrail: state.dockedSinceLastCleaning,
+			completedTask: false,
 		};
 	}
 
@@ -175,6 +177,7 @@ export function transitionLiveMapTaskState(
 				cleaningTaskActive: state.cleaningTaskActive,
 			},
 			resetTrail: false,
+			completedTask: false,
 		};
 	}
 
@@ -183,11 +186,12 @@ export function transitionLiveMapTaskState(
 			return {
 				state: { dockedSinceLastCleaning: true, returningToDock: false, cleaningTaskActive: false },
 				resetTrail: false,
+				completedTask: state.cleaningTaskActive,
 			};
 		}
 	}
 
-	return { state, resetTrail: false };
+	return { state, resetTrail: false, completedTask: false };
 }
 
 export function renderLiveMapImage20002(

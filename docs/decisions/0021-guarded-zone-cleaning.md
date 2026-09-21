@@ -2,7 +2,7 @@
 
 - Status: accepted for test-host validation
 - Date: 2026-09-20
-- Amended: 2026-09-20
+- Amended: 2026-09-21
 
 ## Context
 
@@ -68,6 +68,15 @@ validation or command queue. Turning the overlay switch off hides and disables
 the click targets and start action. It does not change upstream zones, map
 data, robot behavior, or silently clear a stored selection.
 
+The selected IDs are task-scoped UI state. After an active cleaning task has
+returned to the dock and the existing live-map lifecycle confirms a subsequent
+`charge` or `fullcharge` state, the adapter acknowledges
+`commands.zones.selectedIds` as `[]` and re-renders the map. A pause, a
+transient charging report during inferred cleaning activity, a connection
+failure, or the initial docked state after adapter startup does not clear the
+selection. This keeps completed zones from remaining highlighted without
+weakening the protections against premature trail resets.
+
 ## Consequences
 
 VIS and scripts can select one or multiple saved zones without handling raw map
@@ -96,7 +105,8 @@ cleaning.
 
 Automated tests cover selection parsing, forbidden/stale-zone rejection, exact
 30000 request construction, object metadata, overlay hiding, selected and
-unselected colors, viewer state wiring, and projection.
+unselected colors, viewer state wiring, confirmed task completion, and
+projection.
 The full adapter quality gate and test-host deployment are required. Actual
 30000 execution on the real device remains a separate explicitly triggered
 physical validation step; deployment alone must not start the robot.

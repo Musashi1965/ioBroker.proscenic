@@ -561,7 +561,7 @@ class Proscenic extends utils.Adapter {
 					this.cleaningInferredUntilMs = Date.now() + CLEANING_ACTIVITY_HOLD_MS;
 				}
 				this.latestRobotStatus = status;
-				this.updateLiveMapTaskState(status);
+				await this.updateLiveMapTaskState(status);
 				await projectStatus(this, status);
 				await this.projectDerivedRobotActivity(previousStatus);
 			}
@@ -838,7 +838,7 @@ class Proscenic extends utils.Adapter {
 		this.pendingConsumableEvent = undefined;
 	}
 
-	private updateLiveMapTaskState(status: RobotStatus): void {
+	private async updateLiveMapTaskState(status: RobotStatus): Promise<void> {
 		const transition = transitionLiveMapTaskState(
 			{
 				dockedSinceLastCleaning: this.liveMapDockedSinceLastCleaning,
@@ -854,6 +854,11 @@ class Proscenic extends utils.Adapter {
 		this.liveMapDockedSinceLastCleaning = transition.state.dockedSinceLastCleaning;
 		this.liveMapReturningToDock = transition.state.returningToDock;
 		this.liveMapCleaningTaskActive = transition.state.cleaningTaskActive;
+		if (transition.completedTask && this.selectedZoneIds.length > 0) {
+			this.selectedZoneIds = [];
+			await this.setStateAsync("commands.zones.selectedIds", { val: "[]", ack: true });
+			await this.projectLatestLiveMapImage("zones");
+		}
 	}
 
 	private resetLiveMapPoseTrail(): void {

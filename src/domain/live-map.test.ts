@@ -537,6 +537,7 @@ describe("live map rendering", () => {
 		expect(transition).to.deep.equal({
 			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
 			resetTrail: false,
+			completedTask: false,
 		});
 	});
 
@@ -558,7 +559,9 @@ describe("live map rendering", () => {
 		expect(nextSweep).to.deep.equal({
 			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
 			resetTrail: true,
+			completedTask: false,
 		});
+		expect(docked.completedTask).to.equal(true);
 	});
 
 	it("keeps an active paused task intact even after the short cleaning-activity hold expires", () => {
@@ -571,6 +574,7 @@ describe("live map rendering", () => {
 		expect(transition).to.deep.equal({
 			state: { dockedSinceLastCleaning: false, returningToDock: false, cleaningTaskActive: true },
 			resetTrail: false,
+			completedTask: false,
 		});
 	});
 
@@ -586,6 +590,7 @@ describe("live map rendering", () => {
 			returningToDock: false,
 			cleaningTaskActive: false,
 		});
+		expect(transition.completedTask).to.equal(false);
 	});
 });
 
