@@ -52,6 +52,7 @@ describe("live map rendering", () => {
 			{
 				key: "shape:4:0:0:100:50",
 				kind: "forbidden",
+				center: { x: 1, y: 0.5 },
 				bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
 			},
 		]);
@@ -507,6 +508,7 @@ describe("live map rendering", () => {
 		const hiddenSvg = decodeSvgDataUrl(hidden?.svgDataUrl);
 
 		expect(visible?.areas[0]?.label).to.equal("Flur & Bad <Nord>");
+		expect(visible?.areas[0]?.center).to.deep.equal({ x: 7, y: 12 });
 		expect(visibleSvg).to.include("Flur &amp; Bad &lt;Nord&gt;");
 		expect(visibleSvg).to.include('data-zone-label="true"');
 		expect(visibleSvg).to.include('text-anchor="middle"');

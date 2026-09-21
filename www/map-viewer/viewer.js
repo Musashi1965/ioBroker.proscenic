@@ -54,6 +54,7 @@
 	let selectionWritePending = false;
 	let startWritePending = false;
 	let renderedZoneLabelsSignature;
+	let zoneLabelRenderFrame = 0;
 
 	function socketRequest(event, ...args) {
 		return new Promise((resolve, reject) => {
@@ -180,7 +181,14 @@
 							.replace(/[\p{Cc}\p{Cf}]/gu, " ")
 							.slice(0, 128)
 					: "";
-			return [{ id: entry.id, bounds, label }];
+			const center =
+				entry.center &&
+				typeof entry.center === "object" &&
+				Number.isFinite(entry.center.x) &&
+				Number.isFinite(entry.center.y)
+					? entry.center
+					: { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+			return [{ id: entry.id, bounds, center, label }];
 		});
 	}
 
@@ -271,11 +279,21 @@
 		context.strokeStyle = "rgb(255 255 255 / 90%)";
 		context.fillStyle = "#263b4a";
 		for (const area of visibleAreas) {
-			const x = ((area.bounds.minX + area.bounds.maxX) / 2 / image.naturalWidth) * stageWidth;
-			const y = ((area.bounds.minY + area.bounds.maxY) / 2 / image.naturalHeight) * stageHeight;
+			const x = (area.center.x / image.naturalWidth) * stageWidth;
+			const y = (area.center.y / image.naturalHeight) * stageHeight;
 			context.strokeText(area.label, x, y);
 			context.fillText(area.label, x, y);
 		}
+	}
+
+	function scheduleZoneLabelRender() {
+		if (zoneLabelRenderFrame !== 0) {
+			return;
+		}
+		zoneLabelRenderFrame = window.requestAnimationFrame(() => {
+			zoneLabelRenderFrame = 0;
+			renderZoneLabels();
+		});
 	}
 
 	function fitMapStage() {
@@ -287,7 +305,7 @@
 		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
 		mapStage.style.width = `${Math.max(1, Math.floor(image.naturalWidth * ratio))}px`;
 		mapStage.style.height = `${Math.max(1, Math.floor(image.naturalHeight * ratio))}px`;
-		renderZoneLabels();
+		scheduleZoneLabelRender();
 	}
 
 	function setSource(source, priority) {
@@ -380,7 +398,7 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
-		renderZoneLabels();
+		scheduleZoneLabelRender();
 	}
 
 	function zoom(factor) {
@@ -460,7 +478,7 @@
 	image.addEventListener("load", () => {
 		mapStage.classList.add("is-visible");
 		fitMapStage();
-		renderZoneLabels();
+		scheduleZoneLabelRender();
 		empty.hidden = true;
 	});
 	image.addEventListener("error", () => {
@@ -614,9 +632,21 @@
 	}
 
 	if (typeof window.ResizeObserver === "function") {
-		new window.ResizeObserver(fitMapStage).observe(viewport);
+		const resizeObserver = new window.ResizeObserver(entries => {
+			if (entries.some(entry => entry.target === viewport)) {
+				fitMapStage();
+			}
+			if (entries.some(entry => entry.target === mapStage)) {
+				scheduleZoneLabelRender();
+			}
+		});
+		resizeObserver.observe(viewport);
+		resizeObserver.observe(mapStage);
 	} else {
-		window.addEventListener("resize", fitMapStage);
+		window.addEventListener("resize", () => {
+			fitMapStage();
+			scheduleZoneLabelRender();
+		});
 	}
 	window.setInterval(refreshMap, POLL_INTERVAL_MS);
 	void refreshMap();

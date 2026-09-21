@@ -36,6 +36,9 @@ describe("live map web viewer", () => {
 		expect(style).to.include("#zoneStart");
 		expect(script).to.include('zoneLabels.getContext("2d")');
 		expect(script).to.include("context.strokeText");
+		expect(script).to.include("area.center.x / image.naturalWidth");
+		expect(script).to.include("scheduleZoneLabelRender");
+		expect(script).to.include("resizeObserver.observe(mapStage)");
 		expect(script).to.include("currentSourcePriority");
 		expect(script).to.include("id === preferredImageStateId ? 2 : 1");
 		expect(style).to.include("border-radius: 999px");

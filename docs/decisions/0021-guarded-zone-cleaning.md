@@ -81,13 +81,17 @@ inferred cleaning activity, a failed command, or an unrelated initial docked
 state does not clear the selection. This keeps completed zones from remaining
 highlighted without weakening the protections against premature trail resets.
 
-Zone labels are projected into a persistent transparent canvas whose drawing
-coordinates are derived from the exact live-map pixels and current fitted
-stage size. The layer shares all zoom and pan transforms with the map image but
-is redrawn only when geometry, stage size, or zoom changes, not for every map
-frame. Its bitmap resolution accounts for the device pixel ratio and zoom while
-the visible text size remains stable. Labels use text with a contrast stroke
-only; they do not introduce a separate background or frame.
+Zone labels are projected into a persistent transparent canvas at the polygon
+centroid (falling back to the bounds center for older data). Drawing coordinates
+are derived from the exact live-map pixels and the final fitted stage size. A
+dedicated stage resize observer and a next-animation-frame render prevent the
+canvas from retaining dimensions measured before VIS or the fullscreen view
+has finished laying out the map. The layer shares all zoom and pan transforms
+with the map image but is redrawn only when geometry, stage size, or zoom
+changes, not for every map frame. Its bitmap resolution accounts for the device
+pixel ratio and zoom while the visible text size remains stable. Labels use
+text with a contrast stroke only; they do not introduce a separate background
+or frame.
 
 The viewer treats animated SVG as its preferred image source and PNG only as a
 fallback. A lower-priority PNG update cannot replace a loaded or pending SVG.

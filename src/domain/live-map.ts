@@ -64,6 +64,10 @@ export interface LiveMapRenderedArea {
 	kind: LiveMapAreaKind;
 	id?: number | string;
 	label?: string;
+	center?: {
+		x: number;
+		y: number;
+	};
 	bounds?: {
 		minX: number;
 		minY: number;
@@ -590,8 +594,8 @@ function renderSvgZoneLabels(areas: readonly LiveMapRenderedArea[]): string {
 				area.kind === "zone" && area.label !== undefined && area.bounds !== undefined,
 		)
 		.map(area => {
-			const x = (area.bounds.minX + area.bounds.maxX) / 2;
-			const y = (area.bounds.minY + area.bounds.maxY) / 2;
+			const x = area.center?.x ?? (area.bounds.minX + area.bounds.maxX) / 2;
+			const y = area.center?.y ?? (area.bounds.minY + area.bounds.maxY) / 2;
 			return `<text data-zone-label="true" x="${roundSvgNumber(x)}" y="${roundSvgNumber(y)}" text-anchor="middle" dominant-baseline="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#263b4a" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" paint-order="stroke">${escapeSvgText(area.label)}</text>`;
 		})
 		.join("");
@@ -896,6 +900,7 @@ function summarizeRenderedAreas(sample: MapSample): LiveMapRenderedArea[] {
 			kind: area.kind,
 			...(id !== undefined ? { id } : {}),
 			...(label !== undefined ? { label } : {}),
+			...(projected.length > 0 ? { center: polygonCenter(projected) } : {}),
 			...(projected.length > 0 ? { bounds: boundsFor(projected) } : {}),
 		};
 	});
@@ -921,6 +926,32 @@ function boundsFor(points: readonly [number, number][]): LiveMapRenderedArea["bo
 		minY: Math.min(...ys),
 		maxX: Math.max(...xs),
 		maxY: Math.max(...ys),
+	};
+}
+
+function polygonCenter(points: readonly [number, number][]): { x: number; y: number } {
+	let twiceArea = 0;
+	let weightedX = 0;
+	let weightedY = 0;
+	for (let index = 0; index < points.length; index++) {
+		const [x1, y1] = points[index];
+		const [x2, y2] = points[(index + 1) % points.length];
+		const cross = x1 * y2 - x2 * y1;
+		twiceArea += cross;
+		weightedX += (x1 + x2) * cross;
+		weightedY += (y1 + y2) * cross;
+	}
+
+	if (Math.abs(twiceArea) > Number.EPSILON) {
+		return {
+			x: roundSvgNumber(weightedX / (3 * twiceArea)),
+			y: roundSvgNumber(weightedY / (3 * twiceArea)),
+		};
+	}
+
+	return {
+		x: roundSvgNumber(points.reduce((sum, [x]) => sum + x, 0) / points.length),
+		y: roundSvgNumber(points.reduce((sum, [, y]) => sum + y, 0) / points.length),
 	};
 }
 
