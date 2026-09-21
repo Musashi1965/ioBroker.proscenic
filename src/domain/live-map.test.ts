@@ -508,6 +508,7 @@ describe("live map rendering", () => {
 
 		expect(visible?.areas[0]?.label).to.equal("Flur & Bad <Nord>");
 		expect(visibleSvg).to.include("Flur &amp; Bad &lt;Nord&gt;");
+		expect(visibleSvg).to.include('data-zone-label="true"');
 		expect(visibleSvg).to.include('text-anchor="middle"');
 		expect(hiddenSvg).to.not.include("Flur");
 	});

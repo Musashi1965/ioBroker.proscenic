@@ -30,6 +30,7 @@
 	const viewport = document.getElementById("viewport");
 	const mapStage = document.getElementById("mapStage");
 	const image = document.getElementById("mapImage");
+	const zoneLabels = document.getElementById("zoneLabels");
 	const empty = document.getElementById("empty");
 	const zoneStart = document.getElementById("zoneStart");
 	const interactionStatus = document.getElementById("interactionStatus");
@@ -48,6 +49,7 @@
 	let zoneCleaningAvailable = false;
 	let selectionWritePending = false;
 	let startWritePending = false;
+	let renderedZoneLabelsSignature;
 
 	function socketRequest(event, ...args) {
 		return new Promise((resolve, reject) => {
@@ -77,6 +79,20 @@
 			return source;
 		}
 		return "";
+	}
+
+	function withoutEmbeddedZoneLabels(source) {
+		const prefix = "data:image/svg+xml;base64,";
+		if (!source.startsWith(prefix)) {
+			return source;
+		}
+		try {
+			const decoded = window.atob(source.slice(prefix.length));
+			const stripped = decoded.replace(/<text\b[^>]*data-zone-label="true"[^>]*>[^<]*<\/text>/gu, "");
+			return `${prefix}${window.btoa(stripped)}`;
+		} catch {
+			return source;
+		}
 	}
 
 	function stateValue(state) {
@@ -153,7 +169,14 @@
 			) {
 				return [];
 			}
-			return [{ id: entry.id, bounds }];
+			const label =
+				typeof entry.label === "string"
+					? entry.label
+							.trim()
+							.replace(/[\p{Cc}\p{Cf}]/gu, " ")
+							.slice(0, 128)
+					: "";
+			return [{ id: entry.id, bounds, label }];
 		});
 	}
 
@@ -207,6 +230,30 @@
 		zoneStart.hidden = !selectionEnabled || selected.length === 0;
 		zoneStart.disabled = !connected || selectionWritePending || startWritePending;
 		zoneStart.textContent = selected.length === 1 ? "▶ 1 Zone" : `▶ ${selected.length} Zonen`;
+		renderZoneLabels();
+	}
+
+	function renderZoneLabels() {
+		const visibleAreas =
+			showZoneOverlays && image.naturalWidth && image.naturalHeight ? zoneAreas.filter(area => area.label) : [];
+		const signature = JSON.stringify({
+			width: image.naturalWidth,
+			height: image.naturalHeight,
+			areas: visibleAreas,
+		});
+		if (signature === renderedZoneLabelsSignature) {
+			return;
+		}
+		renderedZoneLabelsSignature = signature;
+		zoneLabels.replaceChildren();
+		for (const area of visibleAreas) {
+			const label = document.createElement("span");
+			label.className = "zone-label";
+			label.textContent = area.label;
+			label.style.left = `${((area.bounds.minX + area.bounds.maxX) / 2 / image.naturalWidth) * 100}%`;
+			label.style.top = `${((area.bounds.minY + area.bounds.maxY) / 2 / image.naturalHeight) * 100}%`;
+			zoneLabels.append(label);
+		}
 	}
 
 	function fitMapStage() {
@@ -225,6 +272,7 @@
 			return;
 		}
 		pendingSource = source;
+		const displaySource = withoutEmbeddedZoneLabels(source);
 		const preload = new window.Image();
 		preload.decoding = "async";
 		preload.addEventListener(
@@ -238,7 +286,7 @@
 				if (pendingSource !== source) {
 					return;
 				}
-				image.src = source;
+				image.src = displaySource;
 				currentSource = source;
 				pendingSource = "";
 			},
@@ -258,7 +306,7 @@
 			},
 			{ once: true },
 		);
-		preload.src = source;
+		preload.src = displaySource;
 	}
 
 	async function refreshInteraction() {
@@ -380,6 +428,7 @@
 
 	image.addEventListener("load", () => {
 		fitMapStage();
+		renderZoneLabels();
 		mapStage.classList.add("is-visible");
 		empty.hidden = true;
 	});

@@ -592,7 +592,7 @@ function renderSvgZoneLabels(areas: readonly LiveMapRenderedArea[]): string {
 		.map(area => {
 			const x = (area.bounds.minX + area.bounds.maxX) / 2;
 			const y = (area.bounds.minY + area.bounds.maxY) / 2;
-			return `<text x="${roundSvgNumber(x)}" y="${roundSvgNumber(y)}" text-anchor="middle" dominant-baseline="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#263b4a" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" paint-order="stroke">${escapeSvgText(area.label)}</text>`;
+			return `<text data-zone-label="true" x="${roundSvgNumber(x)}" y="${roundSvgNumber(y)}" text-anchor="middle" dominant-baseline="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#263b4a" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" paint-order="stroke">${escapeSvgText(area.label)}</text>`;
 		})
 		.join("");
 }

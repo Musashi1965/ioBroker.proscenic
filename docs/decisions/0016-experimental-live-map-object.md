@@ -87,6 +87,11 @@ animated SVG renders that bounded, escaped label at the center of the
 selectable zone. Labels are omitted together with the polygons when zone
 overlays are disabled. The PNG remains a static compatibility fallback and
 does not contain vector text.
+To avoid label flicker when pose events replace the SVG data URI, the packaged
+viewer removes the marked SVG label elements from its frequently changing
+image and renders the same bounded labels as a separate map-stage overlay.
+That overlay shares the map transform and survives image swaps, so it remains
+aligned during fit, pan, and zoom without being repainted for every robot pose.
 Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
 stored zone-cleaning selection untouched. In the interactive viewer it also
 disables click selection and hides the contextual start action. ADR 0021
