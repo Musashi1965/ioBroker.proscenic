@@ -246,14 +246,24 @@
 		}
 		renderedZoneLabelsSignature = signature;
 		zoneLabels.replaceChildren();
+		zoneLabels.setAttribute("viewBox", `0 0 ${image.naturalWidth} ${image.naturalHeight}`);
 		for (const area of visibleAreas) {
-			const label = document.createElement("span");
-			label.className = "zone-label";
+			const label = document.createElementNS(zoneLabels.namespaceURI, "text");
+			label.setAttribute("class", "zone-label");
+			label.setAttribute("x", String((area.bounds.minX + area.bounds.maxX) / 2));
+			label.setAttribute("y", String((area.bounds.minY + area.bounds.maxY) / 2));
 			label.textContent = area.label;
-			label.style.left = `${((area.bounds.minX + area.bounds.maxX) / 2 / image.naturalWidth) * 100}%`;
-			label.style.top = `${((area.bounds.minY + area.bounds.maxY) / 2 / image.naturalHeight) * 100}%`;
 			zoneLabels.append(label);
 		}
+	}
+
+	function updateZoneLabelScale() {
+		if (!image.naturalWidth || mapStage.clientWidth <= 0) {
+			return;
+		}
+		const renderedScale = (mapStage.clientWidth / image.naturalWidth) * view.scale;
+		zoneLabels.style.setProperty("--zone-label-font-size", `${9 / renderedScale}px`);
+		zoneLabels.style.setProperty("--zone-label-stroke-width", `${2 / renderedScale}px`);
 	}
 
 	function fitMapStage() {
@@ -265,6 +275,7 @@
 		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
 		mapStage.style.width = `${Math.max(1, Math.floor(image.naturalWidth * ratio))}px`;
 		mapStage.style.height = `${Math.max(1, Math.floor(image.naturalHeight * ratio))}px`;
+		updateZoneLabelScale();
 	}
 
 	function setSource(source) {
@@ -350,6 +361,7 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
+		updateZoneLabelScale();
 	}
 
 	function zoom(factor) {

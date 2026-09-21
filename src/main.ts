@@ -51,6 +51,7 @@ import {
 import {
 	buildZoneCleaningRequest,
 	normalizeZoneSelection,
+	shouldRecoverPendingZoneCleaningSelection,
 	validateZoneCleaningSelection,
 	zoneCleaningOptions,
 } from "./domain/zone-cleaning";
@@ -175,6 +176,10 @@ class Proscenic extends utils.Adapter {
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
 	private liveMapShowZoneOverlays = true;
 	private selectedZoneIds: number[] = [];
+	private zoneCleaningCompletionPending = false;
+	private zoneCleaningActivityObserved = false;
+	private zoneCleaningPaused = false;
+	private zoneCleaningCompletionTimer: ioBroker.Timeout | undefined;
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -233,6 +238,7 @@ class Proscenic extends utils.Adapter {
 			this.shuttingDown = true;
 			this.clearReconnectTimer();
 			this.clearGatewayIdleTimer();
+			this.clearZoneCleaningCompletionTimer();
 			this.rejectPendingConsumableEvent(new Error("Adapter unload interrupted consumable operation"));
 			this.rejectPendingMapZoneCatalogRead(new Error("Adapter unload interrupted map zone catalog read"));
 			this.cancelPendingCommandConfirmation();
@@ -561,7 +567,7 @@ class Proscenic extends utils.Adapter {
 					this.cleaningInferredUntilMs = Date.now() + CLEANING_ACTIVITY_HOLD_MS;
 				}
 				this.latestRobotStatus = status;
-				await this.updateLiveMapTaskState(status);
+				await this.updateLiveMapTaskState(status, previousStatus);
 				await projectStatus(this, status);
 				await this.projectDerivedRobotActivity(previousStatus);
 			}
@@ -838,7 +844,19 @@ class Proscenic extends utils.Adapter {
 		this.pendingConsumableEvent = undefined;
 	}
 
-	private async updateLiveMapTaskState(status: RobotStatus): Promise<void> {
+	private async updateLiveMapTaskState(status: RobotStatus, previousStatus: RobotStatus | undefined): Promise<void> {
+		if (status.mode === "sweep" || hasCleaningProgress(status, previousStatus)) {
+			this.clearZoneCleaningCompletionTimer();
+			this.zoneCleaningActivityObserved = this.zoneCleaningCompletionPending;
+			this.zoneCleaningPaused = false;
+		} else if (status.mode === "pause" && this.zoneCleaningCompletionPending) {
+			this.clearZoneCleaningCompletionTimer();
+			this.zoneCleaningPaused = true;
+		} else if (status.mode === "backcharge" && this.zoneCleaningCompletionPending) {
+			this.clearZoneCleaningCompletionTimer();
+			this.zoneCleaningPaused = false;
+		}
+
 		const transition = transitionLiveMapTaskState(
 			{
 				dockedSinceLastCleaning: this.liveMapDockedSinceLastCleaning,
@@ -854,10 +872,61 @@ class Proscenic extends utils.Adapter {
 		this.liveMapDockedSinceLastCleaning = transition.state.dockedSinceLastCleaning;
 		this.liveMapReturningToDock = transition.state.returningToDock;
 		this.liveMapCleaningTaskActive = transition.state.cleaningTaskActive;
-		if (transition.completedTask && this.selectedZoneIds.length > 0) {
-			this.selectedZoneIds = [];
-			await this.setStateAsync("commands.zones.selectedIds", { val: "[]", ack: true });
-			await this.projectLatestLiveMapImage("zones");
+		const recoveredZoneTaskCompleted = this.isRecoveredZoneTaskCompleted(status);
+		if (transition.completedTask || recoveredZoneTaskCompleted) {
+			await this.clearCompletedZoneSelection();
+		} else if (
+			this.zoneCleaningCompletionPending &&
+			this.zoneCleaningActivityObserved &&
+			!this.zoneCleaningPaused &&
+			(status.mode === "charge" || status.mode === "fullcharge")
+		) {
+			this.scheduleZoneCleaningCompletionCheck();
+		}
+	}
+
+	private isRecoveredZoneTaskCompleted(status: RobotStatus): boolean {
+		return (
+			this.zoneCleaningCompletionPending &&
+			this.zoneCleaningActivityObserved &&
+			!this.zoneCleaningPaused &&
+			(status.mode === "charge" || status.mode === "fullcharge") &&
+			this.cleaningInferredUntilMs <= Date.now()
+		);
+	}
+
+	private async clearCompletedZoneSelection(): Promise<void> {
+		this.clearZoneCleaningCompletionTimer();
+		this.zoneCleaningCompletionPending = false;
+		this.zoneCleaningActivityObserved = false;
+		this.zoneCleaningPaused = false;
+		if (this.selectedZoneIds.length === 0) {
+			return;
+		}
+		this.selectedZoneIds = [];
+		await this.setStateAsync("commands.zones.selectedIds", { val: "[]", ack: true });
+		await this.projectLatestLiveMapImage("zones");
+	}
+
+	private scheduleZoneCleaningCompletionCheck(): void {
+		this.clearZoneCleaningCompletionTimer();
+		const delayMs = Math.max(1, this.cleaningInferredUntilMs - Date.now() + 100);
+		this.zoneCleaningCompletionTimer = this.setTimeout(() => {
+			this.zoneCleaningCompletionTimer = undefined;
+			const status = this.latestRobotStatus;
+			if (!status || !this.isRecoveredZoneTaskCompleted(status)) {
+				return;
+			}
+			void this.clearCompletedZoneSelection().catch(error => {
+				this.log.debug(`Could not clear completed zone selection: ${redactedErrorMessage(error)}`);
+			});
+		}, delayMs);
+	}
+
+	private clearZoneCleaningCompletionTimer(): void {
+		if (this.zoneCleaningCompletionTimer !== undefined) {
+			this.clearTimeout(this.zoneCleaningCompletionTimer);
+			this.zoneCleaningCompletionTimer = undefined;
 		}
 	}
 
@@ -1107,6 +1176,12 @@ class Proscenic extends utils.Adapter {
 			const result = await session.client.sendCommand(session.token, request);
 			const apiLatencyMs = Date.now() - apiStartedAt;
 			const accepted = result.code === undefined || result.code === 0;
+			if (accepted) {
+				this.clearZoneCleaningCompletionTimer();
+				this.zoneCleaningCompletionPending = true;
+				this.zoneCleaningActivityObserved = false;
+				this.zoneCleaningPaused = false;
+			}
 			const confirmation = accepted
 				? this.waitForCommandConfirmation("zoneCleaning")
 				: Promise.resolve(undefined);
@@ -1367,9 +1442,24 @@ class Proscenic extends utils.Adapter {
 	}
 
 	private async initializeZoneCleaningControls(): Promise<void> {
-		const current = await this.getStateAsync("commands.zones.selectedIds");
+		const [current, lastCommand, lastResult, lastExecution] = await Promise.all([
+			this.getStateAsync("commands.zones.selectedIds"),
+			this.getStateAsync("commands.lastCommand"),
+			this.getStateAsync("commands.lastResult"),
+			this.getStateAsync("commands.lastExecution"),
+		]);
 		const selected = normalizeZoneSelection(current?.val);
 		this.selectedZoneIds = selected ?? [];
+		this.zoneCleaningCompletionPending = shouldRecoverPendingZoneCleaningSelection(
+			this.selectedZoneIds.length,
+			current?.lc ?? current?.ts,
+			lastCommand?.val,
+			lastResult?.val,
+			lastExecution?.val,
+		);
+		this.zoneCleaningActivityObserved =
+			this.zoneCleaningCompletionPending && lastResult?.val === "status-confirmed";
+		this.zoneCleaningPaused = false;
 		await this.setStateAsync("commands.zones.selectedIds", {
 			val: JSON.stringify(this.selectedZoneIds),
 			ack: true,
@@ -1437,6 +1527,10 @@ class Proscenic extends utils.Adapter {
 		}
 
 		this.selectedZoneIds = normalized;
+		this.clearZoneCleaningCompletionTimer();
+		this.zoneCleaningCompletionPending = false;
+		this.zoneCleaningActivityObserved = false;
+		this.zoneCleaningPaused = false;
 		await this.setStateAsync("commands.zones.selectedIds", {
 			val: JSON.stringify(normalized),
 			ack: true,

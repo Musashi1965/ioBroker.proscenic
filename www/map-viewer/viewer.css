@@ -81,25 +81,28 @@ body {
 #zoneLabels {
 	position: absolute;
 	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
 	pointer-events: none;
 }
 
 .zone-label {
-	position: absolute;
-	max-width: 45%;
-	transform: translate(-50%, -50%);
-	padding: 1px 4px;
-	border: 1px solid rgb(38 59 74 / 35%);
-	border-radius: 4px;
-	background: rgb(255 255 255 / 82%);
-	box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
-	color: #263b4a;
-	font-size: 9px;
+	fill: #263b4a;
+	stroke: rgb(255 255 255 / 90%);
+	stroke-width: var(--zone-label-stroke-width, 2px);
+	stroke-linejoin: round;
+	paint-order: stroke;
+	font-family:
+		system-ui,
+		-apple-system,
+		BlinkMacSystemFont,
+		"Segoe UI",
+		sans-serif;
+	font-size: var(--zone-label-font-size, 9px);
 	font-weight: 600;
-	line-height: 1.15;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	text-anchor: middle;
+	dominant-baseline: middle;
 }
 
 #empty {

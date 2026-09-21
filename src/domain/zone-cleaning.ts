@@ -14,6 +14,30 @@ export interface ZoneCleaningOption {
 	label?: string;
 }
 
+const ACCEPTED_ZONE_CLEANING_RESULTS = new Set(["api-accepted", "api-accepted-unconfirmed", "status-confirmed"]);
+
+export function shouldRecoverPendingZoneCleaningSelection(
+	selectedZoneCount: number,
+	selectionChangedAtMs: number | undefined,
+	lastCommand: unknown,
+	lastResult: unknown,
+	lastExecution: unknown,
+): boolean {
+	if (
+		selectedZoneCount <= 0 ||
+		selectionChangedAtMs === undefined ||
+		lastCommand !== "zoneCleaning" ||
+		typeof lastResult !== "string" ||
+		!ACCEPTED_ZONE_CLEANING_RESULTS.has(lastResult) ||
+		typeof lastExecution !== "string"
+	) {
+		return false;
+	}
+
+	const executionAtMs = Date.parse(lastExecution);
+	return Number.isFinite(executionAtMs) && executionAtMs >= selectionChangedAtMs;
+}
+
 export function normalizeZoneSelection(value: ioBroker.StateValue | undefined): number[] | undefined {
 	if (value === null || value === undefined) {
 		return [];

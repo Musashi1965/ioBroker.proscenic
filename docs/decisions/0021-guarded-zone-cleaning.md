@@ -71,11 +71,20 @@ data, robot behavior, or silently clear a stored selection.
 The selected IDs are task-scoped UI state. After an active cleaning task has
 returned to the dock and the existing live-map lifecycle confirms a subsequent
 `charge` or `fullcharge` state, the adapter acknowledges
-`commands.zones.selectedIds` as `[]` and re-renders the map. A pause, a
-transient charging report during inferred cleaning activity, a connection
-failure, or the initial docked state after adapter startup does not clear the
-selection. This keeps completed zones from remaining highlighted without
-weakening the protections against premature trail resets.
+`commands.zones.selectedIds` as `[]` and re-renders the map. The adapter also
+recovers a pending, previously status-confirmed zone-cleaning selection from
+the persisted command diagnostics when a reconnect or restart interrupted the
+in-memory lifecycle. It compares the selection's ioBroker `lc` timestamp with
+the last accepted zone-command execution so that a newer user selection is not
+mistaken for the completed task. A pause, a transient charging report during
+inferred cleaning activity, a failed command, or an unrelated initial docked
+state does not clear the selection. This keeps completed zones from remaining
+highlighted without weakening the protections against premature trail resets.
+
+Zone labels are projected as a persistent SVG text layer whose view box uses
+the exact live-map pixel coordinates. The layer shares all fit, zoom, and pan
+transforms with the map image. Labels use text with a contrast stroke only;
+they do not introduce a separate background or frame.
 
 ## Consequences
 

@@ -3,6 +3,7 @@ import type { LiveMapCoordinateMetadata } from "./live-map";
 import {
 	buildZoneCleaningRequest,
 	normalizeZoneSelection,
+	shouldRecoverPendingZoneCleaningSelection,
 	validateZoneCleaningSelection,
 	zoneCleaningOptions,
 } from "./zone-cleaning";
@@ -45,5 +46,41 @@ describe("zone cleaning", () => {
 			contentType: "application/json;charset=UTF-8",
 			body: "[1001,1002]",
 		});
+	});
+
+	it("recovers only selections that belong to an accepted zone-cleaning command", () => {
+		const execution = "2026-09-21T10:05:00.000Z";
+		const selectionChangedAt = Date.parse("2026-09-21T10:04:00.000Z");
+
+		expect(
+			shouldRecoverPendingZoneCleaningSelection(
+				2,
+				selectionChangedAt,
+				"zoneCleaning",
+				"status-confirmed",
+				execution,
+			),
+		).to.equal(true);
+		expect(
+			shouldRecoverPendingZoneCleaningSelection(
+				1,
+				Date.parse("2026-09-21T10:06:00.000Z"),
+				"zoneCleaning",
+				"status-confirmed",
+				execution,
+			),
+		).to.equal(false);
+		expect(
+			shouldRecoverPendingZoneCleaningSelection(2, selectionChangedAt, "zoneCleaning", "failed", execution),
+		).to.equal(false);
+		expect(
+			shouldRecoverPendingZoneCleaningSelection(
+				0,
+				selectionChangedAt,
+				"zoneCleaning",
+				"status-confirmed",
+				execution,
+			),
+		).to.equal(false);
 	});
 });
