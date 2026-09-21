@@ -12,8 +12,8 @@ describe("live map web viewer", () => {
 
 		expect(html).to.include('id="viewport"');
 		expect(html).to.include('src="/lib/js/socket.io.js"');
-		expect(html).to.include('href="./viewer.css?revision=20260921-2"');
-		expect(html).to.include('src="./viewer.js?revision=20260921-2"');
+		expect(html).to.include('href="./viewer.css?revision=20260921-3"');
+		expect(html).to.include('src="./viewer.js?revision=20260921-3"');
 		expect(script).to.include("proscenic.${instance}");
 		expect(script).to.include("${rootPrefix}.map.live");
 		expect(script).to.include(".svgDataUri");
@@ -42,7 +42,12 @@ describe("live map web viewer", () => {
 		expect(script).to.include("label.style.left = `${(area.center.x / image.naturalWidth) * 100}%`");
 		expect(script).to.include("label.style.top = `${(area.center.y / image.naturalHeight) * 100}%`");
 		expect(script).to.include("zoneLabels.replaceChildren(fragment)");
+		expect(script).to.include("zoneLabels.style.width = `${stageWidth}px`");
+		expect(script).to.include("zoneLabels.style.height = `${stageHeight}px`");
 		expect(style).to.include(".zone-label");
+		expect(style).to.include("#zoneLabels");
+		expect(style).to.include("width: 100%");
+		expect(style).to.include("height: 100%");
 		expect(script).to.include("currentSourcePriority");
 		expect(script).to.include("id === preferredImageStateId ? 2 : 1");
 		expect(style).to.include("border-radius: 999px");

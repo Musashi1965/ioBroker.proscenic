@@ -275,8 +275,12 @@
 		const availableWidth = Math.max(1, viewport.clientWidth - 24);
 		const availableHeight = Math.max(1, viewport.clientHeight - 24);
 		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
-		mapStage.style.width = `${Math.max(1, Math.floor(image.naturalWidth * ratio))}px`;
-		mapStage.style.height = `${Math.max(1, Math.floor(image.naturalHeight * ratio))}px`;
+		const stageWidth = Math.max(1, Math.floor(image.naturalWidth * ratio));
+		const stageHeight = Math.max(1, Math.floor(image.naturalHeight * ratio));
+		mapStage.style.width = `${stageWidth}px`;
+		mapStage.style.height = `${stageHeight}px`;
+		zoneLabels.style.width = `${stageWidth}px`;
+		zoneLabels.style.height = `${stageHeight}px`;
 	}
 
 	function setSource(source, priority) {
