@@ -57,6 +57,8 @@ body {
 }
 
 #mapStage {
+	--zone-label-font-size: 9px;
+	--zone-label-shadow-size: 1px;
 	position: relative;
 	display: none;
 	min-width: 0;
@@ -81,9 +83,23 @@ body {
 #zoneLabels {
 	position: absolute;
 	inset: 0;
-	width: 100%;
-	height: 100%;
 	pointer-events: none;
+}
+
+.zone-label {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	color: #263b4a;
+	font-size: var(--zone-label-font-size);
+	font-weight: 600;
+	line-height: 1;
+	text-align: center;
+	text-shadow:
+		calc(-1 * var(--zone-label-shadow-size)) 0 0 rgb(255 255 255 / 90%),
+		var(--zone-label-shadow-size) 0 0 rgb(255 255 255 / 90%),
+		0 calc(-1 * var(--zone-label-shadow-size)) 0 rgb(255 255 255 / 90%),
+		0 var(--zone-label-shadow-size) 0 rgb(255 255 255 / 90%);
+	white-space: nowrap;
 }
 
 #empty {

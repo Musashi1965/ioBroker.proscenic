@@ -12,8 +12,8 @@ describe("live map web viewer", () => {
 
 		expect(html).to.include('id="viewport"');
 		expect(html).to.include('src="/lib/js/socket.io.js"');
-		expect(html).to.include('href="./viewer.css?revision=20260921-1"');
-		expect(html).to.include('src="./viewer.js?revision=20260921-1"');
+		expect(html).to.include('href="./viewer.css?revision=20260921-2"');
+		expect(html).to.include('src="./viewer.js?revision=20260921-2"');
 		expect(script).to.include("proscenic.${instance}");
 		expect(script).to.include("${rootPrefix}.map.live");
 		expect(script).to.include(".svgDataUri");
@@ -31,16 +31,18 @@ describe("live map web viewer", () => {
 		expect(html).to.include('id="mapStage"');
 		expect(html).to.include('id="zoneStart"');
 		expect(html).to.include('id="zoneLabels"');
-		expect(html).to.include("<canvas");
+		expect(html).to.not.include("<canvas");
 		expect(html).to.not.include("viewer-header");
 		expect(style).to.include("grid-template-rows: minmax(0, 1fr)");
 		expect(style).to.include("min-height: 0");
 		expect(style).to.include("#zoneStart");
-		expect(script).to.include('zoneLabels.getContext("2d")');
-		expect(script).to.include("context.strokeText");
+		expect(script).to.include('document.createElement("span")');
+		expect(script).to.include('label.className = "zone-label"');
 		expect(script).to.include("area.center.x / image.naturalWidth");
-		expect(script).to.include("scheduleZoneLabelRender");
-		expect(script).to.include("resizeObserver.observe(mapStage)");
+		expect(script).to.include("label.style.left = `${(area.center.x / image.naturalWidth) * 100}%`");
+		expect(script).to.include("label.style.top = `${(area.center.y / image.naturalHeight) * 100}%`");
+		expect(script).to.include("zoneLabels.replaceChildren(fragment)");
+		expect(style).to.include(".zone-label");
 		expect(script).to.include("currentSourcePriority");
 		expect(script).to.include("id === preferredImageStateId ? 2 : 1");
 		expect(style).to.include("border-radius: 999px");

@@ -54,7 +54,6 @@
 	let selectionWritePending = false;
 	let startWritePending = false;
 	let renderedZoneLabelsSignature;
-	let zoneLabelRenderFrame = 0;
 
 	function socketRequest(event, ...args) {
 		return new Promise((resolve, reject) => {
@@ -248,52 +247,25 @@
 	function renderZoneLabels() {
 		const visibleAreas =
 			showZoneOverlays && image.naturalWidth && image.naturalHeight ? zoneAreas.filter(area => area.label) : [];
-		const stageWidth = mapStage.clientWidth;
-		const stageHeight = mapStage.clientHeight;
 		const signature = JSON.stringify({
 			width: image.naturalWidth,
 			height: image.naturalHeight,
-			stageWidth,
-			stageHeight,
-			scale: view.scale,
 			areas: visibleAreas,
 		});
 		if (signature === renderedZoneLabelsSignature) {
 			return;
 		}
 		renderedZoneLabelsSignature = signature;
-		const bitmapScale = Math.max(1, window.devicePixelRatio || 1) * view.scale;
-		zoneLabels.width = Math.max(1, Math.round(stageWidth * bitmapScale));
-		zoneLabels.height = Math.max(1, Math.round(stageHeight * bitmapScale));
-		const context = zoneLabels.getContext("2d");
-		if (!context || stageWidth <= 0 || stageHeight <= 0) {
-			return;
-		}
-		context.setTransform(bitmapScale, 0, 0, bitmapScale, 0, 0);
-		context.clearRect(0, 0, stageWidth, stageHeight);
-		context.font = `${600} ${9 / view.scale}px system-ui, sans-serif`;
-		context.textAlign = "center";
-		context.textBaseline = "middle";
-		context.lineJoin = "round";
-		context.lineWidth = 2 / view.scale;
-		context.strokeStyle = "rgb(255 255 255 / 90%)";
-		context.fillStyle = "#263b4a";
+		const fragment = document.createDocumentFragment();
 		for (const area of visibleAreas) {
-			const x = (area.center.x / image.naturalWidth) * stageWidth;
-			const y = (area.center.y / image.naturalHeight) * stageHeight;
-			context.strokeText(area.label, x, y);
-			context.fillText(area.label, x, y);
+			const label = document.createElement("span");
+			label.className = "zone-label";
+			label.style.left = `${(area.center.x / image.naturalWidth) * 100}%`;
+			label.style.top = `${(area.center.y / image.naturalHeight) * 100}%`;
+			label.textContent = area.label;
+			fragment.append(label);
 		}
-	}
-
-	function scheduleZoneLabelRender() {
-		if (zoneLabelRenderFrame !== 0) {
-			return;
-		}
-		zoneLabelRenderFrame = window.requestAnimationFrame(() => {
-			zoneLabelRenderFrame = 0;
-			renderZoneLabels();
-		});
+		zoneLabels.replaceChildren(fragment);
 	}
 
 	function fitMapStage() {
@@ -305,7 +277,6 @@
 		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
 		mapStage.style.width = `${Math.max(1, Math.floor(image.naturalWidth * ratio))}px`;
 		mapStage.style.height = `${Math.max(1, Math.floor(image.naturalHeight * ratio))}px`;
-		scheduleZoneLabelRender();
 	}
 
 	function setSource(source, priority) {
@@ -398,7 +369,8 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
-		scheduleZoneLabelRender();
+		mapStage.style.setProperty("--zone-label-font-size", `${9 / view.scale}px`);
+		mapStage.style.setProperty("--zone-label-shadow-size", `${1 / view.scale}px`);
 	}
 
 	function zoom(factor) {
@@ -478,7 +450,7 @@
 	image.addEventListener("load", () => {
 		mapStage.classList.add("is-visible");
 		fitMapStage();
-		scheduleZoneLabelRender();
+		renderZoneLabels();
 		empty.hidden = true;
 	});
 	image.addEventListener("error", () => {
@@ -636,17 +608,10 @@
 			if (entries.some(entry => entry.target === viewport)) {
 				fitMapStage();
 			}
-			if (entries.some(entry => entry.target === mapStage)) {
-				scheduleZoneLabelRender();
-			}
 		});
 		resizeObserver.observe(viewport);
-		resizeObserver.observe(mapStage);
 	} else {
-		window.addEventListener("resize", () => {
-			fitMapStage();
-			scheduleZoneLabelRender();
-		});
+		window.addEventListener("resize", fitMapStage);
 	}
 	window.setInterval(refreshMap, POLL_INTERVAL_MS);
 	void refreshMap();
