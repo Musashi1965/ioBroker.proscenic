@@ -476,6 +476,42 @@ describe("live map rendering", () => {
 		expect(selectedCenter[1]).to.be.greaterThan(selectedCenter[2]);
 	});
 
+	it("renders bounded escaped saved-zone names in the SVG overlay", () => {
+		const width = 20;
+		const height = 20;
+		const grid = Buffer.alloc(width * height, 127);
+		const data = {
+			map: encodeLiteralOnlyLz4(grid).toString("base64"),
+			width,
+			height,
+			resolution: 0.05,
+			x_min: 0,
+			y_min: 0,
+			area: [
+				{
+					id: 1005,
+					name: " Flur & Bad <Nord> ",
+					__proscenicKind: "zone",
+					vertexs: [
+						[100, 100],
+						[600, 100],
+						[600, 600],
+						[100, 600],
+					],
+				},
+			],
+		};
+		const visible = renderLiveMapImage20002(data);
+		const hidden = renderLiveMapImage20002(data, [], { showZoneOverlays: false });
+		const visibleSvg = decodeSvgDataUrl(visible?.svgDataUrl);
+		const hiddenSvg = decodeSvgDataUrl(hidden?.svgDataUrl);
+
+		expect(visible?.areas[0]?.label).to.equal("Flur & Bad <Nord>");
+		expect(visibleSvg).to.include("Flur &amp; Bad &lt;Nord&gt;");
+		expect(visibleSvg).to.include('text-anchor="middle"');
+		expect(hiddenSvg).to.not.include("Flur");
+	});
+
 	it("normalizes writable live-map background colors", () => {
 		expect(DEFAULT_LIVE_MAP_BACKGROUND_COLOR).to.equal("#b8ccd8");
 		expect(DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR).to.equal("#d9d9d9");

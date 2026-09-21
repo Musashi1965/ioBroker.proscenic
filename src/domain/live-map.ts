@@ -233,7 +233,15 @@ export function renderLiveMapImage20002(
 	}
 	const fallbackPng = encodeRgbPng(sample.width, sample.height, fallbackPixels);
 	const pngDataUrl = `data:image/png;base64,${fallbackPng.toString("base64")}`;
-	const svg = renderLiveMapSvg(sample.width, sample.height, basePng, runtime, options.animateRobot !== false);
+	const areas = summarizeRenderedAreas(sample);
+	const svg = renderLiveMapSvg(
+		sample.width,
+		sample.height,
+		basePng,
+		runtime,
+		options.animateRobot !== false,
+		options.showZoneOverlays !== false ? areas : [],
+	);
 	const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
 	if (
 		Buffer.byteLength(svgDataUrl, "utf8") > MAX_LIVE_MAP_DATA_URL_BYTES ||
@@ -249,7 +257,7 @@ export function renderLiveMapImage20002(
 		format: "svg",
 		width: sample.width,
 		height: sample.height,
-		areas: summarizeRenderedAreas(sample),
+		areas,
 		poseCount: runtime.projectedPoseCount,
 		rawPoseCount: poses.length,
 		pathLineSegments: runtime.pathLineSegments,
@@ -559,15 +567,38 @@ function renderLiveMapSvg(
 	basePng: Buffer,
 	runtime: RobotRuntimeRenderResult,
 	animateRobot: boolean,
+	areas: readonly LiveMapRenderedArea[],
 ): string {
 	const marker = runtime.latest ? renderSvgRobotMarker(runtime.latest, runtime.latestMotionPath, animateRobot) : "";
+	const zoneLabels = renderSvgZoneLabels(areas);
 	const embeddedPng = `data:image/png;base64,${basePng.toString("base64")}`;
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`,
 		`<image href="${embeddedPng}" width="${width}" height="${height}"/>`,
+		zoneLabels,
 		marker,
 		"</svg>",
 	].join("");
+}
+
+function renderSvgZoneLabels(areas: readonly LiveMapRenderedArea[]): string {
+	return areas
+		.filter(
+			(
+				area,
+			): area is LiveMapRenderedArea & { label: string; bounds: NonNullable<LiveMapRenderedArea["bounds"]> } =>
+				area.kind === "zone" && area.label !== undefined && area.bounds !== undefined,
+		)
+		.map(area => {
+			const x = (area.bounds.minX + area.bounds.maxX) / 2;
+			const y = (area.bounds.minY + area.bounds.maxY) / 2;
+			return `<text x="${roundSvgNumber(x)}" y="${roundSvgNumber(y)}" text-anchor="middle" dominant-baseline="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#263b4a" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" paint-order="stroke">${escapeSvgText(area.label)}</text>`;
+		})
+		.join("");
+}
+
+function escapeSvgText(value: string): string {
+	return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function renderSvgRobotMarker(
@@ -873,7 +904,10 @@ function summarizeRenderedAreas(sample: MapSample): LiveMapRenderedArea[] {
 function firstUsefulLabel(...values: unknown[]): string | undefined {
 	for (const value of values) {
 		if (typeof value === "string" && value.trim().length > 0) {
-			return value;
+			return value
+				.trim()
+				.replace(/[\p{Cc}\p{Cf}]/gu, " ")
+				.slice(0, 128);
 		}
 	}
 	return undefined;

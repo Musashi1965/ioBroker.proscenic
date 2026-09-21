@@ -2,7 +2,7 @@
 
 - Status: accepted for local development
 - Date: 2026-09-13
-- Amended: 2026-09-20
+- Amended: 2026-09-21
 
 The image format and pose-trail lifecycle portions of this decision are amended
 by ADR 0020. The remaining privacy, metadata-cache, color, and diagnostics
@@ -82,6 +82,11 @@ forbidden-area polygons are drawn into the local image. The default is `true`.
 Unselected selectable zones use a transparent white fill and a stronger
 blue-gray boundary; zone IDs currently present in
 `commands.zones.selectedIds` use a transparent light-green fill.
+When the authoritative 21004 catalog supplies a non-empty `name` or `tag`, the
+animated SVG renders that bounded, escaped label at the center of the
+selectable zone. Labels are omitted together with the polygons when zone
+overlays are disabled. The PNG remains a static compatibility fallback and
+does not contain vector text.
 Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
 stored zone-cleaning selection untouched. In the interactive viewer it also
 disables click selection and hides the contextual start action. ADR 0021
