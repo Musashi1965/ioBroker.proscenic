@@ -67,7 +67,7 @@ export async function projectZoneCleaningCatalog(
 	await adapter.setStateAsync("capabilities.zoneCleaning", { val: available, ack: true });
 }
 
-const LIVE_MAP_VIEWER_REVISION = "20260921-3";
+const LIVE_MAP_VIEWER_REVISION = "20260921-4";
 
 export function liveMapViewerUrl(instance: number | undefined): string {
 	const safeInstance = typeof instance === "number" && Number.isSafeInteger(instance) && instance >= 0 ? instance : 0;

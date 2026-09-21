@@ -92,13 +92,13 @@ viewer removes the marked SVG label elements from its frequently changing
 image and renders the same bounded labels as a separate map-stage overlay.
 That overlay shares the map transform and survives image swaps, so it remains
 aligned during fit, pan, and zoom without being repainted for every robot pose.
-Each label anchor is expressed as a percentage of the immutable source-image
-dimensions. Responsive stage resizing therefore scales the map, zone overlays,
-and label anchors through the same browser layout instead of independently
-converting label positions through transient viewport pixel dimensions. The
-viewer also assigns the label layer the exact fitted map-stage width and height
-after every resize instead of relying only on absolute-positioning shorthand;
-this keeps the invariant intact in embedded VIS browser runtimes.
+The persistent label layer is an SVG with the same immutable source-image
+`viewBox` as the map. Every label uses the original map-space center coordinates
+directly, so responsive resizing, pan, and zoom apply the same coordinate
+transformation as the zone image without an intermediate HTML percentage
+layout. The viewer also assigns the label SVG the exact fitted map-stage width
+and height after every resize. This avoids divergent HTML/SVG percentage
+positioning in embedded Safari and VIS browser runtimes.
 Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
 stored zone-cleaning selection untouched. In the interactive viewer it also
 disables click selection and hides the contextual start action. ADR 0021

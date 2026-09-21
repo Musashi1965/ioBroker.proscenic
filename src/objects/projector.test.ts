@@ -412,7 +412,7 @@ describe("projectLiveMapImage", () => {
 		await projectLiveMapViewerUrl(adapter);
 
 		expect(states.get("map.live.viewerUrl")).to.deep.equal({
-			val: "/proscenic/map-viewer/?instance=2&revision=20260921-3",
+			val: "/proscenic/map-viewer/?instance=2&revision=20260921-4",
 			ack: true,
 		});
 	});

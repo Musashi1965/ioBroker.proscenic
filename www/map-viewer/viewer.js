@@ -6,6 +6,7 @@
 	const MAX_IMAGE_SOURCE_LENGTH = 512 * 1024;
 	const MAX_ZONE_COUNT = 20;
 	const POLL_INTERVAL_MS = 5000;
+	const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 	const params = new URLSearchParams(window.location.search);
 	const requestedInstance = Number(params.get("instance"));
 	const instance = Number.isSafeInteger(requestedInstance) && requestedInstance >= 0 ? requestedInstance : 0;
@@ -256,16 +257,26 @@
 			return;
 		}
 		renderedZoneLabelsSignature = signature;
+		zoneLabels.setAttribute("viewBox", `0 0 ${image.naturalWidth} ${image.naturalHeight}`);
 		const fragment = document.createDocumentFragment();
 		for (const area of visibleAreas) {
-			const label = document.createElement("span");
-			label.className = "zone-label";
-			label.style.left = `${(area.center.x / image.naturalWidth) * 100}%`;
-			label.style.top = `${(area.center.y / image.naturalHeight) * 100}%`;
+			const label = document.createElementNS(SVG_NAMESPACE, "text");
+			label.setAttribute("class", "zone-label");
+			label.setAttribute("x", String(area.center.x));
+			label.setAttribute("y", String(area.center.y));
 			label.textContent = area.label;
 			fragment.append(label);
 		}
 		zoneLabels.replaceChildren(fragment);
+	}
+
+	function updateZoneLabelTypography() {
+		if (!image.naturalWidth || mapStage.clientWidth <= 0) {
+			return;
+		}
+		const displayedPixelsPerSourceUnit = (mapStage.clientWidth / image.naturalWidth) * view.scale;
+		mapStage.style.setProperty("--zone-label-font-size", `${9 / displayedPixelsPerSourceUnit}px`);
+		mapStage.style.setProperty("--zone-label-stroke-width", `${2 / displayedPixelsPerSourceUnit}px`);
 	}
 
 	function fitMapStage() {
@@ -281,6 +292,9 @@
 		mapStage.style.height = `${stageHeight}px`;
 		zoneLabels.style.width = `${stageWidth}px`;
 		zoneLabels.style.height = `${stageHeight}px`;
+		zoneLabels.setAttribute("width", String(stageWidth));
+		zoneLabels.setAttribute("height", String(stageHeight));
+		updateZoneLabelTypography();
 	}
 
 	function setSource(source, priority) {
@@ -373,8 +387,7 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
-		mapStage.style.setProperty("--zone-label-font-size", `${9 / view.scale}px`);
-		mapStage.style.setProperty("--zone-label-shadow-size", `${1 / view.scale}px`);
+		updateZoneLabelTypography();
 	}
 
 	function zoom(factor) {

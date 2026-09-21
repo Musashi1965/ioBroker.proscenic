@@ -9,7 +9,7 @@
 		<title>Proscenic live map</title>
 		<link
 			rel="stylesheet"
-			href="./viewer.css?revision=20260921-3"
+			href="./viewer.css?revision=20260921-4"
 		/>
 		<script src="/lib/js/socket.io.js"></script>
 	</head>
@@ -25,10 +25,12 @@
 						alt="Proscenic live map"
 						draggable="false"
 					/>
-					<div
+					<svg
 						id="zoneLabels"
 						aria-hidden="true"
-					></div>
+						focusable="false"
+						preserveAspectRatio="none"
+					></svg>
 				</div>
 				<p id="empty">Waiting for map data…</p>
 				<button
@@ -71,6 +73,6 @@
 				</div>
 			</section>
 		</main>
-		<script src="./viewer.js?revision=20260921-3"></script>
+		<script src="./viewer.js?revision=20260921-4"></script>
 	</body>
 </html>
