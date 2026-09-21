@@ -1,6 +1,6 @@
 {
   "name": "iobroker.proscenic",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ioBroker adapter for Proscenic vacuum robots using the legacy Proscenic cloud gateway",
   "author": {
     "name": "C@ptain Ch@os",

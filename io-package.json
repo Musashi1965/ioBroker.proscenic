@@ -1,8 +1,21 @@
 {
 	"common": {
 		"name": "proscenic",
-		"version": "0.3.0",
+		"version": "0.4.0",
 		"news": {
+			"0.4.0": {
+				"en": "Improved live-map zone labels and fixed their alignment in Safari, Chrome, embedded VIS views, and enlarged viewer dialogs",
+				"de": "Live-Karten-Zonenbeschriftungen verbessert und ihre Ausrichtung in Safari, Chrome, eingebetteten VIS-Ansichten und vergrößerten Viewer-Dialogen korrigiert",
+				"ru": "Улучшены подписи зон на живой карте и исправлено их выравнивание в Safari, Chrome, встроенных представлениях VIS и увеличенных окнах просмотра",
+				"pt": "Melhorados os rótulos de zonas do mapa ao vivo e corrigido o alinhamento no Safari, Chrome, vistas VIS incorporadas e diálogos ampliados do visualizador",
+				"nl": "Livekaart-zonelabels verbeterd en uitlijning gecorrigeerd in Safari, Chrome, ingesloten VIS-weergaven en vergrote viewer-dialoogvensters",
+				"fr": "Amélioration des libellés de zones de la carte en direct et correction de leur alignement dans Safari, Chrome, les vues VIS intégrées et les fenêtres agrandies du visualiseur",
+				"it": "Migliorate le etichette delle zone della mappa live e corretto l'allineamento in Safari, Chrome, viste VIS incorporate e finestre del visualizzatore ingrandite",
+				"es": "Mejoradas las etiquetas de zonas del mapa en vivo y corregida su alineación en Safari, Chrome, vistas VIS incrustadas y diálogos ampliados del visor",
+				"pl": "Ulepszono etykiety stref na mapie na żywo i poprawiono ich wyrównanie w Safari, Chrome, osadzonych widokach VIS oraz powiększonych oknach podglądu",
+				"uk": "Покращено підписи зон на живій карті та виправлено їх вирівнювання в Safari, Chrome, вбудованих поданнях VIS і збільшених вікнах перегляду",
+				"zh-cn": "改进实时地图区域标签，并修复其在 Safari、Chrome、嵌入式 VIS 视图和放大的查看器对话框中的对齐"
+			},
 			"0.3.0": {
 				"en": "Added interactive saved-zone cleaning, safer consumable resets, an embedded animated live-map viewer, and more resilient command delivery",
 				"de": "Interaktive Reinigung gespeicherter Zonen, sichere Verbrauchsmaterial-Resets, einen eingebetteten animierten Live-Kartenviewer und robustere Befehlsübertragung hinzugefügt",
