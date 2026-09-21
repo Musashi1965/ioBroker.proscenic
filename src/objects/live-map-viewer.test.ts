@@ -12,6 +12,8 @@ describe("live map web viewer", () => {
 
 		expect(html).to.include('id="viewport"');
 		expect(html).to.include('src="/lib/js/socket.io.js"');
+		expect(html).to.include('href="./viewer.css?revision=20260921-1"');
+		expect(html).to.include('src="./viewer.js?revision=20260921-1"');
 		expect(script).to.include("proscenic.${instance}");
 		expect(script).to.include("${rootPrefix}.map.live");
 		expect(script).to.include(".svgDataUri");

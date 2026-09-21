@@ -399,7 +399,7 @@ describe("projectLiveMapImage", () => {
 		expect(states.get("map.live.zoneCatalogLastError")?.val).to.equal("<redacted-email> at <redacted-address>");
 	});
 
-	it("publishes the stable same-origin live map viewer URL for the adapter instance", async () => {
+	it("publishes the revisioned same-origin live map viewer URL for the adapter instance", async () => {
 		const states = new Map<string, ioBroker.SettableState>();
 		const adapter = {
 			instance: 2,
@@ -412,7 +412,7 @@ describe("projectLiveMapImage", () => {
 		await projectLiveMapViewerUrl(adapter);
 
 		expect(states.get("map.live.viewerUrl")).to.deep.equal({
-			val: "/proscenic/map-viewer/?instance=2",
+			val: "/proscenic/map-viewer/?instance=2&revision=20260921-1",
 			ack: true,
 		});
 	});

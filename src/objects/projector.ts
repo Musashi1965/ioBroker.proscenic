@@ -67,9 +67,11 @@ export async function projectZoneCleaningCatalog(
 	await adapter.setStateAsync("capabilities.zoneCleaning", { val: available, ack: true });
 }
 
+const LIVE_MAP_VIEWER_REVISION = "20260921-1";
+
 export function liveMapViewerUrl(instance: number | undefined): string {
 	const safeInstance = typeof instance === "number" && Number.isSafeInteger(instance) && instance >= 0 ? instance : 0;
-	return `/proscenic/map-viewer/?instance=${safeInstance}`;
+	return `/proscenic/map-viewer/?instance=${safeInstance}&revision=${LIVE_MAP_VIEWER_REVISION}`;
 }
 
 export async function projectLiveMapViewerUrl(adapter: ioBroker.Adapter): Promise<void> {

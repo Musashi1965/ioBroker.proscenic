@@ -97,9 +97,11 @@ stored zone-cleaning selection untouched. In the interactive viewer it also
 disables click selection and hides the contextual start action. ADR 0021
 defines its writable and interaction semantics.
 
-`map.live.viewerUrl` contains the stable same-origin web-adapter path for the
-interactive viewer defined by ADR 0020. It is a URL only and contains neither
-map data nor installation-specific network coordinates.
+`map.live.viewerUrl` contains the revisioned same-origin web-adapter path for
+the interactive viewer defined by ADR 0020. Its implementation-revision query
+invalidates stale VIS/web-adapter caches after viewer changes but remains stable
+across live map frames. It is a URL only and contains neither map data nor
+installation-specific network coordinates.
 
 `map.live.areas` contains a bounded JSON summary from the authoritative 21004
 saved-zone catalog. Each entry may include the stable area key, kind

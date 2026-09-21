@@ -25,8 +25,10 @@ The adapter publishes three bounded image states:
 - `map.live.svgDataUri` is an explicit alias for that SVG;
 - `map.live.pngDataUri` is a static PNG fallback containing the marker at the
   latest confirmed pose.
-- `map.live.viewerUrl` is the stable same-origin path
-  `/proscenic/map-viewer/?instance=<n>` for an iframe-capable live viewer.
+- `map.live.viewerUrl` is the same-origin path
+  `/proscenic/map-viewer/?instance=<n>&revision=<viewer-revision>` for an
+  iframe-capable live viewer. The instance portion remains stable while the
+  implementation revision changes only when packaged viewer behavior changes.
 
 `map.live.format` reports `svg`. The SVG embeds a rasterized base map containing
 the accumulated trail and overlays the current robot marker. On a pose-triggered
@@ -63,6 +65,10 @@ uses the existing writable `map.live.canvasBackgroundColor` for the complete
 viewer surface, and centers the contained map with a fixed margin. It supports
 bounded zoom and pan; wheel zoom requires Ctrl or Command so ordinary dashboard
 scrolling cannot accidentally move the map. Reset restores the centered fit.
+The projected viewer URL and its CSS/JavaScript references carry the same
+implementation revision. This deliberately invalidates web-adapter and VIS
+caches after a viewer update without changing the URL for individual map
+frames.
 
 ## Consequences
 
@@ -72,8 +78,10 @@ that require PNG must bind to `map.live.pngDataUri`.
 
 Iframe-capable visualizations can bind to `map.live.viewerUrl`. Because the URL
 does not change for each map frame, the iframe remains connected while the
-viewer refreshes only its internal image. The ioBroker web adapter must be
-installed and reachable on the same origin as the visualization.
+viewer refreshes only its internal image. It changes after a packaged viewer
+revision so consumers cannot retain stale layout code across adapter updates.
+The ioBroker web adapter must be installed and reachable on the same origin as
+the visualization.
 
 The static map and full task trail no longer need to be redrawn by the browser
 during animation. The SVG data URI is somewhat larger than the PNG because it
