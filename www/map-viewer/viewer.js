@@ -11,7 +11,9 @@
 	const instance = Number.isSafeInteger(requestedInstance) && requestedInstance >= 0 ? requestedInstance : 0;
 	const rootPrefix = `proscenic.${instance}`;
 	const mapStatePrefix = `${rootPrefix}.map.live`;
-	const imageStateIds = [`${mapStatePrefix}.svgDataUri`, `${mapStatePrefix}.pngDataUri`];
+	const preferredImageStateId = `${mapStatePrefix}.svgDataUri`;
+	const fallbackImageStateId = `${mapStatePrefix}.pngDataUri`;
+	const imageStateIds = [preferredImageStateId, fallbackImageStateId];
 	const backgroundColorStateId = `${mapStatePrefix}.canvasBackgroundColor`;
 	const areasStateId = `${mapStatePrefix}.areas`;
 	const showZoneOverlaysStateId = `${mapStatePrefix}.showZoneOverlays`;
@@ -39,7 +41,9 @@
 	let connected = false;
 	let loading = false;
 	let currentSource = "";
+	let currentSourcePriority = 0;
 	let pendingSource = "";
+	let pendingSourcePriority = 0;
 	let pointer;
 	let suppressClickUntil = 0;
 	let zoneAreas = [];
@@ -236,34 +240,42 @@
 	function renderZoneLabels() {
 		const visibleAreas =
 			showZoneOverlays && image.naturalWidth && image.naturalHeight ? zoneAreas.filter(area => area.label) : [];
+		const stageWidth = mapStage.clientWidth;
+		const stageHeight = mapStage.clientHeight;
 		const signature = JSON.stringify({
 			width: image.naturalWidth,
 			height: image.naturalHeight,
+			stageWidth,
+			stageHeight,
+			scale: view.scale,
 			areas: visibleAreas,
 		});
 		if (signature === renderedZoneLabelsSignature) {
 			return;
 		}
 		renderedZoneLabelsSignature = signature;
-		zoneLabels.replaceChildren();
-		zoneLabels.setAttribute("viewBox", `0 0 ${image.naturalWidth} ${image.naturalHeight}`);
-		for (const area of visibleAreas) {
-			const label = document.createElementNS(zoneLabels.namespaceURI, "text");
-			label.setAttribute("class", "zone-label");
-			label.setAttribute("x", String((area.bounds.minX + area.bounds.maxX) / 2));
-			label.setAttribute("y", String((area.bounds.minY + area.bounds.maxY) / 2));
-			label.textContent = area.label;
-			zoneLabels.append(label);
-		}
-	}
-
-	function updateZoneLabelScale() {
-		if (!image.naturalWidth || mapStage.clientWidth <= 0) {
+		const bitmapScale = Math.max(1, window.devicePixelRatio || 1) * view.scale;
+		zoneLabels.width = Math.max(1, Math.round(stageWidth * bitmapScale));
+		zoneLabels.height = Math.max(1, Math.round(stageHeight * bitmapScale));
+		const context = zoneLabels.getContext("2d");
+		if (!context || stageWidth <= 0 || stageHeight <= 0) {
 			return;
 		}
-		const renderedScale = (mapStage.clientWidth / image.naturalWidth) * view.scale;
-		zoneLabels.style.setProperty("--zone-label-font-size", `${9 / renderedScale}px`);
-		zoneLabels.style.setProperty("--zone-label-stroke-width", `${2 / renderedScale}px`);
+		context.setTransform(bitmapScale, 0, 0, bitmapScale, 0, 0);
+		context.clearRect(0, 0, stageWidth, stageHeight);
+		context.font = `${600} ${9 / view.scale}px system-ui, sans-serif`;
+		context.textAlign = "center";
+		context.textBaseline = "middle";
+		context.lineJoin = "round";
+		context.lineWidth = 2 / view.scale;
+		context.strokeStyle = "rgb(255 255 255 / 90%)";
+		context.fillStyle = "#263b4a";
+		for (const area of visibleAreas) {
+			const x = ((area.bounds.minX + area.bounds.maxX) / 2 / image.naturalWidth) * stageWidth;
+			const y = ((area.bounds.minY + area.bounds.maxY) / 2 / image.naturalHeight) * stageHeight;
+			context.strokeText(area.label, x, y);
+			context.fillText(area.label, x, y);
+		}
 	}
 
 	function fitMapStage() {
@@ -275,14 +287,18 @@
 		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
 		mapStage.style.width = `${Math.max(1, Math.floor(image.naturalWidth * ratio))}px`;
 		mapStage.style.height = `${Math.max(1, Math.floor(image.naturalHeight * ratio))}px`;
-		updateZoneLabelScale();
+		renderZoneLabels();
 	}
 
-	function setSource(source) {
+	function setSource(source, priority) {
 		if (!source || source === currentSource || source === pendingSource) {
 			return;
 		}
+		if (priority < currentSourcePriority || priority < pendingSourcePriority) {
+			return;
+		}
 		pendingSource = source;
+		pendingSourcePriority = priority;
 		const displaySource = withoutEmbeddedZoneLabels(source);
 		const preload = new window.Image();
 		preload.decoding = "async";
@@ -294,22 +310,25 @@
 				} catch {
 					// The load event already proves that the browser can display this source.
 				}
-				if (pendingSource !== source) {
+				if (pendingSource !== source || pendingSourcePriority !== priority) {
 					return;
 				}
 				image.src = displaySource;
 				currentSource = source;
+				currentSourcePriority = priority;
 				pendingSource = "";
+				pendingSourcePriority = 0;
 			},
 			{ once: true },
 		);
 		preload.addEventListener(
 			"error",
 			() => {
-				if (pendingSource !== source) {
+				if (pendingSource !== source || pendingSourcePriority !== priority) {
 					return;
 				}
 				pendingSource = "";
+				pendingSourcePriority = 0;
 				if (!currentSource) {
 					empty.textContent = "The live map image could not be displayed.";
 					empty.hidden = false;
@@ -340,10 +359,10 @@
 		try {
 			applyBackgroundColor(stateValue(await readState(backgroundColorStateId)));
 			await refreshInteraction();
-			for (const id of imageStateIds) {
+			for (const [index, id] of imageStateIds.entries()) {
 				const source = safeImageSource(stateValue(await readState(id)));
 				if (source) {
-					setSource(source);
+					setSource(source, imageStateIds.length - index);
 					return;
 				}
 			}
@@ -361,7 +380,7 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
-		updateZoneLabelScale();
+		renderZoneLabels();
 	}
 
 	function zoom(factor) {
@@ -439,13 +458,14 @@
 	}
 
 	image.addEventListener("load", () => {
+		mapStage.classList.add("is-visible");
 		fitMapStage();
 		renderZoneLabels();
-		mapStage.classList.add("is-visible");
 		empty.hidden = true;
 	});
 	image.addEventListener("error", () => {
 		currentSource = "";
+		currentSourcePriority = 0;
 		mapStage.classList.remove("is-visible");
 		empty.textContent = "The live map image could not be displayed.";
 		empty.hidden = false;
@@ -586,7 +606,7 @@
 			}
 			const source = safeImageSource(stateValue(state));
 			if (source) {
-				setSource(source);
+				setSource(source, id === preferredImageStateId ? 2 : 1);
 			}
 		});
 	} catch {

@@ -81,10 +81,18 @@ inferred cleaning activity, a failed command, or an unrelated initial docked
 state does not clear the selection. This keeps completed zones from remaining
 highlighted without weakening the protections against premature trail resets.
 
-Zone labels are projected as a persistent SVG text layer whose view box uses
-the exact live-map pixel coordinates. The layer shares all fit, zoom, and pan
-transforms with the map image. Labels use text with a contrast stroke only;
-they do not introduce a separate background or frame.
+Zone labels are projected into a persistent transparent canvas whose drawing
+coordinates are derived from the exact live-map pixels and current fitted
+stage size. The layer shares all zoom and pan transforms with the map image but
+is redrawn only when geometry, stage size, or zoom changes, not for every map
+frame. Its bitmap resolution accounts for the device pixel ratio and zoom while
+the visible text size remains stable. Labels use text with a contrast stroke
+only; they do not introduce a separate background or frame.
+
+The viewer treats animated SVG as its preferred image source and PNG only as a
+fallback. A lower-priority PNG update cannot replace a loaded or pending SVG.
+This prevents the socket update sequence and polling fallback from making the
+viewer oscillate between both representations of the same map frame.
 
 ## Consequences
 
