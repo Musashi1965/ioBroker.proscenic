@@ -92,13 +92,18 @@ viewer removes the marked SVG label elements from its frequently changing
 image and renders the same bounded labels as a separate map-stage overlay.
 That overlay shares the map transform and survives image swaps, so it remains
 aligned during fit, pan, and zoom without being repainted for every robot pose.
-The persistent label layer is an SVG with the same immutable source-image
-`viewBox` as the map. Every label uses the original map-space center coordinates
-directly, so responsive resizing, pan, and zoom apply the same coordinate
-transformation as the zone image without an intermediate HTML percentage
-layout. The viewer also assigns the label SVG the exact fitted map-stage width
-and height after every resize. This avoids divergent HTML/SVG percentage
-positioning in embedded Safari and VIS browser runtimes.
+The persistent label layer is a transparent canvas whose backing store follows
+the fitted map stage and the browser pixel ratio. Every label center is
+projected directly from original map coordinates into the displayed map stage;
+the canvas is redrawn only when its geometry, zone data, visibility, or zoom
+changes. This avoids both the earlier HTML percentage layout and Safari's
+divergent positioning of dynamically created inline-SVG text nodes while
+keeping the text centered and free of a label box.
+For the preferred SVG source the viewer derives the immutable map dimensions
+from the bounded root `viewBox` instead of trusting browser-specific intrinsic
+image sizing. PNG fallback dimensions come from the successfully preloaded
+image. The same dimensions drive map fitting, label projection, and pointer
+hit testing.
 Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
 stored zone-cleaning selection untouched. In the interactive viewer it also
 disables click selection and hides the contextual start action. ADR 0021

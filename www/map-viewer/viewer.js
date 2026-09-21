@@ -6,7 +6,9 @@
 	const MAX_IMAGE_SOURCE_LENGTH = 512 * 1024;
 	const MAX_ZONE_COUNT = 20;
 	const POLL_INTERVAL_MS = 5000;
-	const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+	const MAX_CANVAS_PIXEL_RATIO = 3;
+	const ZONE_LABEL_FONT_SIZE = 9;
+	const ZONE_LABEL_STROKE_WIDTH = 2;
 	const params = new URLSearchParams(window.location.search);
 	const requestedInstance = Number(params.get("instance"));
 	const instance = Number.isSafeInteger(requestedInstance) && requestedInstance >= 0 ? requestedInstance : 0;
@@ -43,6 +45,8 @@
 	let loading = false;
 	let currentSource = "";
 	let currentSourcePriority = 0;
+	let currentMapWidth = 0;
+	let currentMapHeight = 0;
 	let pendingSource = "";
 	let pendingSourcePriority = 0;
 	let pointer;
@@ -97,6 +101,25 @@
 			return `${prefix}${window.btoa(stripped)}`;
 		} catch {
 			return source;
+		}
+	}
+
+	function svgSourceDimensions(source) {
+		const prefix = "data:image/svg+xml;base64,";
+		if (!source.startsWith(prefix)) {
+			return undefined;
+		}
+		try {
+			const decoded = window.atob(source.slice(prefix.length));
+			const match = decoded.match(/<svg\b[^>]*\bviewBox="0 0 ([0-9]+(?:\.[0-9]+)?) ([0-9]+(?:\.[0-9]+)?)"/u);
+			if (!match) {
+				return undefined;
+			}
+			const width = Number(match[1]);
+			const height = Number(match[2]);
+			return width > 0 && height > 0 && width <= 4096 && height <= 4096 ? { width, height } : undefined;
+		} catch {
+			return undefined;
 		}
 	}
 
@@ -246,55 +269,65 @@
 	}
 
 	function renderZoneLabels() {
-		const visibleAreas =
-			showZoneOverlays && image.naturalWidth && image.naturalHeight ? zoneAreas.filter(area => area.label) : [];
+		const stageWidth = mapStage.clientWidth;
+		const stageHeight = mapStage.clientHeight;
+		const sourceWidth = currentMapWidth;
+		const sourceHeight = currentMapHeight;
+		const visibleAreas = showZoneOverlays ? zoneAreas.filter(area => area.label) : [];
+		const pixelRatio = Math.min(MAX_CANVAS_PIXEL_RATIO, Math.max(1, window.devicePixelRatio || 1));
 		const signature = JSON.stringify({
-			width: image.naturalWidth,
-			height: image.naturalHeight,
+			stageWidth,
+			stageHeight,
+			sourceWidth,
+			sourceHeight,
+			pixelRatio,
+			scale: view.scale,
 			areas: visibleAreas,
 		});
 		if (signature === renderedZoneLabelsSignature) {
 			return;
 		}
 		renderedZoneLabelsSignature = signature;
-		zoneLabels.setAttribute("viewBox", `0 0 ${image.naturalWidth} ${image.naturalHeight}`);
-		const fragment = document.createDocumentFragment();
-		for (const area of visibleAreas) {
-			const label = document.createElementNS(SVG_NAMESPACE, "text");
-			label.setAttribute("class", "zone-label");
-			label.setAttribute("x", String(area.center.x));
-			label.setAttribute("y", String(area.center.y));
-			label.textContent = area.label;
-			fragment.append(label);
-		}
-		zoneLabels.replaceChildren(fragment);
-	}
-
-	function updateZoneLabelTypography() {
-		if (!image.naturalWidth || mapStage.clientWidth <= 0) {
+		zoneLabels.width = Math.max(1, Math.round(stageWidth * pixelRatio));
+		zoneLabels.height = Math.max(1, Math.round(stageHeight * pixelRatio));
+		const context = zoneLabels.getContext("2d");
+		if (!context || stageWidth <= 0 || stageHeight <= 0) {
 			return;
 		}
-		const displayedPixelsPerSourceUnit = (mapStage.clientWidth / image.naturalWidth) * view.scale;
-		mapStage.style.setProperty("--zone-label-font-size", `${9 / displayedPixelsPerSourceUnit}px`);
-		mapStage.style.setProperty("--zone-label-stroke-width", `${2 / displayedPixelsPerSourceUnit}px`);
+		context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+		context.clearRect(0, 0, stageWidth, stageHeight);
+		if (!sourceWidth || !sourceHeight || visibleAreas.length === 0) {
+			return;
+		}
+		const scaleX = stageWidth / sourceWidth;
+		const scaleY = stageHeight / sourceHeight;
+		context.fillStyle = "#263b4a";
+		context.strokeStyle = "rgb(255 255 255 / 90%)";
+		context.lineJoin = "round";
+		context.lineWidth = ZONE_LABEL_STROKE_WIDTH / view.scale;
+		context.font = `600 ${ZONE_LABEL_FONT_SIZE / view.scale}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+		context.textAlign = "center";
+		context.textBaseline = "middle";
+		for (const area of visibleAreas) {
+			const x = area.center.x * scaleX;
+			const y = area.center.y * scaleY;
+			context.strokeText(area.label, x, y);
+			context.fillText(area.label, x, y);
+		}
 	}
 
 	function fitMapStage() {
-		if (!image.naturalWidth || !image.naturalHeight) {
+		if (!currentMapWidth || !currentMapHeight) {
 			return;
 		}
 		const availableWidth = Math.max(1, viewport.clientWidth - 24);
 		const availableHeight = Math.max(1, viewport.clientHeight - 24);
-		const ratio = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
-		const stageWidth = Math.max(1, Math.floor(image.naturalWidth * ratio));
-		const stageHeight = Math.max(1, Math.floor(image.naturalHeight * ratio));
+		const ratio = Math.min(availableWidth / currentMapWidth, availableHeight / currentMapHeight);
+		const stageWidth = Math.max(1, Math.floor(currentMapWidth * ratio));
+		const stageHeight = Math.max(1, Math.floor(currentMapHeight * ratio));
 		mapStage.style.width = `${stageWidth}px`;
 		mapStage.style.height = `${stageHeight}px`;
-		zoneLabels.style.width = `${stageWidth}px`;
-		zoneLabels.style.height = `${stageHeight}px`;
-		zoneLabels.setAttribute("width", String(stageWidth));
-		zoneLabels.setAttribute("height", String(stageHeight));
-		updateZoneLabelTypography();
+		renderZoneLabels();
 	}
 
 	function setSource(source, priority) {
@@ -307,6 +340,7 @@
 		pendingSource = source;
 		pendingSourcePriority = priority;
 		const displaySource = withoutEmbeddedZoneLabels(source);
+		const declaredDimensions = svgSourceDimensions(source);
 		const preload = new window.Image();
 		preload.decoding = "async";
 		preload.addEventListener(
@@ -320,6 +354,8 @@
 				if (pendingSource !== source || pendingSourcePriority !== priority) {
 					return;
 				}
+				currentMapWidth = declaredDimensions?.width ?? preload.naturalWidth;
+				currentMapHeight = declaredDimensions?.height ?? preload.naturalHeight;
 				image.src = displaySource;
 				currentSource = source;
 				currentSourcePriority = priority;
@@ -387,7 +423,7 @@
 
 	function applyTransform() {
 		mapStage.style.transform = `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`;
-		updateZoneLabelTypography();
+		renderZoneLabels();
 	}
 
 	function zoom(factor) {
@@ -407,7 +443,7 @@
 	}
 
 	function zoneAtPointer(event) {
-		if (!image.naturalWidth || !image.naturalHeight) {
+		if (!currentMapWidth || !currentMapHeight) {
 			return undefined;
 		}
 		const rect = mapStage.getBoundingClientRect();
@@ -421,8 +457,8 @@
 		) {
 			return undefined;
 		}
-		const x = ((event.clientX - rect.left) / rect.width) * image.naturalWidth;
-		const y = ((event.clientY - rect.top) / rect.height) * image.naturalHeight;
+		const x = ((event.clientX - rect.left) / rect.width) * currentMapWidth;
+		const y = ((event.clientY - rect.top) / rect.height) * currentMapHeight;
 		return zoneAreas
 			.filter(
 				area =>
@@ -473,6 +509,8 @@
 	image.addEventListener("error", () => {
 		currentSource = "";
 		currentSourcePriority = 0;
+		currentMapWidth = 0;
+		currentMapHeight = 0;
 		mapStage.classList.remove("is-visible");
 		empty.textContent = "The live map image could not be displayed.";
 		empty.hidden = false;
