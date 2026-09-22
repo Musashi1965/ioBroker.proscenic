@@ -30,6 +30,7 @@ export interface LiveMapRenderOptions {
 	backgroundColor?: string;
 	animateRobot?: boolean;
 	showZoneOverlays?: boolean;
+	showForbiddenOverlays?: boolean;
 	selectedZoneIds?: readonly number[];
 }
 
@@ -227,6 +228,7 @@ export function renderLiveMapImage20002(
 		sample,
 		basePixels,
 		options.showZoneOverlays !== false,
+		options.showForbiddenOverlays !== false,
 		new Set(options.selectedZoneIds ?? []),
 	);
 	const runtime = drawRobotRuntime(sample, occupancy, basePixels, poses);
@@ -445,11 +447,18 @@ function drawCoordinateMetadata(
 	sample: MapSample,
 	pixels: Buffer,
 	showZoneOverlays: boolean,
+	showForbiddenOverlays: boolean,
 	selectedZoneIds: ReadonlySet<number>,
 ): { renderedForbiddenAreaCount: number; renderedZoneAreaCount: number; renderedRoomAreaCount: number } {
 	let renderedForbiddenAreaCount = 0;
 	let renderedZoneAreaCount = 0;
-	for (const area of showZoneOverlays ? sample.areas : []) {
+	for (const area of sample.areas) {
+		if (area.kind === "zone" && !showZoneOverlays) {
+			continue;
+		}
+		if (area.kind === "forbidden" && !showForbiddenOverlays) {
+			continue;
+		}
 		const projected = area.vertices
 			.map(vertex => projectRobotCoordinate(sample, vertex))
 			.filter((vertex): vertex is [number, number] => vertex !== undefined);

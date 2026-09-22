@@ -33,6 +33,8 @@ describe("initial object definitions", () => {
 				definition.id === "map.live.canvasBackgroundColor" ||
 				definition.id === "map.live.mapBackgroundColor" ||
 				definition.id === "map.live.showZoneOverlays" ||
+				definition.id === "map.live.showForbiddenOverlays" ||
+				definition.id === "safety.forbiddenZoneProtection" ||
 				definition.id === "commands.zones.selectedIds"
 			) {
 				expect(definition.object.common.write, definition.id).to.equal(true);
@@ -101,6 +103,11 @@ describe("initial object definitions", () => {
 		expect(ids).to.include("commands.zones.available");
 		expect(ids).to.include("commands.zones.selectedIds");
 		expect(ids).to.include("commands.zones.start");
+		expect(ids).to.include("safety.forbiddenZoneProtection");
+		expect(ids).to.include("safety.forbiddenZoneKnown");
+		expect(ids).to.include("safety.forbiddenZoneCount");
+		expect(ids).to.include("safety.forbiddenZoneMapId");
+		expect(ids).to.include("safety.lastBlockReason");
 		expect(ids).to.include("commands.queueDepth");
 		expect(ids).to.include("commands.lastApiLatencyMs");
 		expect(ids).to.include("commands.lastConfirmationLatencyMs");
@@ -123,6 +130,8 @@ describe("initial object definitions", () => {
 			"map.live.mapBackgroundColor",
 			"map.live.backgroundColor",
 			"map.live.showZoneOverlays",
+			"map.live.showForbiddenOverlays",
+			"safety.forbiddenZoneProtection",
 			"commands.zones.selectedIds",
 		]);
 		expect(ids).to.include("device.onlineUpdated");
@@ -144,7 +153,11 @@ describe("initial object definitions", () => {
 				expect(definition.object.common.write, definition.id).to.equal(true);
 				continue;
 			}
-			if (definition.id === "map.live.showZoneOverlays") {
+			if (
+				definition.id === "map.live.showZoneOverlays" ||
+				definition.id === "map.live.showForbiddenOverlays" ||
+				definition.id === "safety.forbiddenZoneProtection"
+			) {
 				expect(definition.object.common.role, definition.id).to.equal("switch");
 				expect(definition.object.common.read, definition.id).to.equal(true);
 				expect(definition.object.common.write, definition.id).to.equal(true);

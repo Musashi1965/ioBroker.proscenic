@@ -406,7 +406,7 @@ describe("live map rendering", () => {
 		expect(pixelAt(pixels, width, 1, 0)).to.deep.equal([221, 221, 221]);
 	});
 
-	it("can hide zone and forbidden-area overlays without removing their catalog summary", () => {
+	it("can hide selectable-zone overlays without removing their catalog summary or forbidden areas", () => {
 		const grid = Buffer.alloc(25, 127);
 		const image = renderLiveMapImage20002(
 			{
@@ -427,14 +427,66 @@ describe("live map rendering", () => {
 							[50, 150],
 						],
 					},
+					{
+						id: 1002,
+						__proscenicKind: "forbidden",
+						vertexs: [
+							[50, 50],
+							[150, 50],
+							[150, 150],
+							[50, 150],
+						],
+					},
 				],
 			},
 			[],
 			{ showZoneOverlays: false },
 		);
 
-		expect(image?.areas).to.have.length(1);
+		expect(image?.areas).to.have.length(2);
 		expect(image?.renderedZoneAreaCount).to.equal(0);
+		expect(image?.renderedForbiddenAreaCount).to.equal(1);
+	});
+
+	it("can hide forbidden-area overlays separately from selectable zones", () => {
+		const grid = Buffer.alloc(25, 127);
+		const image = renderLiveMapImage20002(
+			{
+				map: encodeLiteralOnlyLz4(grid).toString("base64"),
+				width: 5,
+				height: 5,
+				resolution: 0.05,
+				x_min: 0,
+				y_min: 0,
+				area: [
+					{
+						id: 1001,
+						__proscenicKind: "zone",
+						vertexs: [
+							[50, 50],
+							[150, 50],
+							[150, 150],
+							[50, 150],
+						],
+					},
+					{
+						id: 1002,
+						__proscenicKind: "forbidden",
+						vertexs: [
+							[250, 250],
+							[350, 250],
+							[350, 350],
+							[250, 350],
+						],
+					},
+				],
+			},
+			[],
+			{ showForbiddenOverlays: false },
+		);
+
+		expect(image?.areas).to.have.length(2);
+		expect(image?.renderedZoneAreaCount).to.equal(1);
 		expect(image?.renderedForbiddenAreaCount).to.equal(0);
 	});
 

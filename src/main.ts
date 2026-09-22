@@ -60,6 +60,7 @@ import {
 	projectDevice,
 	projectConsumableResetProgress,
 	projectConsumables,
+	projectForbiddenZoneSafety,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
 	projectMapZoneCatalogReadSuccess,
@@ -67,6 +68,7 @@ import {
 	projectMaintenanceHistory,
 	projectMaintenanceMessage,
 	projectRobotActivity,
+	projectSafetyBlock,
 	projectStatus,
 	projectZoneCleaningCatalog,
 	redactedErrorMessage,
@@ -130,6 +132,15 @@ interface PendingCommandConfirmation {
 	resolve: (latencyMs: number | undefined) => void;
 }
 
+class SafetyBlockError extends Error {
+	public constructor(
+		public readonly command: string,
+		public readonly reason: string,
+	) {
+		super(`Forbidden-zone protection blocked ${command}: ${reason}`);
+	}
+}
+
 class Proscenic extends utils.Adapter {
 	private gatewayClient: ProscenicGatewayClient | undefined;
 	private reconnectTimer: ioBroker.Timeout | undefined;
@@ -175,6 +186,8 @@ class Proscenic extends utils.Adapter {
 	private liveMapCanvasBackgroundColor = DEFAULT_LIVE_MAP_CANVAS_BACKGROUND_COLOR;
 	private liveMapMapBackgroundColor = DEFAULT_LIVE_MAP_BACKGROUND_COLOR;
 	private liveMapShowZoneOverlays = true;
+	private liveMapShowForbiddenOverlays = true;
+	private forbiddenZoneProtection = true;
 	private selectedZoneIds: number[] = [];
 	private zoneCleaningCompletionPending = false;
 	private zoneCleaningActivityObserved = false;
@@ -211,6 +224,7 @@ class Proscenic extends utils.Adapter {
 		await initializeLiveMapAreaStates(this);
 		await projectLiveMapViewerUrl(this);
 		await this.initializeLiveMapColors();
+		await this.initializeForbiddenZoneSafety();
 		await this.initializeZoneCleaningControls();
 		this.subscribeStates("commands.*");
 		this.subscribeStates("consumables.*.reset");
@@ -218,6 +232,8 @@ class Proscenic extends utils.Adapter {
 		this.subscribeStates("map.live.canvasBackgroundColor");
 		this.subscribeStates("map.live.mapBackgroundColor");
 		this.subscribeStates("map.live.showZoneOverlays");
+		this.subscribeStates("map.live.showForbiddenOverlays");
+		this.subscribeStates("safety.forbiddenZoneProtection");
 
 		if (!this.config.username || !this.config.password) {
 			await setDeviceListDiagnostics(this, 0, "not-configured");
@@ -530,6 +546,7 @@ class Proscenic extends utils.Adapter {
 				this.rejectPendingMapZoneCatalogRead(error);
 				await setMapZoneCatalogReadFailure(this, error);
 				await projectZoneCleaningCatalog(this, zoneCleaningOptions(this.latestMapCoordinateMetadata), false);
+				await projectForbiddenZoneSafety(this, 0, this.latestMapId);
 				return;
 			}
 			if (this.latestMapId !== undefined && catalog.mapId !== this.latestMapId) {
@@ -537,6 +554,7 @@ class Proscenic extends utils.Adapter {
 				this.rejectPendingMapZoneCatalogRead(error);
 				await setMapZoneCatalogReadFailure(this, error);
 				await projectZoneCleaningCatalog(this, [], false);
+				await projectForbiddenZoneSafety(this, 0, catalog.mapId);
 				return;
 			}
 
@@ -545,6 +563,7 @@ class Proscenic extends utils.Adapter {
 			this.hasLoadedMapZoneCatalog = true;
 			this.resolvePendingMapZoneCatalogRead(catalog);
 			await projectMapZoneCatalogReadSuccess(this, this.latestMapZoneCatalogCount);
+			await this.projectForbiddenZoneSafetyState(catalog);
 			const options = zoneCleaningOptions(catalog);
 			await projectZoneCleaningCatalog(
 				this,
@@ -597,6 +616,7 @@ class Proscenic extends utils.Adapter {
 					mapChanged = true;
 					await initializeLiveMapAreaStates(this);
 					await projectZoneCleaningCatalog(this, [], false);
+					await projectForbiddenZoneSafety(this, 0, map.mapId);
 				}
 				if (map.pathId !== undefined) {
 					this.latestMapPathId = map.pathId;
@@ -620,6 +640,7 @@ class Proscenic extends utils.Adapter {
 						zoneOptions.length > 0 &&
 						this.latestMapCoordinateMetadata?.mapId === this.latestMapId,
 				);
+				await this.projectForbiddenZoneSafetyState();
 			}
 			this.latestMapData = data;
 			await this.projectLatestLiveMapImage("map");
@@ -714,6 +735,7 @@ class Proscenic extends utils.Adapter {
 		} catch (error) {
 			await setMapZoneCatalogReadFailure(this, error);
 			await projectZoneCleaningCatalog(this, zoneCleaningOptions(this.latestMapCoordinateMetadata), false);
+			await this.projectForbiddenZoneSafetyState(undefined);
 			this.log.debug(`Could not refresh Proscenic map zones: ${redactedErrorMessage(error)}`);
 		}
 	}
@@ -951,6 +973,7 @@ class Proscenic extends utils.Adapter {
 				mapBackgroundColor: this.liveMapMapBackgroundColor,
 				animateRobot: renderReason === "pose",
 				showZoneOverlays: this.liveMapShowZoneOverlays,
+				showForbiddenOverlays: this.liveMapShowForbiddenOverlays,
 				selectedZoneIds: this.selectedZoneIds,
 			});
 			if (image) {
@@ -1008,6 +1031,14 @@ class Proscenic extends utils.Adapter {
 		}
 		if (relativeId === "map.live.showZoneOverlays") {
 			void this.setLiveMapShowZoneOverlays(state.val);
+			return;
+		}
+		if (relativeId === "map.live.showForbiddenOverlays") {
+			void this.setLiveMapShowForbiddenOverlays(state.val);
+			return;
+		}
+		if (relativeId === "safety.forbiddenZoneProtection") {
+			void this.setForbiddenZoneProtection(state.val);
 			return;
 		}
 		if (relativeId === "commands.zones.selectedIds") {
@@ -1167,6 +1198,7 @@ class Proscenic extends utils.Adapter {
 
 			await this.setStateAsync("commands.lastResult", { val: "validating-zones", ack: true });
 			const catalog = await this.requestMapZoneCatalog(session);
+			await this.ensureForbiddenZoneProtection("zoneCleaning", catalog);
 			const selection = validateZoneCleaningSelection(zoneIds, this.latestMapId, catalog);
 			const request = buildZoneCleaningRequest(selection, session.serial, session.username);
 
@@ -1216,6 +1248,41 @@ class Proscenic extends utils.Adapter {
 		}
 	}
 
+	private async ensureForbiddenZoneProtection(
+		command: "start" | "deepCleaning" | "zoneCleaning",
+		catalog: LiveMapCoordinateMetadata,
+	): Promise<void> {
+		const forbiddenCount = this.forbiddenZoneCount(catalog);
+		await projectForbiddenZoneSafety(this, forbiddenCount, catalog.mapId);
+		if (!this.forbiddenZoneProtection) {
+			return;
+		}
+		if (this.latestMapId === undefined) {
+			await this.blockForForbiddenZoneProtection(command, "safety-blocked-no-active-map");
+		}
+		if (catalog.mapId !== this.latestMapId) {
+			await this.blockForForbiddenZoneProtection(command, "safety-blocked-map-mismatch");
+		}
+		if (forbiddenCount <= 0) {
+			await this.blockForForbiddenZoneProtection(command, "safety-blocked-no-forbidden-zone");
+		}
+	}
+
+	private async blockForForbiddenZoneProtection(command: string, reason: string): Promise<never> {
+		await projectSafetyBlock(this, reason);
+		throw new SafetyBlockError(command, reason);
+	}
+
+	private forbiddenZoneCount(catalog: LiveMapCoordinateMetadata | undefined): number {
+		return (catalog?.area ?? []).filter(area => area.kind === "forbidden").length;
+	}
+
+	private async projectForbiddenZoneSafetyState(catalog = this.latestMapCoordinateMetadata): Promise<void> {
+		const mapId = catalog?.mapId ?? this.latestMapId;
+		const count = catalog?.mapId === this.latestMapId ? this.forbiddenZoneCount(catalog) : 0;
+		await projectForbiddenZoneSafety(this, count, mapId);
+	}
+
 	private async sendConsumableReset(
 		session: CommandSession,
 		component: ConsumableComponent,
@@ -1248,6 +1315,12 @@ class Proscenic extends utils.Adapter {
 			const session = await this.waitForCommandSession();
 			if (!this.commandEnabled) {
 				throw new Error("Proscenic commands are not enabled for the selected device");
+			}
+
+			if (command === "start" || command === "deepCleaning") {
+				await this.setStateAsync("commands.lastResult", { val: "validating-safety", ack: true });
+				const catalog = await this.requestMapZoneCatalog(session);
+				await this.ensureForbiddenZoneProtection(command, catalog);
 			}
 
 			await this.setStateAsync("commands.lastResult", { val: "sending", ack: true });
@@ -1283,7 +1356,9 @@ class Proscenic extends utils.Adapter {
 			}
 		} catch (error) {
 			this.cancelPendingCommandConfirmation();
-			this.recoverCommandSessionAfterFailure();
+			if (!(error instanceof SafetyBlockError)) {
+				this.recoverCommandSessionAfterFailure();
+			}
 			await this.setCommandFailure(stateId, command, error);
 		}
 	}
@@ -1386,7 +1461,10 @@ class Proscenic extends utils.Adapter {
 	private async setCommandFailure(stateId: string, command: ConfirmableRobotCommand, error: unknown): Promise<void> {
 		const message = redactedErrorMessage(error);
 		await this.setStateAsync("commands.lastCommand", { val: command, ack: true });
-		await this.setStateAsync("commands.lastResult", { val: "failed", ack: true });
+		await this.setStateAsync("commands.lastResult", {
+			val: error instanceof SafetyBlockError ? "safety-blocked" : "failed",
+			ack: true,
+		});
 		await this.setStateAsync("commands.lastError", { val: message, ack: true });
 		await this.setStateAsync("commands.lastExecution", { val: new Date().toISOString(), ack: true });
 		await this.setStateAsync(stateId, { val: false, ack: true });
@@ -1438,7 +1516,24 @@ class Proscenic extends utils.Adapter {
 		this.liveMapShowZoneOverlays = showZoneOverlays ?? true;
 		await this.setStateAsync("map.live.showZoneOverlays", { val: this.liveMapShowZoneOverlays, ack: true });
 
+		const currentShowForbiddenOverlays = await this.getStateAsync("map.live.showForbiddenOverlays");
+		const showForbiddenOverlays = normalizeCommandButtonValue(currentShowForbiddenOverlays?.val);
+		this.liveMapShowForbiddenOverlays = showForbiddenOverlays ?? true;
+		await this.setStateAsync("map.live.showForbiddenOverlays", {
+			val: this.liveMapShowForbiddenOverlays,
+			ack: true,
+		});
+
 		await this.deleteObsoleteLiveMapRoomColor();
+	}
+
+	private async initializeForbiddenZoneSafety(): Promise<void> {
+		const currentProtection = await this.getStateAsync("safety.forbiddenZoneProtection");
+		const protection = normalizeCommandButtonValue(currentProtection?.val);
+		this.forbiddenZoneProtection = protection ?? true;
+		await this.setStateAsync("safety.forbiddenZoneProtection", { val: this.forbiddenZoneProtection, ack: true });
+		await this.projectForbiddenZoneSafetyState();
+		await this.setStateAsync("safety.lastBlockReason", { val: "", ack: true });
 	}
 
 	private async initializeZoneCleaningControls(): Promise<void> {
@@ -1513,6 +1608,37 @@ class Proscenic extends utils.Adapter {
 		this.liveMapShowZoneOverlays = normalized;
 		await this.setStateAsync("map.live.showZoneOverlays", { val: normalized, ack: true });
 		await this.projectLatestLiveMapImage("map");
+	}
+
+	private async setLiveMapShowForbiddenOverlays(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeCommandButtonValue(value);
+		if (normalized === undefined) {
+			await this.setStateAsync("map.live.showForbiddenOverlays", {
+				val: this.liveMapShowForbiddenOverlays,
+				ack: true,
+			});
+			this.log.warn("Ignoring invalid live map forbidden-overlay switch value.");
+			return;
+		}
+
+		this.liveMapShowForbiddenOverlays = normalized;
+		await this.setStateAsync("map.live.showForbiddenOverlays", { val: normalized, ack: true });
+		await this.projectLatestLiveMapImage("map");
+	}
+
+	private async setForbiddenZoneProtection(value: ioBroker.StateValue | undefined): Promise<void> {
+		const normalized = normalizeCommandButtonValue(value);
+		if (normalized === undefined) {
+			await this.setStateAsync("safety.forbiddenZoneProtection", {
+				val: this.forbiddenZoneProtection,
+				ack: true,
+			});
+			this.log.warn("Ignoring invalid forbidden-zone protection switch value.");
+			return;
+		}
+
+		this.forbiddenZoneProtection = normalized;
+		await this.setStateAsync("safety.forbiddenZoneProtection", { val: normalized, ack: true });
 	}
 
 	private async setSelectedZoneIds(value: ioBroker.StateValue | undefined): Promise<void> {

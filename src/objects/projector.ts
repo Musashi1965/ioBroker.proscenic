@@ -67,6 +67,22 @@ export async function projectZoneCleaningCatalog(
 	await adapter.setStateAsync("capabilities.zoneCleaning", { val: available, ack: true });
 }
 
+export async function projectForbiddenZoneSafety(
+	adapter: ioBroker.Adapter,
+	count: number,
+	mapId: number | undefined,
+): Promise<void> {
+	await adapter.setStateAsync("safety.forbiddenZoneKnown", { val: count > 0, ack: true });
+	await adapter.setStateAsync("safety.forbiddenZoneCount", { val: count, ack: true });
+	await adapter.setStateAsync("safety.forbiddenZoneMapId", { val: mapId ?? 0, ack: true });
+	await adapter.setStateAsync("safety.lastCheck", { val: new Date().toISOString(), ack: true });
+}
+
+export async function projectSafetyBlock(adapter: ioBroker.Adapter, reason: string): Promise<void> {
+	await adapter.setStateAsync("safety.lastBlockReason", { val: reason, ack: true });
+	await adapter.setStateAsync("safety.lastCheck", { val: new Date().toISOString(), ack: true });
+}
+
 const LIVE_MAP_VIEWER_REVISION = "20260921-5";
 
 export function liveMapViewerUrl(instance: number | undefined): string {

@@ -28,8 +28,17 @@ Expose the following objects:
 - `commands.zones.selectedIds`: a readable/writable JSON array of zone IDs;
 - `commands.zones.start`: a write-only boolean button;
 - `map.live.showZoneOverlays`: a readable/writable boolean VIS switch which
-  controls both selectable-zone and forbidden-area overlays without removing
-  the catalog or selection.
+  controls selectable-zone overlays and viewer click selection without removing
+  the catalog or selection;
+- `map.live.showForbiddenOverlays`: a readable/writable boolean VIS switch
+  which controls forbidden-area overlay rendering independently from selectable
+  zones;
+- `safety.forbiddenZoneProtection`: a readable/writable boolean switch which
+  requires a current forbidden area before adapter-initiated cleaning starts;
+- `safety.forbiddenZoneKnown`, `safety.forbiddenZoneCount`,
+  `safety.forbiddenZoneMapId`, `safety.lastBlockReason`, and
+  `safety.lastCheck`: read-only diagnostics for the latest forbidden-zone
+  safety evaluation.
 
 The selection state accepts a JSON numeric array and, for visualization
 compatibility, a comma-separated numeric list. The adapter acknowledges a
@@ -64,9 +73,23 @@ The viewer shows its zone-cleaning start action only when overlay selection is
 enabled, `capabilities.zoneCleaning` is true, and at least one selected ID is
 also present in the current `commands.zones.available` list. The compact action
 writes only to `commands.zones.start`; it does not bypass the adapter's fresh 21004
-validation or command queue. Turning the overlay switch off hides and disables
-the click targets and start action. It does not change upstream zones, map
-data, robot behavior, or silently clear a stored selection.
+validation or command queue. Turning the selectable-zone overlay switch off
+hides and disables the click targets and start action. It does not hide
+forbidden-area overlays. Turning the forbidden-area overlay switch off only
+changes the local image. Neither switch changes upstream zones, map data,
+robot behavior, or silently clears a stored selection.
+
+When `safety.forbiddenZoneProtection` is enabled, the adapter performs a fresh
+21004 catalog read before sending any adapter-initiated cleaning start
+(`commands.start`, `commands.deepCleaning`, or `commands.zones.start`). The
+adapter requires the catalog `mapId` to match the active map and at least one
+catalog entry with `kind=forbidden`. If that check fails, the adapter does not
+send the mutating REST command, sets `commands.lastResult` to
+`safety-blocked`, records the reason under `safety.lastBlockReason`, and leaves
+non-cleaning commands such as pause, return-to-dock, fan speed, and dust
+collection unaffected. This protects only commands sent through this adapter;
+the adapter cannot prevent starts issued directly by the vendor app, the robot,
+or another integration.
 
 The selected IDs are task-scoped UI state. After an active cleaning task has
 returned to the dock and the existing live-map lifecycle confirms a subsequent

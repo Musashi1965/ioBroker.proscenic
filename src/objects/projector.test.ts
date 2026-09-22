@@ -4,6 +4,7 @@ import {
 	projectConsumables,
 	projectConsumableResetProgress,
 	projectDevice,
+	projectForbiddenZoneSafety,
 	projectLiveMapImage,
 	projectLiveMapViewerUrl,
 	projectMapZoneCatalogReadSuccess,
@@ -11,6 +12,7 @@ import {
 	projectMapMetadata,
 	projectMaintenanceMessage,
 	projectRobotActivity,
+	projectSafetyBlock,
 	projectZoneCleaningCatalog,
 	redactedErrorMessage,
 	setConnectionState,
@@ -374,6 +376,27 @@ describe("projectLiveMapImage", () => {
 			ack: true,
 		});
 		expect(states.get("capabilities.zoneCleaning")).to.deep.equal({ val: true, ack: true });
+	});
+
+	it("publishes forbidden-zone safety diagnostics", async () => {
+		const states = new Map<string, ioBroker.SettableState>();
+		const adapter = {
+			setStateAsync: (id: string, state: ioBroker.SettableState) => {
+				states.set(id, state);
+				return Promise.resolve();
+			},
+		} as unknown as ioBroker.Adapter;
+
+		await projectForbiddenZoneSafety(adapter, 2, 42);
+		await projectSafetyBlock(adapter, "safety-blocked-no-forbidden-zone");
+
+		expect(states.get("safety.forbiddenZoneKnown")).to.deep.equal({ val: true, ack: true });
+		expect(states.get("safety.forbiddenZoneCount")).to.deep.equal({ val: 2, ack: true });
+		expect(states.get("safety.forbiddenZoneMapId")).to.deep.equal({ val: 42, ack: true });
+		expect(states.get("safety.lastBlockReason")).to.deep.equal({
+			val: "safety-blocked-no-forbidden-zone",
+			ack: true,
+		});
 	});
 
 	it("initializes and reports the authoritative 21004 zone catalog", async () => {

@@ -48,6 +48,7 @@ Expose an explicit experimental live-map image under:
 - `map.live.mapBackgroundColor`;
 - `map.live.backgroundColor`;
 - `map.live.showZoneOverlays`;
+- `map.live.showForbiddenOverlays`;
 - `map.live.renderReason`;
 - `map.live.lastPathId`;
 - `map.live.pathResetCount`;
@@ -77,8 +78,11 @@ writes. The adapter-owned pose trail uses a dedicated light-green overlay color
 instead of reusing the background, room, or wall colors. The pose trail is
 rendered wider than one pixel for VIS readability.
 
-`map.live.showZoneOverlays` controls whether saved selectable zones and
-forbidden-area polygons are drawn into the local image. The default is `true`.
+`map.live.showZoneOverlays` controls whether saved selectable zones are drawn
+into the local image and exposed as viewer click targets. The default is
+`true`. `map.live.showForbiddenOverlays` separately controls whether
+forbidden-area polygons are drawn into the local image. The default is also
+`true`.
 Unselected selectable zones use a transparent white fill and a stronger
 blue-gray boundary; zone IDs currently present in
 `commands.zones.selectedIds` use a transparent light-green fill.
@@ -104,10 +108,13 @@ from the bounded root `viewBox` instead of trusting browser-specific intrinsic
 image sizing. PNG fallback dimensions come from the successfully preloaded
 image. The same dimensions drive map fitting, label projection, and pointer
 hit testing.
-Turning the switch off leaves `map.live.areas`, the 21004 catalog, and the
-stored zone-cleaning selection untouched. In the interactive viewer it also
-disables click selection and hides the contextual start action. ADR 0021
-defines its writable and interaction semantics.
+Turning the selectable-zone switch off leaves `map.live.areas`, the 21004
+catalog, forbidden-area rendering, and the stored zone-cleaning selection
+untouched. In the interactive viewer it also disables click selection and hides
+the contextual start action. Turning the forbidden-area switch off affects only
+the local rendered image; it does not change upstream zones, map data, robot
+behavior, or the adapter's forbidden-zone safety diagnostics. ADR 0021 defines
+the writable and interaction semantics.
 
 `map.live.viewerUrl` contains the revisioned same-origin web-adapter path for
 the interactive viewer defined by ADR 0020. Its implementation-revision query
