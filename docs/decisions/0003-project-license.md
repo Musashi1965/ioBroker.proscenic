@@ -12,7 +12,8 @@ explicit boundary is needed to prevent accidental license contamination.
 ## Decision
 
 Release original software, documentation, and neutral examples under MIT with
-copyright attributed to `C@ptain Ch@os <butan_akrobat1t@icloud.com>`.
+copyright attributed to
+`C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>`.
 
 Use a provenance-first policy:
 

@@ -134,7 +134,7 @@
 			"uk": "Адаптер ioBroker для вакуумних роботів Proscenic, які використовують застарілий хмарний шлюз Proscenic",
 			"zh-cn": "使用传统 Proscenic 云网关的 Proscenic 真空机器人的 ioBroker 适配器"
 		},
-		"authors": ["C@ptain Ch@os <butan_akrobat1t@icloud.com>"],
+		"authors": ["C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>"],
 		"keywords": ["proscenic", "vacuum", "robot", "m7 pro"],
 		"licenseInformation": {
 			"type": "free",

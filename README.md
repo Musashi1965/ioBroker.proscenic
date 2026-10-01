@@ -93,6 +93,10 @@ Security policy and contribution requirements are documented in
 
 ### Unreleased
 
+- Replaced private maintainer e-mail metadata with the public GitHub noreply
+  address and added repository-maintenance files requested by ioBroker review
+  tooling.
+
 ### 0.3.0 (2026-09-20)
 
 - Added a derived robot activity state for dashboards and strengthened command
@@ -172,4 +176,4 @@ their respective owners.
 
 MIT License. See [LICENSE](LICENSE).
 
-Copyright (c) 2026 C@ptain Ch@os <butan_akrobat1t@icloud.com>
+Copyright (c) 2026 C@ptain Ch@os <223081183+Musashi1965@users.noreply.github.com>
